@@ -126,7 +126,7 @@ function Header() {
                         }}>
                             
                             {/* Mục 1: Xem trang cá nhân & Tài khoản */}
-                        <div 
+                        <div  
                             style={{...menuItemStyle, alignItems: "flex-start"}}
                             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f0f2f5"}
                             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}

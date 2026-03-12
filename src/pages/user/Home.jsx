@@ -288,6 +288,18 @@ function Home() {
         setActiveCommentMenu(null);
     };
 
+    const menuButtonStyle = {
+    padding: "12px 15px",
+    border: "none",
+    background: "white",
+    textAlign: "left",
+    cursor: "pointer",
+    fontSize: "14px",
+    borderBottom: "1px solid #eee",
+    fontWeight: "500",
+    transition: "background 0.2s"
+};
+
     return (
         <Layout>
             <div style={{ display: "flex", gap: "10px", marginBottom: "20px", alignItems: "center" }}>
@@ -326,39 +338,74 @@ function Home() {
                             •••
                         </span>
 
-                        {activePostMenu === post._id && currentUser && (currentUser._id == post.author_id || currentUser.id == post.author_id || currentUser._id == post.author) && (
+                        {activePostMenu === post._id && currentUser && (
                             <div 
-                            className="popup-menu"
-                            style={{
-                                position: "absolute",
-                                top: "25px", 
-                                right: "0",
-                                background: "white",
-                                border: "1px solid #ddd",
-                                borderRadius: "8px",
-                                boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
-                                width: "150px",
-                                zIndex: 10,
-                                display: "flex",
-                                flexDirection: "column",
-                                overflow: "hidden"
-                            }}>
-                                <button 
-                                    onClick={() => handleEditPost(post)}
-                                    style={{ padding: "10px", border: "none", background: "white", textAlign: "left", cursor: "pointer", fontSize: "14px", borderBottom: "1px solid #eee" }}
-                                    onMouseOver={(e) => e.target.style.background = "#f0f2f5"}
-                                    onMouseOut={(e) => e.target.style.background = "white"}
-                                >
-                                    ✏️ Sửa bài viết
-                                </button>
-                                <button 
-                                    onClick={() => handleDeletePost(post._id)}
-                                    style={{ padding: "10px", border: "none", background: "white", textAlign: "left", cursor: "pointer", fontSize: "14px", color: "#dc3545" }}
-                                    onMouseOver={(e) => e.target.style.background = "#f0f2f5"}
-                                    onMouseOut={(e) => e.target.style.background = "white"}
-                                >
-                                    🗑️ Xóa bài viết
-                                </button>
+                                className="popup-menu"
+                                style={{
+                                    position: "absolute",
+                                    top: "25px", 
+                                    right: "0",
+                                    background: "white",
+                                    border: "1px solid #ddd",
+                                    borderRadius: "8px",
+                                    boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
+                                    width: "170px",
+                                    zIndex: 10,
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    overflow: "hidden"
+                                }}
+                            >
+                                {(() => {
+                                    const myId = String(currentUser._id || currentUser.id || "");
+                                    const ownerId = String(post.author_id || post.author || post.user_id || "");
+                                    
+                                    // KIỂM TRA XEM CÓ PHẢI CHỦ BÀI VIẾT KHÔNG
+                                    if (myId === ownerId) {
+                                        return (
+                                            <>
+                                                <button 
+                                                    onClick={() => handleEditPost(post)}
+                                                    style={menuButtonStyle}
+                                                    onMouseOver={(e) => e.target.style.background = "#f0f2f5"}
+                                                    onMouseOut={(e) => e.target.style.background = "white"}
+                                                >
+                                                    ✏️ Sửa bài viết
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleDeletePost(post._id)}
+                                                    style={{ ...menuButtonStyle, color: "#dc3545" }}
+                                                    onMouseOver={(e) => e.target.style.background = "#f0f2f5"}
+                                                    onMouseOut={(e) => e.target.style.background = "white"}
+                                                >
+                                                    🗑️ Xóa bài viết
+                                                </button>
+                                            </>
+                                        );
+                                    } else {
+                                        // NẾU LÀ NGƯỜI KHÁC THÌ HIỂN THỊ CÁC NÚT NÀY
+                                        return (
+                                            <>
+                                                <button 
+                                                    onClick={() => alert("Đã ẩn bài viết này")}
+                                                    style={menuButtonStyle}
+                                                    onMouseOver={(e) => e.target.style.background = "#f0f2f5"}
+                                                    onMouseOut={(e) => e.target.style.background = "white"}
+                                                >
+                                                    🙈 Ẩn bài viết
+                                                </button>
+                                                <button 
+                                                    onClick={() => alert("Đã báo cáo bài viết")}
+                                                    style={{ ...menuButtonStyle, color: "#dc3545" }}
+                                                    onMouseOver={(e) => e.target.style.background = "#f0f2f5"}
+                                                    onMouseOut={(e) => e.target.style.background = "white"}
+                                                >
+                                                    ⚠️ Báo cáo vi phạm
+                                                </button>
+                                            </>
+                                        );
+                                    }
+                                })()}
                             </div>
                         )}
                     </div>
@@ -420,7 +467,9 @@ function Home() {
                                     /* FIX LỖI Ở ĐÂY: Bỏ ngoặc nhọn {} bọc ngoài hàm map */
                                     postComments[post._id].length > 0 ? (
                                         postComments[post._id].map(cmt => {
-                                            const isCommentOwner = currentUser && currentUser._id === cmt.author_id;
+                                            // Ép cả 2 về String để tránh lỗi so sánh giữa String và Object
+const isCommentOwner = currentUser && 
+    String(currentUser._id || currentUser.id) === String(cmt.author_id || cmt.user_id);
                                             return (
                                                 <div key={cmt._id} style={{ display: "flex", gap: "10px", marginBottom: "12px", alignItems: "flex-start" }}>
                                                     {cmt.author_avatar ? (

@@ -123,7 +123,10 @@ function Login() {
             </form>
 
             <div style={{ textAlign: "center", marginTop: "20px", fontSize: "14px", color: "#333" }}>
-              Chưa có tài khoản? <span style={{ color: "#558b2f", fontWeight: "bold", cursor: "pointer" }}>Đăng kí</span>
+              Chưa có tài khoản? 
+              <span style={{ color: "#558b2f", fontWeight: "bold", cursor: "pointer" }}
+                onClick={() => navigate("/register")}
+              >Đăng kí</span>
             </div>
 
             <div style={{ display: "flex", gap: "15px", marginTop: "20px" }}>
