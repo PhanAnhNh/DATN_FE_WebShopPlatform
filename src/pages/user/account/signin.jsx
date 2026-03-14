@@ -1,14 +1,30 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom"; 
+import { useNavigate } from "react-router-dom";
+import Toast from '../../../components/Toast'; // Import Toast
+import "../../../css/AdminManageLayout.css"; // Import CSS
+import { CheckCircle, AlertCircle } from 'lucide-react';
 
 function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [showPassword, setShowPassword] = useState(false); 
+  const [showPassword, setShowPassword] = useState(false);
+  
+  // Toast states
+  const [toast, setToast] = useState({
+    show: false,
+    message: '',
+    type: 'success'
+  });
   
   const navigate = useNavigate();
 
+  // Hàm hiển thị toast
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+  };
+
+  // src/pages/user/account/signin.jsx
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
@@ -31,21 +47,38 @@ function Login() {
       }
 
       const data = await response.json();
+      console.log("User login response:", data);
 
-      localStorage.setItem("access_token", data.access_token);
-      if (data.user) {
-        localStorage.setItem("user", JSON.stringify(data.user)); 
-      }
+      // Dùng key RIÊNG cho user
+      localStorage.setItem("user_token", data.access_token); // Key riêng
+      localStorage.setItem("user_data", JSON.stringify(data.user)); // Key riêng
 
-      alert("Đăng nhập thành công!");
-       navigate("/"); 
+      showToast("Đăng nhập thành công!", "success");
+      
+      setTimeout(() => {
+        navigate("/");
+      }, 1500);
+
     } catch (err) {
       setError(err.message);
+      showToast(err.message, "error");
     }
   };
 
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", fontFamily: "Arial, sans-serif" }}>
+      
+      {/* Toast Container */}
+      {toast.show && (
+        <div className="toast-container">
+          <Toast 
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast({ show: false, message: '', type: 'success' })}
+          />
+        </div>
+      )}
+
       {/* Header */}
       <div style={{ padding: "15px 30px", background: "white", display: "flex", alignItems: "center", gap: "10px", borderBottom: "1px solid #ddd" }}>
         <img src="https://placehold.co/40x40/2e7d32/white?text=Logo" alt="Logo" style={{ borderRadius: "50%" }} />
@@ -115,6 +148,7 @@ function Login() {
                 </div>
               </div>
 
+              {/* Có thể giữ lại error hoặc bỏ, vì đã có toast hiển thị lỗi */}
               {error && <div style={{ color: "red", fontSize: "13px", textAlign: "center" }}>{error}</div>}
 
               <button type="submit" style={{ padding: "15px", borderRadius: "8px", border: "none", backgroundColor: "#558b2f", color: "white", fontWeight: "bold", fontSize: "16px", cursor: "pointer", marginTop: "10px" }}>

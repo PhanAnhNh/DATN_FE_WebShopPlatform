@@ -26,7 +26,7 @@ function Header() {
 
     // HÀM XỬ LÝ KHI CLICK VÀO AVATAR
     const handleAvatarClick = () => {
-        const token = localStorage.getItem("access_token");
+        const token = localStorage.getItem("user_token");
         
         if (token) {
             // Đã đăng nhập -> Bật/tắt menu
@@ -40,11 +40,11 @@ function Header() {
 
     // HÀM XỬ LÝ ĐĂNG XUẤT
     const handleLogout = () => {
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("user"); // Xóa luôn thông tin user nếu có lưu
-        setIsMenuOpen(false); // Đóng menu
-        alert("Đăng xuất thành công!");
-        navigate("/"); // Có thể chuyển về trang chủ hoặc trang login tùy ý
+    localStorage.removeItem("user_token");
+    localStorage.removeItem("user");
+
+    setIsMenuOpen(false);
+    navigate("/");
     };
 
     // Style chung cho các mục trong menu (để code gọn hơn)

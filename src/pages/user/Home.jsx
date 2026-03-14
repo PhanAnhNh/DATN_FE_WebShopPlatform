@@ -468,9 +468,9 @@ function Home() {
                                     postComments[post._id].length > 0 ? (
                                         postComments[post._id].map(cmt => {
                                             // Ép cả 2 về String để tránh lỗi so sánh giữa String và Object
-const isCommentOwner = currentUser && 
-    String(currentUser._id || currentUser.id) === String(cmt.author_id || cmt.user_id);
-                                            return (
+                                        const isCommentOwner = currentUser && 
+                                            String(currentUser._id || currentUser.id) === String(cmt.author_id || cmt.user_id);
+                                                return (
                                                 <div key={cmt._id} style={{ display: "flex", gap: "10px", marginBottom: "12px", alignItems: "flex-start" }}>
                                                     {cmt.author_avatar ? (
                                                         <img src={cmt.author_avatar} alt="avatar" style={{ width: "32px", height: "32px", borderRadius: "50%", objectFit: "cover" }} />
@@ -526,7 +526,6 @@ const isCommentOwner = currentUser &&
                                                                 >
                                                                     •••
                                                                 </div>
-
                                                                 {/* Popup Menu */}
                                                                 {activeCommentMenu === cmt._id && (
                                                                     <div 

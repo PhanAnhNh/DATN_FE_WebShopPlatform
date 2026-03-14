@@ -4,6 +4,10 @@ import Home from "./pages/user/Home.jsx";
 import Login from "./pages/user/account/signin.jsx"; // Hãy đảm bảo đường dẫn này đúng nhé
 import Profile from "./pages/user/profile.jsx";
 import Register from "./pages/user/account/signup.jsx"; // Đảm bảo đường dẫn này đúng nhé
+import AdminLogin from "./pages/admin/Admin_login.jsx";
+import AdminLayout from "./components/Adminlayout/LayoutAdmin.jsx";
+import DashboardPage from "./pages/admin/Dashboard.jsx";
+import UsersManagement from "./pages/admin/ManagePosts.jsx";
 
 function App() {
   return (
@@ -13,7 +17,25 @@ function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/profile" element={<Profile />} />
       <Route path="/register" element={<Register />} /> 
+      <Route path="/admin/login" element={<AdminLogin />} /> 
+      <Route 
+        path="/admin/dashboard" 
+        element={
+          <AdminLayout>
+            <DashboardPage />
+          </AdminLayout>
+        } 
+      />
+      <Route 
+        path="/admin/users" 
+        element={
+          <AdminLayout>
+            <UsersManagement />
+          </AdminLayout>
+        } 
+      />
     </Routes>
+    
   );
 }
 
