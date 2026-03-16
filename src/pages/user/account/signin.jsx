@@ -24,46 +24,49 @@ function Login() {
     setToast({ show: true, message, type });
   };
 
-  // src/pages/user/account/signin.jsx
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setError("");
+  // src/pages/user/account/signin.jsx - SỬA handleLogin
+const handleLogin = async (e) => {
+  e.preventDefault();
+  setError("");
 
-    try {
-      const formData = new URLSearchParams();
-      formData.append("username", email); 
-      formData.append("password", password);
+  try {
+    const formData = new URLSearchParams();
+    formData.append("username", email); 
+    formData.append("password", password);
 
-      const response = await fetch("http://localhost:8000/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: formData,
-      });
+    const response = await fetch("http://localhost:8000/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: formData,
+    });
 
-      if (!response.ok) {
-        throw new Error("Email hoặc mật khẩu không chính xác!");
-      }
-
-      const data = await response.json();
-      console.log("User login response:", data);
-
-      // Dùng key RIÊNG cho user
-      localStorage.setItem("user_token", data.access_token); // Key riêng
-      localStorage.setItem("user_data", JSON.stringify(data.user)); // Key riêng
-
-      showToast("Đăng nhập thành công!", "success");
-      
-      setTimeout(() => {
-        navigate("/");
-      }, 1500);
-
-    } catch (err) {
-      setError(err.message);
-      showToast(err.message, "error");
+    if (!response.ok) {
+      throw new Error("Email hoặc mật khẩu không chính xác!");
     }
-  };
+
+    const data = await response.json();
+    console.log("User login response:", data);
+
+    // Lưu token và user data với key thống nhất
+    localStorage.setItem("user_token", data.access_token);
+    localStorage.setItem("user_data", JSON.stringify(data.user));
+    
+    // THÊM: Lưu cả user với key "user" cho tương thích với code cũ
+    localStorage.setItem("user", JSON.stringify(data.user));
+
+    showToast("Đăng nhập thành công!", "success");
+    
+    setTimeout(() => {
+      navigate("/");
+    }, 1500);
+
+  } catch (err) {
+    setError(err.message);
+    showToast(err.message, "error");
+  }
+};
 
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", fontFamily: "Arial, sans-serif" }}>

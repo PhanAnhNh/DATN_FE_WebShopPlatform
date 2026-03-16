@@ -21,55 +21,90 @@ function Home() {
     const [editingCommentId, setEditingCommentId] = useState(null); 
     const [editCommentContent, setEditCommentContent] = useState("");
     
-    useEffect(() => {
-        const handleClickOutside = (event) => {
+    // src/pages/user/Home.jsx - SỬA useEffect
+
+    // src/pages/user/Home.jsx - SỬA phần useEffect đầu tiên
+
+useEffect(() => {
+    console.log("=== DEBUG AUTH ===");
+    console.log("user_token:", localStorage.getItem("user_token")?.substring(0, 20) + "...");
+    console.log("user_data:", localStorage.getItem("user_data"));
+    console.log("user:", localStorage.getItem("user"));
+    
+    const handleClickOutside = (event) => {
         if (!event.target.closest('.menu-trigger') && !event.target.closest('.popup-menu')) {
             setActivePostMenu(null);
             setActiveCommentMenu(null);
         }
-        };
-        document.addEventListener("mousedown", handleClickOutside);
-        
-        const storedUser = localStorage.getItem("user");
-        if (storedUser) {
-            setCurrentUser(JSON.parse(storedUser));
-        }
-        const fetchFeedAndLikes = async () => {
-            try {
-                let url = "/posts/feed";
-                if (category !== "general") {
-                    url += `?category=${category}`; 
-                }
-
-                const res = await api.get(url);
-                const fetchedPosts = res.data;
-                
-                setPosts(fetchedPosts);
-
-                const likeChecks = fetchedPosts.map(post => 
-                    api.get(`/likes/check/${post._id}`)
-                        .then(res => ({ id: post._id, isLiked: res.data.liked }))
-                        .catch(() => ({ id: post._id, isLiked: false }))
-                );
-
-                const likeResults = await Promise.all(likeChecks);
-                
-                const likeMap = {};
-                likeResults.forEach(result => {
-                    likeMap[result.id] = result.isLiked;
-                });
-                setLikedPosts(likeMap);
-
-            } catch (err) {
-                console.error("Lỗi khi tải Feed:", err);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    
+    // SỬA: Lấy user từ user_data
+    const storedUserData = localStorage.getItem("user_data");
+    const storedUserLegacy = localStorage.getItem("user");
+    
+    let userData = null;
+    if (storedUserData) {
+        userData = JSON.parse(storedUserData);
+        setCurrentUser(userData);
+        console.log("Set currentUser from user_data:", userData);
+    } else if (storedUserLegacy) {
+        userData = JSON.parse(storedUserLegacy);
+        setCurrentUser(userData);
+        console.log("Set currentUser from user:", userData);
+    }
+    
+    const fetchFeedAndLikes = async () => {
+        try {
+            let url = "/posts/feed";
+            if (category !== "general") {
+                url += `?category=${category}`; 
             }
-        };
 
-        fetchFeedAndLikes();
-        return () => {
+            const token = localStorage.getItem("user_token");
+            if (!token) {
+                console.log("Không tìm thấy token, chuyển hướng đến login");
+                window.location.href = "/login";
+                return;
+            }
+
+            const res = await api.get(url);
+            console.log("Feed response:", res.data);
+            const fetchedPosts = res.data;
+            
+            setPosts(fetchedPosts);
+
+            // Xử lý like checks
+            const likeChecks = fetchedPosts.map(post => 
+                api.get(`/likes/check/${post._id}`)
+                    .then(res => ({ id: post._id, isLiked: res.data.liked }))
+                    .catch(() => ({ id: post._id, isLiked: false }))
+            );
+
+            const likeResults = await Promise.all(likeChecks);
+            
+            const likeMap = {};
+            likeResults.forEach(result => {
+                likeMap[result.id] = result.isLiked;
+            });
+            setLikedPosts(likeMap);
+
+        } catch (err) {
+            console.error("Lỗi khi tải Feed:", err);
+            if (err.response?.status === 401) {
+                localStorage.removeItem("user_token");
+                localStorage.removeItem("user_data");
+                localStorage.removeItem("user");
+                window.location.href = "/login";
+            }
+        }
+    };
+
+    fetchFeedAndLikes();
+    return () => {
         document.removeEventListener('mousedown', handleClickOutside);
     };
-    }, [category]);
+}, [category]);
 
     const handleToggleComments = async (postId) => {
         const isCurrentlyShown = showComments[postId];
@@ -424,9 +459,29 @@ function Home() {
                         )}
                     </div>
 
-                    {post.image && (
-                        <img src={post.image} alt="post_img" style={{ width: "100%", borderRadius: "8px", objectFit: "cover", maxHeight: "400px", marginBottom: "15px" }} />
-                    )}
+                        {/* HOẶC hiển thị tất cả ảnh dạng grid */}
+                        {post.images && post.images.length > 0 && (
+                        <div style={{ 
+                            display: "grid", 
+                            gridTemplateColumns: post.images.length > 1 ? "repeat(2, 1fr)" : "1fr",
+                            gap: "10px",
+                            marginBottom: "15px"
+                        }}>
+                            {post.images.map((imgUrl, index) => (
+                            <img 
+                                key={index}
+                                src={imgUrl} 
+                                alt={`post_img_${index}`} 
+                                style={{ 
+                                width: "100%", 
+                                borderRadius: "8px", 
+                                objectFit: "cover", 
+                                maxHeight: "400px"
+                                }} 
+                            />
+                            ))}
+                        </div>
+                        )}
 
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", fontSize: "14px", color: "#65676B" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>

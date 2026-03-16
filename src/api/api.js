@@ -17,11 +17,17 @@ api.interceptors.request.use(
       const adminToken = localStorage.getItem('admin_token');
       if (adminToken) {
         config.headers.Authorization = `Bearer ${adminToken}`;
+        console.log('Gửi request admin với token:', adminToken.substring(0, 20) + '...');
+      } else {
+        console.log('Không tìm thấy admin_token');
       }
     } else {
       const userToken = localStorage.getItem('user_token');
       if (userToken) {
         config.headers.Authorization = `Bearer ${userToken}`;
+        console.log(`Gửi request user (${config.url}) với token:`, userToken.substring(0, 20) + '...');
+      } else {
+        console.log(`Không tìm thấy user_token cho request: ${config.url}`);
       }
     }
     
@@ -36,6 +42,8 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    console.error('API Error:', error.response?.status, error.config?.url);
+    
     if (error.response?.status === 401) {
       const isAdminRequest = error.config?.url?.startsWith('/admin/');
       
@@ -48,6 +56,7 @@ api.interceptors.response.use(
         // Token user hết hạn
         localStorage.removeItem('user_token');
         localStorage.removeItem('user_data');
+        localStorage.removeItem('user');
         window.location.href = '/login';
       }
     }

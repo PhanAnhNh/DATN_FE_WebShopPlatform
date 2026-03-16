@@ -7,7 +7,10 @@ import Register from "./pages/user/account/signup.jsx"; // Đảm bảo đườn
 import AdminLogin from "./pages/admin/Admin_login.jsx";
 import AdminLayout from "./components/Adminlayout/LayoutAdmin.jsx";
 import DashboardPage from "./pages/admin/Dashboard.jsx";
-import UsersManagement from "./pages/admin/ManagePosts.jsx";
+import UsersManagement from "./pages/admin/ManageUsers.jsx";
+import ShopsManagement from "./pages/admin/ManageShop.jsx";
+import PostsManagement from "./pages/admin/ManagePosts.jsx";
+import Statistics from "./pages/admin/Statistical.jsx";
 
 function App() {
   return (
@@ -31,6 +34,30 @@ function App() {
         element={
           <AdminLayout>
             <UsersManagement />
+          </AdminLayout>
+        } 
+      />
+      <Route 
+        path="/admin/stores" 
+        element={
+          <AdminLayout>
+            <ShopsManagement />
+          </AdminLayout>
+        } 
+      />
+      <Route 
+        path="/admin/posts" 
+        element={
+          <AdminLayout>
+            <PostsManagement />
+          </AdminLayout>
+        } 
+      />
+      <Route 
+        path="/admin/statistics" 
+        element={
+          <AdminLayout>
+            <Statistics />
           </AdminLayout>
         } 
       />
