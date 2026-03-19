@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import api from '../../api/api';
 import '../../css/AdminManageLayout.css';
-import Toast from '../../components/Toast';
+import Toast from '../../components/common/Toast';
 
 const Statistics = () => {
   const [loading, setLoading] = useState(true);

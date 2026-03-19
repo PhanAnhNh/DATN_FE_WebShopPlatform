@@ -1,3 +1,4 @@
+// src/api/api.js
 import axios from 'axios';
 
 const api = axios.create({
@@ -7,27 +8,50 @@ const api = axios.create({
   },
 });
 
-// Interceptor để tự động thêm token vào request
+// CHỈ GIỮ LẠI MỘT INTERCEPTOR
 api.interceptors.request.use(
   (config) => {
+    // Log để debug
+    console.log('Request URL:', config.url);
+    
     // Kiểm tra URL để quyết định dùng token nào
-    const isAdminRequest = config.url?.startsWith('/admin/');
+    const isAdminRequest = config.url?.includes('/admin/');
+    const isShopRequest = config.url?.includes('/shop/');
     
     if (isAdminRequest) {
       const adminToken = localStorage.getItem('admin_token');
+      console.log('Is admin request, token exists:', !!adminToken);
+      
       if (adminToken) {
         config.headers.Authorization = `Bearer ${adminToken}`;
-        console.log('Gửi request admin với token:', adminToken.substring(0, 20) + '...');
       } else {
-        console.log('Không tìm thấy admin_token');
+        // Thử dùng user_token nếu không có admin_token
+        const userToken = localStorage.getItem('user_token');
+        if (userToken) {
+          config.headers.Authorization = `Bearer ${userToken}`;
+          console.log('Using user token for admin request');
+        }
+      }
+    } else if (isShopRequest) {
+      // Request cho shop dashboard
+      const shopToken = localStorage.getItem('shop_token');
+      console.log('Is shop request, token exists:', !!shopToken);
+      
+      if (shopToken) {
+        config.headers.Authorization = `Bearer ${shopToken}`;
+      } else {
+        // Fallback sang user_token nếu không có shop_token
+        const userToken = localStorage.getItem('user_token');
+        if (userToken) {
+          config.headers.Authorization = `Bearer ${userToken}`;
+          console.log('Using user token for shop request');
+        }
       }
     } else {
+      // Request cho user thông thường
       const userToken = localStorage.getItem('user_token');
       if (userToken) {
         config.headers.Authorization = `Bearer ${userToken}`;
-        console.log(`Gửi request user (${config.url}) với token:`, userToken.substring(0, 20) + '...');
-      } else {
-        console.log(`Không tìm thấy user_token cho request: ${config.url}`);
       }
     }
     
@@ -38,22 +62,26 @@ api.interceptors.request.use(
   }
 );
 
-// Interceptor để xử lý lỗi 401 (Unauthorized)
+// Interceptor để xử lý lỗi
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     console.error('API Error:', error.response?.status, error.config?.url);
     
     if (error.response?.status === 401) {
-      const isAdminRequest = error.config?.url?.startsWith('/admin/');
+      const isAdminRequest = error.config?.url?.includes('/admin/');
+      const isShopRequest = error.config?.url?.includes('/shop/');
       
       if (isAdminRequest) {
-        // Token admin hết hạn
         localStorage.removeItem('admin_token');
         localStorage.removeItem('admin_data');
         window.location.href = '/admin/login';
+      } else if (isShopRequest) {
+        localStorage.removeItem('shop_token');
+        localStorage.removeItem('shop_data');
+        localStorage.removeItem('shop_info');
+        window.location.href = '/shop/login';
       } else {
-        // Token user hết hạn
         localStorage.removeItem('user_token');
         localStorage.removeItem('user_data');
         localStorage.removeItem('user');

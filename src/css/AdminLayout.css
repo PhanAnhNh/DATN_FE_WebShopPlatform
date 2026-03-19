@@ -388,6 +388,7 @@ body {
 .avatar-container {
   position: relative;
   display: inline-block;
+  height: 50px;
 }
 
 .user-avatar {

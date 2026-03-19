@@ -25,7 +25,7 @@ function SidebarLeft() {
     useEffect(() => {
         const fetchMyProfile = async () => {
             try {
-                const res = await api.get("/auth/me");
+                const res = await api.get("/api/v1/auth/me");
                 setUser(res.data);
             } catch (error) {
                 console.error("Lỗi khi lấy thông tin cá nhân:", error);

@@ -1,4 +1,3 @@
-// src/pages/admin/posts/PostsManagement.jsx
 import React, { useState, useEffect } from 'react';
 import { 
   Search, Plus, Download, Edit2, Trash2, Eye,
@@ -8,8 +7,8 @@ import {
 } from 'lucide-react';
 import api from '../../api/api';
 import '../../css/AdminManageLayout.css';
-import Toast from '../../components/Toast';
-import ConfirmDialog from '../../components/ConfirmDialog';
+import Toast from '../../components/common/Toast';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 
 const PostsManagement = () => {
   const [posts, setPosts] = useState([]);
@@ -75,14 +74,13 @@ const PostsManagement = () => {
     setToast({ show: true, message, type });
   };
 
-  // SỬA: fetchPosts dùng API thật
   const fetchPosts = async () => {
   try {
     setLoading(true);
     setError(null);
     
     // Dùng API admin để lấy tất cả bài viết
-    const response = await api.get('/admin/posts?limit=100');
+    const response = await api.get('/api/v1/admin/posts?limit=100');
     console.log('Posts data:', response.data);
     
     setPosts(response.data);

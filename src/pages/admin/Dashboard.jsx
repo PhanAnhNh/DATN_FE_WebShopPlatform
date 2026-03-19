@@ -33,26 +33,47 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        const token = localStorage.getItem('admin_token'); // Dùng key riêng cho admin
-        if (!token) {
-          setError('Vui lòng đăng nhập lại');
-          setTimeout(() => {
-            window.location.href = '/admin/login';
-          }, 2000);
+useEffect(() => {
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // DEBUG: Kiểm tra token và user data
+      const token = localStorage.getItem('admin_token');
+      const userData = localStorage.getItem('admin_data');
+      console.log('Token exists:', !!token);
+      console.log('User data:', userData ? JSON.parse(userData) : null);
+      
+      // Kiểm tra cả user_token nếu có
+      const userToken = localStorage.getItem('user_token');
+      const user = localStorage.getItem('user');
+      console.log('User token exists:', !!userToken);
+      console.log('User:', user ? JSON.parse(user) : null);  // SỬA: console.log
+      
+      if (!token) {
+        setError('Vui lòng đăng nhập lại');
+        setTimeout(() => {
+          window.location.href = '/admin/login';
+        }, 2000);
+        return;
+      }
+
+      // Kiểm tra role từ userData
+      if (userData) {
+        const parsedUser = JSON.parse(userData);
+        if (parsedUser.role !== 'admin') {
+          setError('Tài khoản không có quyền admin');
           return;
         }
+      }
 
-        const [dashboardRes, categoryRes] = await Promise.all([
-          api.get('/admin/dashboard'),
-          api.get('/admin/post-category')
-        ]);
-
+      // Thử gọi từng API riêng để biết API nào lỗi
+      try {
+        console.log('Calling dashboard API...');
+        const dashboardRes = await api.get('/api/v1/admin/dashboard');
+        console.log('Dashboard response:', dashboardRes.data);
+        
         if (dashboardRes?.data) {
           setStats({
             users: dashboardRes.data.total_users || 0,
@@ -61,7 +82,16 @@ const Dashboard = () => {
             reports: dashboardRes.data.total_reports || 0
           });
         }
+      } catch (dashboardError) {
+        console.error('Dashboard API error:', dashboardError.response?.data || dashboardError.message);
+      }
 
+      // Thử gọi category API
+      try {
+        console.log('Calling category API...');
+        const categoryRes = await api.get('/api/v1/admin/post-category');
+        console.log('Category response:', categoryRes.data);
+        
         if (categoryRes?.data && Array.isArray(categoryRes.data)) {
           const converted = categoryRes.data.map((item, index) => ({
             name: item.category || `Danh mục ${index + 1}`,
@@ -71,27 +101,25 @@ const Dashboard = () => {
           }));
           setPostStats(converted);
         }
-        
-      } catch (error) {
-        console.error('Lỗi khi tải dữ liệu:', error);
-        
-        if (error.response?.status === 401) {
-          setError('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
-          setTimeout(() => {
-            localStorage.removeItem('access_token');
-            localStorage.removeItem('user');
-            window.location.href = '/admin/login';
-          }, 2000);
-        } else {
-          setError('Không thể kết nối đến server. Đang hiển thị dữ liệu mẫu.');
+      } catch (categoryError) {
+        console.error('Category API error:', categoryError.response?.data || categoryError.message);
+        // Nếu API chưa có hoặc lỗi 403, dùng dữ liệu mẫu
+        if (categoryError.response?.status === 403) {
+          console.log('User không có quyền truy cập API này, dùng dữ liệu mẫu');
         }
-      } finally {
-        setLoading(false);
+        setPostStats(defaultPostStats);
       }
-    };
-    
-    fetchData();
-  }, []);
+      
+    } catch (error) {
+      console.error('Lỗi khi tải dữ liệu:', error);
+      setError('Không thể kết nối đến server. Đang hiển thị dữ liệu mẫu.');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  fetchData();
+}, []);
 
   const getColorForKey = (key, index) => {
     const colors = {

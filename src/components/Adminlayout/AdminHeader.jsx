@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api/api';
+import '../../css/AdminLayout.css';
 
 const AdminHeader = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -15,7 +16,7 @@ const AdminHeader = () => {
   const handleLogout = async () => {
     try {
       const token = localStorage.getItem('admin_token'); // Key riêng
-      await api.post('/admin/logout', {}, {
+      await api.post('/api/v1/admin/logout', {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
     } catch (error) {
@@ -48,12 +49,12 @@ const AdminHeader = () => {
   };
 
   const handleViewProfile = () => {
-    navigate('/admin/profile');
+    navigate('/api/v1/admin/profile');
     setIsDropdownOpen(false);
   };
 
   const handleSettings = () => {
-    navigate('/admin/settings');
+    navigate('/api/v1/admin/settings');
     setIsDropdownOpen(false);
   };
 

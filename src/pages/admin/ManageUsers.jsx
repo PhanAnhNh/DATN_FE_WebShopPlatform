@@ -6,8 +6,8 @@ import {
 } from 'lucide-react';
 import api from '../../api/api';
 import '../../css/AdminManageLayout.css';
-import Toast from '../../components/Toast';
-import ConfirmDialog from '../../components/ConfirmDialog';
+import Toast from '../../components/common/Toast';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
 
 const UsersManagement = () => {
   const [users, setUsers] = useState([]);
@@ -68,7 +68,7 @@ const UsersManagement = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await api.get('/users');
+      const response = await api.get('/api/v1/users');
       console.log('Users data:', response.data);
       setUsers(response.data);
       setTotalUsers(response.data.length);
@@ -149,7 +149,7 @@ const handleAddUser = async (e) => {
     // Log dữ liệu gửi lên
     console.log('Sending data to API:', formData);
     
-    const response = await api.post('/users/', formData);
+    const response = await api.post('/api/v1/users', formData);
     console.log('API Response:', response.data);
     
     if (response.data) {
@@ -184,7 +184,7 @@ const handleAddUser = async (e) => {
 
     setSubmitting(true);
     try {
-      const response = await api.put(`/users/${selectedUser._id}`, formData);
+      const response = await api.put(`/api/v1/users/${selectedUser._id}`, formData);
       if (response.data) {
         showToast('Cập nhật người dùng thành công!', 'success');
         setShowModal(false);
@@ -207,7 +207,7 @@ const handleAddUser = async (e) => {
       type: 'warning',
       onConfirm: async () => {
         try {
-          const response = await api.delete(`/users/${userId}`);
+          const response = await api.delete(`/api/v1/users/${userId}`);
           if (response.data) {
             showToast('Xóa người dùng thành công!', 'success');
             fetchUsers();

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Toast from '../../../components/Toast'; // Import Toast
+import Toast from '../../../components/common/Toast'; // Import Toast
 import "../../../css/AdminManageLayout.css"; // Import CSS
 import { CheckCircle, AlertCircle } from 'lucide-react';
 
@@ -34,7 +34,7 @@ const handleLogin = async (e) => {
     formData.append("username", email); 
     formData.append("password", password);
 
-    const response = await fetch("http://localhost:8000/auth/login", {
+    const response = await fetch("http://localhost:8000/api/v1/auth/login", {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",

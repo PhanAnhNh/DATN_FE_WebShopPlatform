@@ -1,7 +1,7 @@
 // components/Toast.jsx
 import React, { useEffect } from 'react';
 import { CheckCircle, AlertCircle, X } from 'lucide-react';
-import '../css/AdminManageLayout.css';
+import '../../css/AdminManageLayout.css';
 
 const Toast = ({ message, type = 'success', onClose, duration = 3000 }) => {
   useEffect(() => {

@@ -56,7 +56,7 @@ useEffect(() => {
     
     const fetchFeedAndLikes = async () => {
         try {
-            let url = "/posts/feed";
+            let url = "/api/v1/posts/feed";
             if (category !== "general") {
                 url += `?category=${category}`; 
             }
@@ -76,7 +76,7 @@ useEffect(() => {
 
             // Xử lý like checks
             const likeChecks = fetchedPosts.map(post => 
-                api.get(`/likes/check/${post._id}`)
+                api.get(`/api/v1/likes/check/${post._id}`)
                     .then(res => ({ id: post._id, isLiked: res.data.liked }))
                     .catch(() => ({ id: post._id, isLiked: false }))
             );
@@ -112,7 +112,7 @@ useEffect(() => {
 
         if (!isCurrentlyShown && !postComments[postId]) {
             try {
-                const res = await api.get(`/comments/${postId}`);
+                const res = await api.get(`/api/v1/comments/${postId}`);
                 setPostComments(prev => ({ ...prev, [postId]: res.data }));
             } catch (error) {
                 console.error("Lỗi khi tải bình luận:", error);
@@ -125,12 +125,12 @@ useEffect(() => {
         if (!text || text.trim() === "") return;
 
         try {
-            await api.post("/comments/", {
+            await api.post("/api/v1/comments/", {
                 post_id: postId,
                 content: text
             });
 
-            const res = await api.get(`/comments/${postId}`);
+            const res = await api.get(`/api/v1/comments/${postId}`);
             setPostComments(prev => ({ ...prev, [postId]: res.data }));
             setCommentInputs(prev => ({ ...prev, [postId]: "" }));
 
@@ -166,7 +166,7 @@ useEffect(() => {
         }));
 
         try {
-            await api.post(`/likes/${postId}`);
+            await api.post(`/api/v1/likes/${postId}`);
         } catch (error) {
             console.error("Lỗi khi like bài viết:", error);
             setLikedPosts(prev => ({ ...prev, [postId]: isCurrentlyLiked }));
@@ -202,7 +202,7 @@ useEffect(() => {
             return p;
         }));
         try {
-            await api.post(`/shares/${postId}`);
+            await api.post(`/api/v1/shares/${postId}`);
         } catch (error) {
             console.error("Lỗi khi chia sẻ bài viết:", error);
             setPosts(prevPosts => prevPosts.map(p => {
@@ -241,13 +241,13 @@ useEffect(() => {
         setIsSubmitting(true);
         try {
             if (editingPost) {
-                const res = await api.put(`/posts/${editingPost._id}`, { content: newPostContent });
+                const res = await api.put(`/api/v1/posts/${editingPost._id}`, { content: newPostContent });
                 setPosts(posts.map(p => 
                     p._id === editingPost._id ? { ...p, content: newPostContent } : p
                 ));
             } else {
                 const newPostData = { content: newPostContent };
-                const res = await api.post("/posts/", newPostData);
+                const res = await api.post("/api/v1/posts/", newPostData);
                 setPosts([res.data, ...posts]);
             }
             setIsCreateModalOpen(false);
@@ -264,7 +264,7 @@ useEffect(() => {
     const handleDeletePost = async (postId) => {
         if (window.confirm("Bạn có chắc chắn muốn xóa bài viết này không?")) {
             try {
-                await api.delete(`/posts/${postId}`);
+                await api.delete(`/api/v1/posts/${postId}`);
                 setPosts(posts.filter(p => p._id !== postId));
                 setActivePostMenu(null); 
             } catch (error) {
@@ -277,7 +277,7 @@ useEffect(() => {
     const handleSaveEditComment = async (postId, commentId) => {
         if (!editCommentContent.trim()) return;
         try {
-            await api.put(`/comments/${commentId}`, { content: editCommentContent });
+            await api.put(`/api/v1/comments/${commentId}`, { content: editCommentContent });
             
             setPostComments(prev => ({
                 ...prev,
@@ -297,7 +297,7 @@ useEffect(() => {
     const handleDeleteComment = async (postId, commentId) => {
         if (window.confirm("Bạn có chắc chắn muốn xóa bình luận này?")) {
             try {
-                await api.delete(`/comments/${commentId}`);
+                await api.delete(`/api/v1/comments/${commentId}`);
                 
                 setPostComments(prev => ({
                     ...prev,

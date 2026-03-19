@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Toast from "../../components/Toast"; // Import Toast
+import Toast from "../../components/common/Toast"; // Import Toast
 import "../../css/AdminManageLayout.css"; // Import CSS
 import { CheckCircle, AlertCircle } from 'lucide-react'; // Import icons
 
@@ -24,13 +24,12 @@ function AdminLogin() {
     setToast({ show: true, message, type });
   };
 
-  // src/pages/admin/auth/AdminLogin.jsx
 const handleLogin = async (e) => {
   e.preventDefault();
   setError("");
 
   try {
-    const response = await fetch("http://localhost:8000/admin/login", {
+    const response = await fetch("http://localhost:8000/api/v1/admin/login", {
       method: "POST",
       headers: {
         "Content-Type": "application/json"

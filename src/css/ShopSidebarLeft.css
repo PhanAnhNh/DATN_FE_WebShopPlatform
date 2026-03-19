@@ -1,0 +1,195 @@
+.shop-sidebar {
+  position: fixed;
+  left: 0;
+  top: 70px;
+  bottom: 0;
+  width: 280px;
+  background: white;
+  box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+  transition: width 0.3s ease;
+  z-index: 900;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Custom scrollbar cho sidebar */
+.shop-sidebar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.shop-sidebar::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.shop-sidebar::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 2px;
+}
+
+.shop-sidebar.collapsed {
+  width: 80px;
+}
+
+.shop-sidebar__shop-info {
+  padding: 24px 16px;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.shop-sidebar.collapsed .shop-sidebar__shop-info {
+  justify-content: center;
+  padding: 20px 0;
+}
+
+.shop-sidebar__shop-avatar {
+  flex-shrink: 0;
+}
+
+.shop-sidebar__shop-avatar img {
+  width: 50px;
+  height: 50px;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.shop-sidebar__shop-details {
+  overflow: hidden;
+}
+
+.shop-sidebar__shop-details h3 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+  color: #2c3e50;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shop-sidebar__shop-details p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #27ae60;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shop-sidebar__nav {
+  padding: 20px 0;
+}
+
+.shop-sidebar__menu {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.shop-sidebar__menu-item {
+  margin-bottom: 2px;
+}
+
+.shop-sidebar__menu-item a {
+  display: flex;
+  align-items: center;
+  padding: 12px 20px;
+  color: #7f8c8d;
+  text-decoration: none;
+  transition: all 0.3s;
+  position: relative;
+  white-space: nowrap;
+}
+
+.shop-sidebar.collapsed .shop-sidebar__menu-item a {
+  justify-content: center;
+  padding: 15px 0;
+}
+
+.shop-sidebar__menu-item a:hover {
+  background: #f0f7ff;
+  color: #3498db;
+}
+
+.shop-sidebar__menu-item a.active {
+  background: #3498db;
+  color: white;
+}
+
+.shop-sidebar__menu-item a.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: #2980b9;
+}
+
+.shop-sidebar__menu-icon {
+  font-size: 1.2rem;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+
+.shop-sidebar.collapsed .shop-sidebar__menu-icon {
+  margin-right: 0;
+}
+
+.shop-sidebar__menu-title {
+  flex: 1;
+  font-size: 0.95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shop-sidebar__menu-arrow {
+  font-size: 0.8rem;
+  opacity: 0.5;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.shop-sidebar.collapsed .shop-sidebar__menu-title,
+.shop-sidebar.collapsed .shop-sidebar__menu-arrow {
+  display: none;
+}
+
+.shop-sidebar__footer {
+  padding: 20px;
+  border-top: 1px solid #e0e0e0;
+  margin-top: auto;
+}
+
+.shop-sidebar__upgrade {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 16px;
+  border-radius: 12px;
+  color: white;
+  text-align: center;
+}
+
+.shop-sidebar__upgrade p {
+  margin: 0 0 12px;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shop-sidebar__upgrade button {
+  background: white;
+  border: none;
+  padding: 6px 20px;
+  border-radius: 20px;
+  color: #764ba2;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.3s;
+  width: 100%;
+  max-width: 100px;
+}
+
+.shop-sidebar__upgrade button:hover {
+  transform: scale(1.05);
+}

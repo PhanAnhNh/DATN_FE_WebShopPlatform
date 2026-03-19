@@ -11,6 +11,11 @@ import UsersManagement from "./pages/admin/ManageUsers.jsx";
 import ShopsManagement from "./pages/admin/ManageShop.jsx";
 import PostsManagement from "./pages/admin/ManagePosts.jsx";
 import Statistics from "./pages/admin/Statistical.jsx";
+import ShopLayout from "./components/Shoplayout/ShopLayout.jsx";
+import ShopDashboard from "./pages/shop_manager/shop_dashboard.jsx";
+import ShopLogin from "./pages/shop_manager/shop_login.jsx";
+import ShopProfile from "./pages/shop_manager/shop_profile.jsx";
+import ShopCustomers from "./pages/shop_manager/shop_manager.jsx";
 
 function App() {
   return (
@@ -59,6 +64,36 @@ function App() {
           <AdminLayout>
             <Statistics />
           </AdminLayout>
+        } 
+      />
+      <Route 
+        path="/shop/dashboard" 
+        element={
+          <ShopLayout>
+            <ShopDashboard />
+          </ShopLayout>
+        } 
+      />
+      <Route 
+        path="/shop/login" 
+        element={
+            <ShopLogin/>
+        } 
+      />
+      <Route 
+        path="/shop/profile" 
+        element={
+          <ShopLayout>
+            <ShopProfile />
+          </ShopLayout>
+        } 
+      />
+      <Route 
+        path="/shop/customers" 
+        element={
+          <ShopLayout>
+            <ShopCustomers />
+          </ShopLayout>
         } 
       />
     </Routes>

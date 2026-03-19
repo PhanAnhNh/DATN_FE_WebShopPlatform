@@ -1,7 +1,7 @@
 // components/ConfirmDialog.jsx
 import React from 'react';
 import { AlertCircle, CheckCircle, X } from 'lucide-react';
-import '../css/AdminManageLayout.css';
+import '../../css/AdminManageLayout.css';
 
 const ConfirmDialog = ({ isOpen, onClose, onConfirm, title, message, type = 'warning' }) => {
   if (!isOpen) return null;
