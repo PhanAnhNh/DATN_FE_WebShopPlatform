@@ -16,6 +16,7 @@ import ShopDashboard from "./pages/shop_manager/shop_dashboard.jsx";
 import ShopLogin from "./pages/shop_manager/shop_login.jsx";
 import ShopProfile from "./pages/shop_manager/shop_profile.jsx";
 import ShopCustomers from "./pages/shop_manager/shop_manager.jsx";
+import ShopProducts from "./pages/shop_manager/shop_product.jsx";
 
 function App() {
   return (
@@ -93,6 +94,14 @@ function App() {
         element={
           <ShopLayout>
             <ShopCustomers />
+          </ShopLayout>
+        } 
+      />
+      <Route 
+        path="/shop/products" 
+        element={
+          <ShopLayout>
+            <ShopProducts />
           </ShopLayout>
         } 
       />
