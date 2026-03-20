@@ -8,7 +8,8 @@ import {
   FaChartBar,
   FaExchangeAlt,
   FaCog,
-  FaChevronRight
+  FaChevronRight,
+  FaDiscourse
 } from 'react-icons/fa';
 import '../../css/ShopSidebarLeft.css';
 
@@ -17,6 +18,7 @@ const ShopSidebarLeft = ({ collapsed }) => {
     { path: '/shop/dashboard', icon: <FaTachometerAlt />, title: 'Tổng Quan' },
     { path: '/shop/customers', icon: <FaUsers />, title: 'Quản Lý Khách Hàng' },
     { path: '/shop/products', icon: <FaBox />, title: 'Quản Lý Sản phẩm' },
+    { path: '/shop/vouchers', icon: <FaDiscourse />, title: 'quản Lý Voucher' },
     { path: '/shop/orders', icon: <FaShoppingCart />, title: 'Quản Lý Đơn Hàng' },
     { path: '/shop/revenue', icon: <FaChartBar />, title: 'Thống Kê Doanh Thu' },
     { path: '/shop/returns', icon: <FaExchangeAlt />, title: 'Quản Lý Đổi Trả' },
@@ -61,14 +63,7 @@ const ShopSidebarLeft = ({ collapsed }) => {
         </ul>
       </nav>
 
-      {!collapsed && (
-        <div className="shop-sidebar__footer">
-          <div className="shop-sidebar__upgrade">
-            <p>Nâng cấp tài khoản</p>
-            <button>Pro</button>
-          </div>
-        </div>
-      )}
+      
     </aside>
   );
 };

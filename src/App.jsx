@@ -17,6 +17,10 @@ import ShopLogin from "./pages/shop_manager/shop_login.jsx";
 import ShopProfile from "./pages/shop_manager/shop_profile.jsx";
 import ShopCustomers from "./pages/shop_manager/shop_manager.jsx";
 import ShopProducts from "./pages/shop_manager/shop_product.jsx";
+import ShopOrders from "./pages/shop_manager/shop_order.jsx";
+import ShopRevenue from "./pages/shop_manager/shop_Statistics.jsx";
+import ShopReturns from "./pages/shop_manager/ShopReturns.jsx"; 
+import ShopSetting from "./pages/shop_manager/shop_setting.jsx"
 
 function App() {
   return (
@@ -105,6 +109,39 @@ function App() {
           </ShopLayout>
         } 
       />
+      <Route 
+        path="/shop/orders" 
+        element={
+          <ShopLayout>
+            <ShopOrders />
+          </ShopLayout>
+        } 
+      />
+      <Route 
+        path="/shop/revenue" 
+        element={
+          <ShopLayout>
+            <ShopRevenue />
+          </ShopLayout>
+        } 
+      />
+
+      <Route 
+        path="/shop/returns" 
+        element={
+          <ShopLayout>
+            <ShopReturns />
+          </ShopLayout>
+        } 
+      />
+      < Route
+        path="/shop/settings"
+        element={
+          <ShopLayout>
+            <ShopSetting/>
+          </ShopLayout>
+        }
+        />
     </Routes>
     
   );
