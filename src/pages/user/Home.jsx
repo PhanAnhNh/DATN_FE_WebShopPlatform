@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../../api/api";
 import Layout from "../../components/layout/Layout";
 
 function Home() {
+    const navigate = useNavigate(); // Thêm useNavigate
     const [posts, setPosts] = useState([]);
     const [currentUser, setCurrentUser] = useState(null);
     const [showComments, setShowComments] = useState({});
@@ -21,90 +22,93 @@ function Home() {
     const [editingCommentId, setEditingCommentId] = useState(null); 
     const [editCommentContent, setEditCommentContent] = useState("");
     
-    // src/pages/user/Home.jsx - SỬA useEffect
-
-    // src/pages/user/Home.jsx - SỬA phần useEffect đầu tiên
-
-useEffect(() => {
-    console.log("=== DEBUG AUTH ===");
-    console.log("user_token:", localStorage.getItem("user_token")?.substring(0, 20) + "...");
-    console.log("user_data:", localStorage.getItem("user_data"));
-    console.log("user:", localStorage.getItem("user"));
-    
-    const handleClickOutside = (event) => {
-        if (!event.target.closest('.menu-trigger') && !event.target.closest('.popup-menu')) {
-            setActivePostMenu(null);
-            setActiveCommentMenu(null);
+    useEffect(() => {
+        console.log("=== DEBUG AUTH ===");
+        console.log("user_token:", localStorage.getItem("user_token")?.substring(0, 20) + "...");
+        console.log("user_data:", localStorage.getItem("user_data"));
+        console.log("user:", localStorage.getItem("user"));
+        
+        const handleClickOutside = (event) => {
+            if (!event.target.closest('.menu-trigger') && !event.target.closest('.popup-menu')) {
+                setActivePostMenu(null);
+                setActiveCommentMenu(null);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        
+        const storedUserData = localStorage.getItem("user_data");
+        const storedUserLegacy = localStorage.getItem("user");
+        
+        let userData = null;
+        if (storedUserData) {
+            userData = JSON.parse(storedUserData);
+            setCurrentUser(userData);
+            console.log("Set currentUser from user_data:", userData);
+        } else if (storedUserLegacy) {
+            userData = JSON.parse(storedUserLegacy);
+            setCurrentUser(userData);
+            console.log("Set currentUser from user:", userData);
         }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    
-    // SỬA: Lấy user từ user_data
-    const storedUserData = localStorage.getItem("user_data");
-    const storedUserLegacy = localStorage.getItem("user");
-    
-    let userData = null;
-    if (storedUserData) {
-        userData = JSON.parse(storedUserData);
-        setCurrentUser(userData);
-        console.log("Set currentUser from user_data:", userData);
-    } else if (storedUserLegacy) {
-        userData = JSON.parse(storedUserLegacy);
-        setCurrentUser(userData);
-        console.log("Set currentUser from user:", userData);
-    }
-    
-    const fetchFeedAndLikes = async () => {
-        try {
-            let url = "/api/v1/posts/feed";
-            if (category !== "general") {
-                url += `?category=${category}`; 
+        
+        const fetchFeedAndLikes = async () => {
+            try {
+                let url = "/api/v1/posts/feed";
+                if (category !== "general") {
+                    url += `?category=${category}`; 
+                }
+
+                const token = localStorage.getItem("user_token");
+                if (!token) {
+                    console.log("Không tìm thấy token, chuyển hướng đến login");
+                    window.location.href = "/login";
+                    return;
+                }
+
+                const res = await api.get(url);
+                console.log("Feed response:", res.data);
+                const fetchedPosts = res.data;
+                
+                setPosts(fetchedPosts);
+
+                const likeChecks = fetchedPosts.map(post => 
+                    api.get(`/api/v1/likes/check/${post._id}`)
+                        .then(res => ({ id: post._id, isLiked: res.data.liked }))
+                        .catch(() => ({ id: post._id, isLiked: false }))
+                );
+
+                const likeResults = await Promise.all(likeChecks);
+                
+                const likeMap = {};
+                likeResults.forEach(result => {
+                    likeMap[result.id] = result.isLiked;
+                });
+                setLikedPosts(likeMap);
+
+            } catch (err) {
+                console.error("Lỗi khi tải Feed:", err);
+                if (err.response?.status === 401) {
+                    localStorage.removeItem("user_token");
+                    localStorage.removeItem("user_data");
+                    localStorage.removeItem("user");
+                    window.location.href = "/login";
+                }
             }
+        };
 
-            const token = localStorage.getItem("user_token");
-            if (!token) {
-                console.log("Không tìm thấy token, chuyển hướng đến login");
-                window.location.href = "/login";
-                return;
-            }
+        fetchFeedAndLikes();
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [category]);
 
-            const res = await api.get(url);
-            console.log("Feed response:", res.data);
-            const fetchedPosts = res.data;
-            
-            setPosts(fetchedPosts);
-
-            // Xử lý like checks
-            const likeChecks = fetchedPosts.map(post => 
-                api.get(`/api/v1/likes/check/${post._id}`)
-                    .then(res => ({ id: post._id, isLiked: res.data.liked }))
-                    .catch(() => ({ id: post._id, isLiked: false }))
-            );
-
-            const likeResults = await Promise.all(likeChecks);
-            
-            const likeMap = {};
-            likeResults.forEach(result => {
-                likeMap[result.id] = result.isLiked;
-            });
-            setLikedPosts(likeMap);
-
-        } catch (err) {
-            console.error("Lỗi khi tải Feed:", err);
-            if (err.response?.status === 401) {
-                localStorage.removeItem("user_token");
-                localStorage.removeItem("user_data");
-                localStorage.removeItem("user");
-                window.location.href = "/login";
-            }
-        }
+    // Hàm chuyển trang
+    const goToForum = () => {
+        navigate('/forum');
     };
 
-    fetchFeedAndLikes();
-    return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
+    const goToShop = () => {
+        navigate('/use/shop');
     };
-}, [category]);
 
     const handleToggleComments = async (postId) => {
         const isCurrentlyShown = showComments[postId];
@@ -241,13 +245,12 @@ useEffect(() => {
         setIsSubmitting(true);
         try {
             if (editingPost) {
-                const res = await api.put(`/api/v1/posts/${editingPost._id}`, { content: newPostContent });
+                await api.put(`/api/v1/posts/${editingPost._id}`, { content: newPostContent });
                 setPosts(posts.map(p => 
                     p._id === editingPost._id ? { ...p, content: newPostContent } : p
                 ));
             } else {
-                const newPostData = { content: newPostContent };
-                const res = await api.post("/api/v1/posts/", newPostData);
+                const res = await api.post("/api/v1/posts/", { content: newPostContent });
                 setPosts([res.data, ...posts]);
             }
             setIsCreateModalOpen(false);
@@ -324,23 +327,74 @@ useEffect(() => {
     };
 
     const menuButtonStyle = {
-    padding: "12px 15px",
-    border: "none",
-    background: "white",
-    textAlign: "left",
-    cursor: "pointer",
-    fontSize: "14px",
-    borderBottom: "1px solid #eee",
-    fontWeight: "500",
-    transition: "background 0.2s"
-};
+        padding: "12px 15px",
+        border: "none",
+        background: "white",
+        textAlign: "left",
+        cursor: "pointer",
+        fontSize: "14px",
+        borderBottom: "1px solid #eee",
+        fontWeight: "500",
+        transition: "background 0.2s"
+    };
 
     return (
         <Layout>
             <div style={{ display: "flex", gap: "10px", marginBottom: "20px", alignItems: "center" }}>
                 <div style={{ display: "flex", flex: 1, gap: "10px" }}>
-                    <div style={{ flex: 1, background: "white", padding: "12px", textAlign: "center", borderRadius: "10px", fontWeight: "bold", color: "#2e7d32", borderBottom: "3px solid #2e7d32", boxShadow: "0 1px 3px rgba(0,0,0,0.1)", cursor: "pointer" }}>Diễn Đàn</div>
-                    <div style={{ flex: 1, background: "white", padding: "12px", textAlign: "center", borderRadius: "10px", fontWeight: "bold", color: "#666", boxShadow: "0 1px 3px rgba(0,0,0,0.1)", cursor: "pointer" }}>Cửa Hàng</div>
+                    {/* Diễn Đàn - Có thể click */}
+                    <div 
+                        onClick={goToForum}
+                        style={{ 
+                            flex: 1, 
+                            background: category === "general" ? "white" : "#f0f2f5", 
+                            padding: "12px", 
+                            textAlign: "center", 
+                            borderRadius: "10px", 
+                            fontWeight: "bold", 
+                            color: category === "general" ? "#2e7d32" : "#666", 
+                            borderBottom: category === "general" ? "3px solid #2e7d32" : "none",
+                            boxShadow: "0 1px 3px rgba(0,0,0,0.1)", 
+                            cursor: "pointer",
+                            transition: "all 0.2s"
+                        }}
+                        onMouseEnter={(e) => {
+                            if (category !== "general") {
+                                e.target.style.background = "#e4e6e9";
+                            }
+                        }}
+                        onMouseLeave={(e) => {
+                            if (category !== "general") {
+                                e.target.style.background = "#f0f2f5";
+                            }
+                        }}
+                    >
+                        Diễn Đàn
+                    </div>
+                    
+                    <div 
+                        onClick={goToShop}
+                        style={{ 
+                            flex: 1, 
+                            background: "#f0f2f5", 
+                            padding: "12px", 
+                            textAlign: "center", 
+                            borderRadius: "10px", 
+                            fontWeight: "bold", 
+                            color: "#666", 
+                            boxShadow: "0 1px 3px rgba(0,0,0,0.1)", 
+                            cursor: "pointer",
+                            transition: "all 0.2s"
+                        }}
+                        onMouseEnter={(e) => {
+                            e.target.style.background = "#e4e6e9";
+                        }}
+                        onMouseLeave={(e) => {
+                            e.target.style.background = "#f0f2f5";
+                        }}
+                    >
+                        Cửa Hàng
+                    </div>
                 </div>
 
                 <div style={{ background: "white", padding: "10px 15px", borderRadius: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)", display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", border: "1px solid #eee" }}>
@@ -353,7 +407,7 @@ useEffect(() => {
 
             {posts.map((post) => (
                 <div key={post._id} style={{ background: "white", borderRadius: "12px", padding: "20px", marginBottom: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
-
+                    {/* Phần nội dung bài viết giữ nguyên */}
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "15px", position: "relative" }}>
                         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
                             <div style={{ width: "40px", height: "40px", background: "#ddd", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
@@ -395,7 +449,6 @@ useEffect(() => {
                                     const myId = String(currentUser._id || currentUser.id || "");
                                     const ownerId = String(post.author_id || post.author || post.user_id || "");
                                     
-                                    // KIỂM TRA XEM CÓ PHẢI CHỦ BÀI VIẾT KHÔNG
                                     if (myId === ownerId) {
                                         return (
                                             <>
@@ -418,7 +471,6 @@ useEffect(() => {
                                             </>
                                         );
                                     } else {
-                                        // NẾU LÀ NGƯỜI KHÁC THÌ HIỂN THỊ CÁC NÚT NÀY
                                         return (
                                             <>
                                                 <button 
@@ -459,8 +511,7 @@ useEffect(() => {
                         )}
                     </div>
 
-                        {/* HOẶC hiển thị tất cả ảnh dạng grid */}
-                        {post.images && post.images.length > 0 && (
+                    {post.images && post.images.length > 0 && (
                         <div style={{ 
                             display: "grid", 
                             gridTemplateColumns: post.images.length > 1 ? "repeat(2, 1fr)" : "1fr",
@@ -468,20 +519,20 @@ useEffect(() => {
                             marginBottom: "15px"
                         }}>
                             {post.images.map((imgUrl, index) => (
-                            <img 
-                                key={index}
-                                src={imgUrl} 
-                                alt={`post_img_${index}`} 
-                                style={{ 
-                                width: "100%", 
-                                borderRadius: "8px", 
-                                objectFit: "cover", 
-                                maxHeight: "400px"
-                                }} 
-                            />
+                                <img 
+                                    key={index}
+                                    src={imgUrl} 
+                                    alt={`post_img_${index}`} 
+                                    style={{ 
+                                        width: "100%", 
+                                        borderRadius: "8px", 
+                                        objectFit: "cover", 
+                                        maxHeight: "400px"
+                                    }} 
+                                />
                             ))}
                         </div>
-                        )}
+                    )}
 
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", fontSize: "14px", color: "#65676B" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
@@ -515,17 +566,16 @@ useEffect(() => {
                         </div>
                     </div>
 
+                    {/* Phần bình luận giữ nguyên */}
                     {showComments[post._id] && (
                         <div style={{ marginTop: "15px", borderTop: "1px solid #eee", paddingTop: "15px" }}>
                             <div>
                                 {postComments[post._id] ? (
-                                    /* FIX LỖI Ở ĐÂY: Bỏ ngoặc nhọn {} bọc ngoài hàm map */
                                     postComments[post._id].length > 0 ? (
                                         postComments[post._id].map(cmt => {
-                                            // Ép cả 2 về String để tránh lỗi so sánh giữa String và Object
-                                        const isCommentOwner = currentUser && 
-                                            String(currentUser._id || currentUser.id) === String(cmt.author_id || cmt.user_id);
-                                                return (
+                                            const isCommentOwner = currentUser && 
+                                                String(currentUser._id || currentUser.id) === String(cmt.author_id || cmt.user_id);
+                                            return (
                                                 <div key={cmt._id} style={{ display: "flex", gap: "10px", marginBottom: "12px", alignItems: "flex-start" }}>
                                                     {cmt.author_avatar ? (
                                                         <img src={cmt.author_avatar} alt="avatar" style={{ width: "32px", height: "32px", borderRadius: "50%", objectFit: "cover" }} />
@@ -553,79 +603,73 @@ useEffect(() => {
                                                             </div>
                                                         ) : (
                                                             <div style={{ display: "flex", alignItems: "center", gap: "5px", position: "relative" }}>
-    
-                                                            {/* 1. Khung nội dung bình luận (Giới hạn maxWidth để không chèn ép nút ...) */}
-                                                            <div style={{ background: "#f0f2f5", padding: "8px 12px", borderRadius: "15px", maxWidth: "85%" }}>
-                                                                <strong style={{ fontSize: "13px", display: "block", color: "#1c1e21" }}>{cmt.author_name}</strong>
-                                                                <span style={{ fontSize: "14px", color: "#1c1e21", wordBreak: "break-word" }}>{cmt.content}</span>
-                                                            </div>
-
-                                                            {/* 2. CỤM NÚT "..." VÀ MENU POPUP BỌC CHUNG VÀO 1 THẺ RELATIVE */}
-                                                            <div style={{ position: "relative" }}>
-                                                                
-                                                                {/* Nút 3 chấm */}
-                                                                <div 
-                                                                className="menu-trigger"
-                                                                    style={{ 
-                                                                        cursor: "pointer", 
-                                                                        color: "#65676B", 
-                                                                        fontSize: "18px", 
-                                                                        width: "32px", 
-                                                                        height: "32px",
-                                                                        display: "flex", 
-                                                                        alignItems: "center", 
-                                                                        justifyContent: "center",
-                                                                        borderRadius: "50%"
-                                                                    }}
-                                                                    onClick={() => setActiveCommentMenu(activeCommentMenu === cmt._id ? null : cmt._id)}
-                                                                >
-                                                                    •••
+                                                                <div style={{ background: "#f0f2f5", padding: "8px 12px", borderRadius: "15px", maxWidth: "85%" }}>
+                                                                    <strong style={{ fontSize: "13px", display: "block", color: "#1c1e21" }}>{cmt.author_name}</strong>
+                                                                    <span style={{ fontSize: "14px", color: "#1c1e21", wordBreak: "break-word" }}>{cmt.content}</span>
                                                                 </div>
-                                                                {/* Popup Menu */}
-                                                                {activeCommentMenu === cmt._id && (
+
+                                                                <div style={{ position: "relative" }}>
                                                                     <div 
-                                                                    className="popup-menu"
-                                                                    style={{
-                                                                        position: "absolute",
-                                                                        top: "100%", // Nằm ngay dưới nút 3 chấm
-                                                                        right: "0",  // Căn mép phải của menu bằng với mép phải của nút 3 chấm
-                                                                        marginTop: "4px", // Cách nút 3 chấm 1 đoạn nhỏ
-                                                                        background: "white", 
-                                                                        border: "1px solid #ddd", 
-                                                                        borderRadius: "8px",
-                                                                        boxShadow: "0 2px 12px rgba(0,0,0,0.15)", 
-                                                                        minWidth: "200px", // Cho rộng ra tí nhìn chữ đỡ bị nghẹt
-                                                                        zIndex: 100, // Tăng z-index để chắc chắn đè lên các bình luận khác
-                                                                        display: "flex", 
-                                                                        flexDirection: "column", 
-                                                                        overflow: "hidden"
-                                                                    }}>
-                                                                        {isCommentOwner ? (
-                                                                            <>
-                                                                                <button onClick={() => handleEditComment(cmt)} style={{ padding: "12px", border: "none", background: "white", textAlign: "left", cursor: "pointer", fontSize: "14px", borderBottom: "1px solid #eee", fontWeight: "500" }}>
-                                                                                    ✏️ Chỉnh sửa bình luận
-                                                                                </button>
-                                                                                <button onClick={() => handleDeleteComment(post._id, cmt._id)} style={{ padding: "12px", border: "none", background: "white", textAlign: "left", cursor: "pointer", fontSize: "14px", color: "#dc3545", fontWeight: "500" }}>
-                                                                                    🗑️ Xóa bình luận
-                                                                                </button>
-                                                                            </>
-                                                                        ) : (
-                                                                            <>
-                                                                                <button onClick={() => handleReportHideComment("Ẩn bình luận")} style={{ padding: "12px", border: "none", background: "white", textAlign: "left", cursor: "pointer", fontSize: "14px", borderBottom: "1px solid #eee", fontWeight: "500" }}>
-                                                                                    👁️‍🗨️ Ẩn bình luận
-                                                                                </button>
-                                                                                <button onClick={() => handleReportHideComment("Chặn user")} style={{ padding: "12px", border: "none", background: "white", textAlign: "left", cursor: "pointer", fontSize: "14px", borderBottom: "1px solid #eee", fontWeight: "500" }}>
-                                                                                    🚫 Chặn {cmt.author_name}
-                                                                                </button>
-                                                                                <button onClick={() => handleReportHideComment("Báo cáo")} style={{ padding: "12px", border: "none", background: "white", textAlign: "left", cursor: "pointer", fontSize: "14px", color: "#dc3545", fontWeight: "500" }}>
-                                                                                    ⚠️ Báo cáo bình luận
-                                                                                </button>
-                                                                            </>
-                                                                        )}
+                                                                        className="menu-trigger"
+                                                                        style={{ 
+                                                                            cursor: "pointer", 
+                                                                            color: "#65676B", 
+                                                                            fontSize: "18px", 
+                                                                            width: "32px", 
+                                                                            height: "32px",
+                                                                            display: "flex", 
+                                                                            alignItems: "center", 
+                                                                            justifyContent: "center",
+                                                                            borderRadius: "50%"
+                                                                        }}
+                                                                        onClick={() => setActiveCommentMenu(activeCommentMenu === cmt._id ? null : cmt._id)}
+                                                                    >
+                                                                        •••
                                                                     </div>
-                                                                )}
+                                                                    {activeCommentMenu === cmt._id && (
+                                                                        <div 
+                                                                            className="popup-menu"
+                                                                            style={{
+                                                                                position: "absolute",
+                                                                                top: "100%",
+                                                                                right: "0",
+                                                                                marginTop: "4px",
+                                                                                background: "white", 
+                                                                                border: "1px solid #ddd", 
+                                                                                borderRadius: "8px",
+                                                                                boxShadow: "0 2px 12px rgba(0,0,0,0.15)", 
+                                                                                minWidth: "200px",
+                                                                                zIndex: 100,
+                                                                                display: "flex", 
+                                                                                flexDirection: "column", 
+                                                                                overflow: "hidden"
+                                                                            }}>
+                                                                            {isCommentOwner ? (
+                                                                                <>
+                                                                                    <button onClick={() => handleEditComment(cmt)} style={{ padding: "12px", border: "none", background: "white", textAlign: "left", cursor: "pointer", fontSize: "14px", borderBottom: "1px solid #eee", fontWeight: "500" }}>
+                                                                                        ✏️ Chỉnh sửa bình luận
+                                                                                    </button>
+                                                                                    <button onClick={() => handleDeleteComment(post._id, cmt._id)} style={{ padding: "12px", border: "none", background: "white", textAlign: "left", cursor: "pointer", fontSize: "14px", color: "#dc3545", fontWeight: "500" }}>
+                                                                                        🗑️ Xóa bình luận
+                                                                                    </button>
+                                                                                </>
+                                                                            ) : (
+                                                                                <>
+                                                                                    <button onClick={() => handleReportHideComment("Ẩn bình luận")} style={{ padding: "12px", border: "none", background: "white", textAlign: "left", cursor: "pointer", fontSize: "14px", borderBottom: "1px solid #eee", fontWeight: "500" }}>
+                                                                                        👁️‍🗨️ Ẩn bình luận
+                                                                                    </button>
+                                                                                    <button onClick={() => handleReportHideComment("Chặn user")} style={{ padding: "12px", border: "none", background: "white", textAlign: "left", cursor: "pointer", fontSize: "14px", borderBottom: "1px solid #eee", fontWeight: "500" }}>
+                                                                                        🚫 Chặn {cmt.author_name}
+                                                                                    </button>
+                                                                                    <button onClick={() => handleReportHideComment("Báo cáo")} style={{ padding: "12px", border: "none", background: "white", textAlign: "left", cursor: "pointer", fontSize: "14px", color: "#dc3545", fontWeight: "500" }}>
+                                                                                        ⚠️ Báo cáo bình luận
+                                                                                    </button>
+                                                                                </>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
                                                             </div>
-                                                        </div>
                                                         )}
                                                     </div>
                                                 </div>
@@ -668,10 +712,11 @@ useEffect(() => {
                     )}
                 </div>
             ))}
+            
             {isCreateModalOpen && (
                 <div style={{
                     position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
-                    backgroundColor: "rgba(244, 244, 244, 0.8)", // Nền mờ giống Facebook
+                    backgroundColor: "rgba(244, 244, 244, 0.8)",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     zIndex: 1000
                 }}>
@@ -679,7 +724,6 @@ useEffect(() => {
                         background: "white", width: "500px", borderRadius: "10px",
                         boxShadow: "0 12px 28px rgba(0,0,0,0.2)", display: "flex", flexDirection: "column"
                     }}>
-                        {/* Header Modal */}
                         <div style={{ position: "relative", padding: "15px", borderBottom: "1px solid #e4e6eb", textAlign: "center" }}>
                             <h3 style={{ margin: 0, fontSize: "20px", fontWeight: "bold" }}>Tạo bài viết</h3>
                             <button 
@@ -690,7 +734,6 @@ useEffect(() => {
                             </button>
                         </div>
 
-                        {/* Thông tin User trong Modal */}
                         <div style={{ padding: "15px", display: "flex", alignItems: "center", gap: "10px" }}>
                             <div style={{ width: "40px", height: "40px", background: "#e4e6eb", borderRadius: "50%", overflow: "hidden" }}>
                                 {currentUser?.avatar_url ? <img src={currentUser.avatar_url} alt="avatar" style={{width: "100%", height:"100%", objectFit:"cover"}}/> : <div style={{width:"100%", height:"100%", display:"flex", alignItems:"center", justifyContent:"center"}}>👤</div>}
@@ -705,7 +748,6 @@ useEffect(() => {
                             </div>
                         </div>
 
-                        {/* Khung nhập nội dung */}
                         <div style={{ padding: "0 15px", flex: 1 }}>
                             <textarea
                                 placeholder="Bạn đang nghĩ gì?"
@@ -716,7 +758,6 @@ useEffect(() => {
                             />
                         </div>
 
-                        {/* Khu vực thêm tiện ích vào bài viết */}
                         <div style={{ padding: "15px" }}>
                             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", border: "1px solid #ced0d4", borderRadius: "8px", padding: "10px 15px", boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}>
                                 <span style={{ fontWeight: "600", color: "#050505", cursor: "pointer" }}>Thêm vào bài viết của bạn</span>
@@ -729,7 +770,6 @@ useEffect(() => {
                             </div>
                         </div>
 
-                        {/* Nút Đăng */}
                         <div style={{ padding: "0 15px 15px 15px" }}>
                             <button 
                                 onClick={handleSubmitPost}

@@ -21,7 +21,8 @@ import {
   FaAngleDoubleRight,
   FaFilter,
   FaPlusCircle,
-  FaMinusCircle
+  FaMinusCircle,
+  FaLink
 } from 'react-icons/fa';
 import shopApi from '../../api/api';
 import '../../css/ShopProducts.css';
@@ -70,6 +71,8 @@ const ShopProducts = () => {
   const [saving, setSaving] = useState(false);
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
+  const [imageUrlInput, setImageUrlInput] = useState(''); // State cho input URL
+  const [imageUploadMethod, setImageUploadMethod] = useState('url'); // 'url' hoặc 'file'
 
   // Debounce search
   useEffect(() => {
@@ -120,7 +123,6 @@ const ShopProducts = () => {
     try {
       const response = await shopApi.get('/api/v1/categories');
       
-      // Chuẩn hóa: tạo trường 'id' từ '_id'
       const normalizedCategories = (response.data || []).map(cat => ({
         ...cat,
         id: cat._id
@@ -167,7 +169,21 @@ const ShopProducts = () => {
     setVariants(updatedVariants);
   };
 
-  // Handle image selection
+  // Handle image URL input
+  const handleImageUrlChange = (e) => {
+    const url = e.target.value;
+    setImageUrlInput(url);
+    setImagePreview(url);
+    // Không set imageFile khi dùng URL
+    setImageFile(null);
+    // Lưu URL vào formData
+    setFormData(prev => ({
+      ...prev,
+      image_url: url
+    }));
+  };
+
+  // Handle image file selection
   const handleImageSelect = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -184,18 +200,36 @@ const ShopProducts = () => {
 
     setImageFile(file);
     setImagePreview(URL.createObjectURL(file));
+    // Xóa URL input khi chọn file
+    setImageUrlInput('');
+    setFormData(prev => ({
+      ...prev,
+      image_url: ''
+    }));
   };
 
-  // Upload image
-  const uploadImage = async (productId) => {
-    if (!imageFile) return null;
+  // Reset image states
+  const resetImage = () => {
+    setImageFile(null);
+    setImagePreview('');
+    setImageUrlInput('');
+    setImageUploadMethod('url');
+    setFormData(prev => ({
+      ...prev,
+      image_url: ''
+    }));
+  };
 
-    const formData = new FormData();
-    formData.append('file', imageFile);
+  // Upload image (chỉ khi có file upload)
+  const uploadImage = async (productId) => {
+    if (!imageFile) return formData.image_url; // Trả về URL nếu có
+
+    const formDataUpload = new FormData();
+    formDataUpload.append('file', imageFile);
 
     try {
       setUploading(true);
-      const response = await shopApi.post(`/api/v1/shop/products/${productId}/upload-image`, formData, {
+      const response = await shopApi.post(`/api/v1/shop/products/${productId}/upload-image`, formDataUpload, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       return response.data.image_url;
@@ -236,60 +270,60 @@ const ShopProducts = () => {
       return;
     }
 
-     try {
-    setSaving(true);
-    
-    // Chuẩn bị dữ liệu gửi lên
-    const productData = {
-      name: formData.name,
-      description: formData.description,
-      category_id: formData.category_id,
-      origin: formData.origin,
-      certification: formData.certification,
-      image_url: null, // Sẽ upload sau
-      variants: variants.map(v => ({
-        name: v.name,
-        price: parseFloat(v.price),
-        stock: parseInt(v.stock) || 0,
-        sku: v.sku || null
-      }))
-    };
+    try {
+      setSaving(true);
+      
+      // Chuẩn bị dữ liệu gửi lên
+      const productData = {
+        name: formData.name,
+        description: formData.description,
+        category_id: formData.category_id,
+        origin: formData.origin,
+        certification: formData.certification,
+        image_url: formData.image_url || null, // Sử dụng URL nếu có
+        variants: variants.map(v => ({
+          name: v.name,
+          price: parseFloat(v.price),
+          stock: parseInt(v.stock) || 0,
+          sku: v.sku || null
+        }))
+      };
 
-    // Nếu không có variants, thêm price và stock
-    if (variants.length === 0) {
-      productData.price = parseFloat(formData.price);
-      productData.stock = parseInt(formData.stock) || 0;
+      // Nếu không có variants, thêm price và stock
+      if (variants.length === 0) {
+        productData.price = parseFloat(formData.price);
+        productData.stock = parseInt(formData.stock) || 0;
+      }
+
+      console.log('Sending product data:', JSON.stringify(productData, null, 2));
+      
+      // Tạo sản phẩm
+      const response = await shopApi.post('/api/v1/shop/products', productData);
+      console.log('Product created:', response.data);
+
+      // Upload ảnh nếu có file upload
+      if (imageFile) {
+        await uploadImage(response.data.id);
+      }
+
+      // Refresh danh sách
+      fetchProducts();
+      
+      setShowAddModal(false);
+      resetForm();
+      alert('Thêm sản phẩm thành công!');
+    } catch (error) {
+      console.error('Error adding product:', error);
+      if (error.response) {
+        console.error('Server response:', error.response.data);
+        alert(`Lỗi: ${JSON.stringify(error.response.data.detail) || 'Có lỗi xảy ra'}`);
+      } else {
+        alert('Có lỗi xảy ra khi thêm sản phẩm');
+      }
+    } finally {
+      setSaving(false);
     }
-
-    console.log('Sending product data:', JSON.stringify(productData, null, 2));
-    
-    // Tạo sản phẩm
-    const response = await shopApi.post('/api/v1/shop/products', productData);
-    console.log('Product created:', response.data);
-
-    // Upload ảnh nếu có
-    if (imageFile) {
-      await uploadImage(response.data.id);
-    }
-
-    // Refresh danh sách
-    fetchProducts();
-    
-    setShowAddModal(false);
-    resetForm();
-    alert('Thêm sản phẩm thành công!');
-  } catch (error) {
-    console.error('Error adding product:', error);
-    if (error.response) {
-      console.error('Server response:', error.response.data);
-      alert(`Lỗi: ${JSON.stringify(error.response.data.detail) || 'Có lỗi xảy ra'}`);
-    } else {
-      alert('Có lỗi xảy ra khi thêm sản phẩm');
-    }
-  } finally {
-    setSaving(false);
-  }
-};
+  };
 
   // Edit product
   const handleEditProduct = (product) => {
@@ -306,6 +340,9 @@ const ShopProducts = () => {
     });
     setVariants(product.variants || []);
     setImagePreview(product.image_url || '');
+    setImageUrlInput(product.image_url || '');
+    setImageFile(null);
+    setImageUploadMethod(product.image_url ? 'url' : 'url');
     setShowEditModal(true);
   };
 
@@ -316,17 +353,20 @@ const ShopProducts = () => {
     try {
       setSaving(true);
       
-      await shopApi.put(`/api/v1/shop/products/${selectedProduct.id}`, {
+      const updateData = {
         name: formData.name,
         description: formData.description,
         category_id: formData.category_id,
         origin: formData.origin,
         certification: formData.certification,
         price: parseFloat(formData.price),
-        stock: parseInt(formData.stock)
-      });
+        stock: parseInt(formData.stock),
+        image_url: formData.image_url || null // Cập nhật URL nếu có
+      };
 
-      // Upload ảnh mới nếu có
+      await shopApi.put(`/api/v1/shop/products/${selectedProduct.id}`, updateData);
+
+      // Upload ảnh mới nếu có file upload
       if (imageFile) {
         await uploadImage(selectedProduct.id);
       }
@@ -391,6 +431,8 @@ const ShopProducts = () => {
     setVariants([]);
     setImageFile(null);
     setImagePreview('');
+    setImageUrlInput('');
+    setImageUploadMethod('url');
     setSelectedProduct(null);
   };
 
@@ -419,6 +461,69 @@ const ShopProducts = () => {
     setSelectedStatus('');
     setPagination(prev => ({ ...prev, page: 1 }));
   };
+
+  // Image upload section component
+  const ImageUploadSection = () => (
+    <div className="form-group full-width">
+      <label>Hình ảnh</label>
+      
+      <div className="image-method-selector">
+        <button
+          type="button"
+          className={`method-btn ${imageUploadMethod === 'url' ? 'active' : ''}`}
+          onClick={() => setImageUploadMethod('url')}
+        >
+          <FaLink /> Nhập URL
+        </button>
+        <button
+          type="button"
+          className={`method-btn ${imageUploadMethod === 'file' ? 'active' : ''}`}
+          onClick={() => setImageUploadMethod('file')}
+        >
+          <FaUpload /> Tải lên từ máy
+        </button>
+      </div>
+
+      {imageUploadMethod === 'url' ? (
+        <div className="image-url-input">
+          <input
+            type="text"
+            placeholder="Nhập URL hình ảnh (vd: https://example.com/image.jpg)"
+            value={imageUrlInput}
+            onChange={handleImageUrlChange}
+          />
+          <p className="input-hint">Hỗ trợ các định dạng: JPG, PNG, GIF, WebP</p>
+        </div>
+      ) : (
+        <div className="image-upload-container">
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleImageSelect}
+            style={{ display: 'none' }}
+            id="product-image"
+          />
+          <label htmlFor="product-image" className="image-upload-btn">
+            <FaUpload /> Chọn ảnh từ máy
+          </label>
+          <p className="input-hint">Hỗ trợ: JPG, PNG, GIF, WebP (Tối đa 5MB)</p>
+        </div>
+      )}
+      
+      {imagePreview && (
+        <div className="image-preview">
+          <img src={imagePreview} alt="Preview" />
+          <button 
+            type="button"
+            className="remove-image"
+            onClick={resetImage}
+          >
+            <FaTimes />
+          </button>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className="shop-products">
@@ -801,37 +906,8 @@ const ShopProducts = () => {
                   )}
                 </div>
 
-                <div className="form-group full-width">
-                  <label>Hình ảnh</label>
-                  <div className="image-upload-container">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageSelect}
-                      style={{ display: 'none' }}
-                      id="product-image"
-                    />
-                    <label htmlFor="product-image" className="image-upload-btn">
-                      <FaUpload /> Chọn ảnh
-                    </label>
-                    
-                    {imagePreview && (
-                      <div className="image-preview">
-                        <img src={imagePreview} alt="Preview" />
-                        <button 
-                          type="button"
-                          className="remove-image"
-                          onClick={() => {
-                            setImageFile(null);
-                            setImagePreview('');
-                          }}
-                        >
-                          <FaTimes />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                {/* Image Upload Section - SỬA LẠI PHẦN NÀY */}
+                <ImageUploadSection />
               </div>
             </div>
 
@@ -855,7 +931,7 @@ const ShopProducts = () => {
         </div>
       )}
 
-      {/* Edit Product Modal */}
+      {/* Edit Product Modal - SỬA LẠI PHẦN HÌNH ẢNH TƯƠNG TỰ */}
       {showEditModal && (
         <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
           <div className="modal-content product-modal" onClick={e => e.stopPropagation()}>
@@ -951,37 +1027,8 @@ const ShopProducts = () => {
                   />
                 </div>
 
-                <div className="form-group full-width">
-                  <label>Hình ảnh</label>
-                  <div className="image-upload-container">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageSelect}
-                      style={{ display: 'none' }}
-                      id="edit-product-image"
-                    />
-                    <label htmlFor="edit-product-image" className="image-upload-btn">
-                      <FaUpload /> Chọn ảnh mới
-                    </label>
-                    
-                    {(imagePreview || formData.image_url) && (
-                      <div className="image-preview">
-                        <img src={imagePreview || formData.image_url} alt="Preview" />
-                        <button 
-                          type="button"
-                          className="remove-image"
-                          onClick={() => {
-                            setImageFile(null);
-                            setImagePreview('');
-                          }}
-                        >
-                          <FaTimes />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                {/* Image Upload Section for Edit */}
+                <ImageUploadSection />
               </div>
             </div>
 

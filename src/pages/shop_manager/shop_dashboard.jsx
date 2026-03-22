@@ -1,3 +1,4 @@
+// src/pages/shop/ShopDashboard.jsx
 import React, { useState, useEffect } from 'react';
 import { 
   FaShoppingBag, 
@@ -6,13 +7,14 @@ import {
   FaExchangeAlt,
   FaDownload
 } from 'react-icons/fa';
-import { Line, Doughnut } from 'react-chartjs-2';
+import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
   PointElement,
   LineElement,
+  BarElement,
   Title,
   Tooltip,
   Legend,
@@ -37,20 +39,40 @@ ChartJS.register(
 
 const ShopDashboard = () => {
   const [stats, setStats] = useState({
-    totalPurchases: 15000,
-    totalProducts: 1000,
-    totalRevenue: 10000000,
-    totalReturns: 10
+    products: {
+      total: 0,
+      in_stock: 0,
+      out_of_stock: 0
+    },
+    orders: {
+      total: 0,
+      today: 0
+    },
+    revenue: {
+      total: 0,
+      this_month: 0
+    },
+    shop: {
+      name: '',
+      logo_url: '',
+      is_verified: false,
+      followers_count: 0
+    }
   });
 
   const [recentActivities, setRecentActivities] = useState([]);
   const [newProducts, setNewProducts] = useState([]);
+  const [chartData, setChartData] = useState({
+    labels: [],
+    orders: [],
+    revenue: []
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchDashboardData();
+    fetchChartData();
     
-    // Cleanup function để tránh memory leak
     return () => {
       setStats({});
       setRecentActivities([]);
@@ -62,20 +84,45 @@ const ShopDashboard = () => {
     try {
       setLoading(true);
       
-      // Thử gọi API, nếu lỗi thì dùng dữ liệu mẫu
       try {
-        const [statsRes, activitiesRes, productsRes] = await Promise.all([
-          api.get('/api/v1/shop/dashboard/stats'),
-          api.get('/api/v1/shop/dashboard/recent-activities'),
-          api.get('api/v1/products?limit=5&sort=newest')
-        ]);
-
+        // Gọi API dashboard stats
+        const statsRes = await api.get('/api/v1/shop/dashboard/stats');
+        console.log('Dashboard stats:', statsRes.data);
         setStats(statsRes.data);
+        
+        // Gọi API recent activities
+        const activitiesRes = await api.get('/api/v1/shop/dashboard/recent-activities');
         setRecentActivities(activitiesRes.data);
-        setNewProducts(productsRes.data);
+        
+        // Gọi API sản phẩm mới
+        const productsRes = await api.get('/api/v1/shop/products?limit=5&sort=newest');
+        setNewProducts(productsRes.data.data || []);
+        
       } catch (apiError) {
-        console.log('API chưa sẵn sàng, dùng dữ liệu mẫu');
-        // Dữ liệu mẫu
+        console.error('API Error:', apiError);
+        // Dữ liệu mẫu nếu API lỗi
+        setStats({
+          products: {
+            total: 1000,
+            in_stock: 950,
+            out_of_stock: 50
+          },
+          orders: {
+            total: 15000,
+            today: 45
+          },
+          revenue: {
+            total: 10000000,
+            this_month: 2500000
+          },
+          shop: {
+            name: 'Đặc Sản Quê Tôi',
+            logo_url: null,
+            is_verified: true,
+            followers_count: 1200
+          }
+        });
+        
         setRecentActivities([
           { type: 'order', description: 'Đơn hàng #DH001 đã được thanh toán', time: '5 phút trước' },
           { type: 'product', description: 'Sản phẩm mới "Cà phê đặc sản" được thêm', time: '1 giờ trước' },
@@ -85,11 +132,11 @@ const ShopDashboard = () => {
         ]);
         
         setNewProducts([
-          { id: 1, name: 'Cà phê đặc sản', price: 250000, stock: 50, image_url: null },
-          { id: 2, name: 'Mật ong rừng', price: 180000, stock: 30, image_url: null },
-          { id: 3, name: 'Gạo lứt đen', price: 120000, stock: 100, image_url: null },
-          { id: 4, name: 'Nấm linh chi', price: 350000, stock: 25, image_url: null },
-          { id: 5, name: 'Trà shan tuyết', price: 280000, stock: 40, image_url: null }
+          { id: '1', name: 'Cà phê đặc sản', price: 250000, stock: 50, image_url: null },
+          { id: '2', name: 'Mật ong rừng', price: 180000, stock: 30, image_url: null },
+          { id: '3', name: 'Gạo lứt đen', price: 120000, stock: 100, image_url: null },
+          { id: '4', name: 'Nấm linh chi', price: 350000, stock: 25, image_url: null },
+          { id: '5', name: 'Trà shan tuyết', price: 280000, stock: 40, image_url: null }
         ]);
       }
     } catch (error) {
@@ -99,13 +146,28 @@ const ShopDashboard = () => {
     }
   };
 
-  // Dữ liệu cho biểu đồ lượt truy cập
-  const trafficData = {
-    labels: ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'],
+  const fetchChartData = async () => {
+    try {
+      const response = await api.get('/api/v1/shop/dashboard/chart-data?days=7');
+      setChartData(response.data);
+    } catch (error) {
+      console.error('Error fetching chart data:', error);
+      // Dữ liệu mẫu
+      setChartData({
+        labels: ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'],
+        orders: [45, 52, 48, 70, 85, 92, 78],
+        revenue: [1200000, 1900000, 1500000, 2100000, 2400000, 2800000, 3100000]
+      });
+    }
+  };
+
+  // Dữ liệu cho biểu đồ lượt truy cập (dùng revenue thay vì traffic)
+  const revenueData = {
+    labels: chartData.labels.length > 0 ? chartData.labels : ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'],
     datasets: [
       {
-        label: 'Lượt truy cập',
-        data: [1200, 1900, 1500, 2100, 2400, 2800, 3100],
+        label: 'Doanh thu',
+        data: chartData.revenue.length > 0 ? chartData.revenue : [1200000, 1900000, 1500000, 2100000, 2400000, 2800000, 3100000],
         borderColor: '#4bc0c0',
         backgroundColor: 'rgba(75, 192, 192, 0.1)',
         borderWidth: 2,
@@ -120,7 +182,20 @@ const ShopDashboard = () => {
     ]
   };
 
-  // Dữ liệu cho biểu đồ tròn
+  // Dữ liệu cho biểu đồ đơn hàng
+  const ordersData = {
+    labels: chartData.labels.length > 0 ? chartData.labels : ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'],
+    datasets: [
+      {
+        label: 'Số lượng đơn hàng',
+        data: chartData.orders.length > 0 ? chartData.orders : [45, 52, 48, 70, 85, 92, 78],
+        backgroundColor: 'rgba(54, 162, 235, 0.8)',
+        borderRadius: 6
+      }
+    ]
+  };
+
+  // Dữ liệu cho biểu đồ tròn (category distribution - tạm thời dùng mẫu)
   const categoryData = {
     labels: ['Nông Sản', 'Hải Sản', 'Đặc Sản'],
     datasets: [
@@ -154,7 +229,12 @@ const ShopDashboard = () => {
         titleColor: '#fff',
         bodyColor: '#fff',
         padding: 10,
-        cornerRadius: 8
+        cornerRadius: 8,
+        callbacks: {
+          label: function(context) {
+            return `${context.dataset.label}: ${formatCurrency(context.raw)}`;
+          }
+        }
       }
     },
     scales: {
@@ -165,7 +245,7 @@ const ShopDashboard = () => {
         },
         ticks: {
           callback: function(value) {
-            return value.toLocaleString('vi-VN');
+            return formatCompactNumber(value);
           }
         }
       },
@@ -178,6 +258,37 @@ const ShopDashboard = () => {
     elements: {
       line: {
         tension: 0.4
+      }
+    }
+  };
+
+  const barOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: false
+      },
+      tooltip: {
+        backgroundColor: 'rgba(0,0,0,0.8)',
+        callbacks: {
+          label: function(context) {
+            return `Số đơn: ${context.raw}`;
+          }
+        }
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        grid: {
+          color: 'rgba(0,0,0,0.05)'
+        }
+      },
+      x: {
+        grid: {
+          display: false
+        }
       }
     }
   };
@@ -212,11 +323,21 @@ const ShopDashboard = () => {
       currency: 'VND',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
-    }).format(amount);
+    }).format(amount || 0);
   };
 
   const formatNumber = (num) => {
-    return new Intl.NumberFormat('vi-VN').format(num);
+    return new Intl.NumberFormat('vi-VN').format(num || 0);
+  };
+
+  const formatCompactNumber = (num) => {
+    if (num >= 1000000) {
+      return (num / 1000000).toFixed(1) + 'tr';
+    }
+    if (num >= 1000) {
+      return (num / 1000).toFixed(0) + 'k';
+    }
+    return num.toString();
   };
 
   if (loading) {
@@ -250,7 +371,7 @@ const ShopDashboard = () => {
             <FaShoppingBag />
           </div>
           <div className="stat-card__content">
-            <h3 className="stat-card__value">{formatNumber(stats.totalPurchases)}</h3>
+            <h3 className="stat-card__value">{formatNumber(stats.orders?.total || 0)}</h3>
             <p className="stat-card__label">Lượt Mua</p>
           </div>
         </div>
@@ -260,7 +381,7 @@ const ShopDashboard = () => {
             <FaBox />
           </div>
           <div className="stat-card__content">
-            <h3 className="stat-card__value">{formatNumber(stats.totalProducts)}</h3>
+            <h3 className="stat-card__value">{formatNumber(stats.products?.total || 0)}</h3>
             <p className="stat-card__label">Sản Phẩm</p>
           </div>
         </div>
@@ -270,7 +391,7 @@ const ShopDashboard = () => {
             <FaMoneyBillWave />
           </div>
           <div className="stat-card__content">
-            <h3 className="stat-card__value">{formatCurrency(stats.totalRevenue)}</h3>
+            <h3 className="stat-card__value">{formatCurrency(stats.revenue?.total || 0)}</h3>
             <p className="stat-card__label">Thu Nhập</p>
           </div>
         </div>
@@ -280,8 +401,8 @@ const ShopDashboard = () => {
             <FaExchangeAlt />
           </div>
           <div className="stat-card__content">
-            <h3 className="stat-card__value">{formatNumber(stats.totalReturns)}</h3>
-            <p className="stat-card__label">Đổi Trả</p>
+            <h3 className="stat-card__value">{formatNumber(stats.products?.out_of_stock || 0)}</h3>
+            <p className="stat-card__label">Hết Hàng</p>
           </div>
         </div>
       </div>
@@ -290,47 +411,22 @@ const ShopDashboard = () => {
       <div className="dashboard__charts">
         <div className="chart-card">
           <div className="chart-card__header">
-            <h3>Lượt Truy Cập</h3>
+            <h3>Doanh Thu 7 Ngày Qua</h3>
             <button className="chart-card__export">
               <FaDownload /> Tải báo cáo
             </button>
           </div>
           <div className="chart-card__body">
-            <Line data={trafficData} options={lineOptions} />
+            <Line data={revenueData} options={lineOptions} />
           </div>
         </div>
 
         <div className="chart-card">
           <div className="chart-card__header">
-            <h3>Lượt Mua Hàng</h3>
+            <h3>Số Lượng Đơn Hàng</h3>
           </div>
-          <div className="chart-card__body doughnut-container">
-            <div className="doughnut-wrapper">
-              <Doughnut data={categoryData} options={doughnutOptions} />
-            </div>
-            <div className="category-legend">
-              <div className="category-item">
-                <span>
-                  <span className="category-dot blue"></span>
-                  Nông Sản
-                </span>
-                <span className="category-percent">45%</span>
-              </div>
-              <div className="category-item">
-                <span>
-                  <span className="category-dot green"></span>
-                  Hải Sản
-                </span>
-                <span className="category-percent">34%</span>
-              </div>
-              <div className="category-item">
-                <span>
-                  <span className="category-dot yellow"></span>
-                  Đặc Sản
-                </span>
-                <span className="category-percent">21%</span>
-              </div>
-            </div>
+          <div className="chart-card__body">
+            <Bar data={ordersData} options={barOptions} />
           </div>
         </div>
       </div>
@@ -340,7 +436,9 @@ const ShopDashboard = () => {
         <div className="dashboard__new-products">
           <div className="section-header">
             <h3>Sản Phẩm Mới</h3>
-            <button className="view-all">Xem tất cả</button>
+            <button className="view-all" onClick={() => window.location.href = '/shop/products'}>
+              Xem tất cả
+            </button>
           </div>
           <div className="products-list">
             {newProducts.length > 0 ? (

@@ -21,6 +21,12 @@ import ShopOrders from "./pages/shop_manager/shop_order.jsx";
 import ShopRevenue from "./pages/shop_manager/shop_Statistics.jsx";
 import ShopReturns from "./pages/shop_manager/ShopReturns.jsx"; 
 import ShopSetting from "./pages/shop_manager/shop_setting.jsx"
+import ShopVouchers from "./pages/shop_manager/ShopVouchers.jsx";
+import ShopPage from "./pages/user/shop/Shop.jsx";
+import { Layout } from "lucide-react";
+import ShopDetailPage from "./pages/user/shop/shop_detail.jsx";
+import ProductDetailPage from "./pages/user/shop/detail_products.jsx";
+import CartPage from "./pages/user/cart.jsx";
 
 function App() {
   return (
@@ -31,6 +37,10 @@ function App() {
       <Route path="/profile" element={<Profile />} />
       <Route path="/register" element={<Register />} /> 
       <Route path="/admin/login" element={<AdminLogin />} /> 
+      <Route path="/use/shop" element={<ShopPage />} />
+      <Route path="/shop/:shop_id" element={<ShopDetailPage />} />
+      <Route path="/product/:product_id" element={<ProductDetailPage />} />
+      <Route path="/cart" element={<CartPage />} />
       <Route 
         path="/admin/dashboard" 
         element={
@@ -142,8 +152,15 @@ function App() {
           </ShopLayout>
         }
         />
+        < Route
+        path="/shop/vouchers"
+        element={
+          <ShopLayout>
+            <ShopVouchers/>
+          </ShopLayout>
+        }
+        />
     </Routes>
-    
   );
 }
 

@@ -1,53 +1,78 @@
+// components/layout/header.jsx
 import React, { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom"; // Import thêm useNavigate để chuyển trang
+import { useNavigate } from "react-router-dom";
+import { FaShoppingCart, FaBell, FaUser, FaBook, FaCog, FaSignOutAlt } from 'react-icons/fa';
+import api from "../../api/api";
 
 function Header() {
-    // State để quản lý việc ẩn/hiện menu dropdown
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [cartCount, setCartCount] = useState(0);
     
-    // Ref dùng để nhận diện click ra ngoài vùng menu
     const menuRef = useRef(null);
-    
-    // Khởi tạo hàm chuyển hướng
     const navigate = useNavigate();
 
-    // Xử lý sự kiện click ra ngoài để đóng menu
-    useEffect(() => {
-        function handleClickOutside(event) {
-            if (menuRef.current && !menuRef.current.contains(event.target)) {
-                setIsMenuOpen(false);
+    // Định nghĩa hàm fetchCartCount ở ngoài useEffect để có thể tái sử dụng
+    const fetchCartCount = async () => {
+        try {
+            const token = localStorage.getItem("user_token");
+            if (!token) {
+                setCartCount(0);
+                return;
             }
+            
+            const response = await api.get('/api/v1/cart/count');
+            console.log("Cart count response:", response.data);
+            setCartCount(response.data.count);
+        } catch (error) {
+            console.error("Error fetching cart count:", error);
+            setCartCount(0);
         }
-        document.addEventListener("mousedown", handleClickOutside);
+    };
+
+    // Effect đầu tiên: fetch khi component mount và set interval
+    useEffect(() => {
+        fetchCartCount();
+        
+        // Có thể thêm interval để cập nhật số lượng giỏ hàng định kỳ
+        const interval = setInterval(fetchCartCount, 30000); // 30 giây
+        return () => clearInterval(interval);
+    }, []);
+
+    // Effect thứ hai: lắng nghe custom event
+    useEffect(() => {
+        const handleCartUpdate = () => {
+            fetchCartCount(); // Bây giờ fetchCartCount đã được định nghĩa
+        };
+        
+        window.addEventListener('cartUpdated', handleCartUpdate);
+        
         return () => {
-            document.removeEventListener("mousedown", handleClickOutside);
+            window.removeEventListener('cartUpdated', handleCartUpdate);
         };
     }, []);
 
-    // HÀM XỬ LÝ KHI CLICK VÀO AVATAR
     const handleAvatarClick = () => {
         const token = localStorage.getItem("user_token");
         
         if (token) {
-            // Đã đăng nhập -> Bật/tắt menu
             setIsMenuOpen(!isMenuOpen);
         } else {
-            // Chưa đăng nhập -> Chuyển sang trang Login
-            navigate("/login"); 
-            // (Nếu không dùng react-router-dom, bạn có thể dùng: window.location.href = "/login";)
+            navigate("/login");
         }
     };
 
-    // HÀM XỬ LÝ ĐĂNG XUẤT
     const handleLogout = () => {
-    localStorage.removeItem("user_token");
-    localStorage.removeItem("user");
-
-    setIsMenuOpen(false);
-    navigate("/");
+        localStorage.removeItem("user_token");
+        localStorage.removeItem("user");
+        setIsMenuOpen(false);
+        setCartCount(0);
+        navigate("/");
     };
 
-    // Style chung cho các mục trong menu (để code gọn hơn)
+    const handleCartClick = () => {
+        navigate("/cart");
+    };
+
     const menuItemStyle = {
         display: "flex",
         alignItems: "center",
@@ -69,13 +94,16 @@ function Header() {
             borderBottom: "1px solid #ddd",
             width: "100%",
             boxSizing: "border-box",
+            position: "sticky",
+            top: 0,
+            zIndex: 1000
         }}>
-            {/* Khối 1: Logo (Bên trái) */}
+            {/* Logo */}
             <div style={{ width: "280px", cursor: "pointer" }} onClick={() => navigate("/")}>
                 <h2 style={{ color: "#2e7d32", margin: 0 }}>Đặc Sản Quê Tôi</h2>
             </div>
 
-            {/* Khối 2: Thanh tìm kiếm (Chính giữa) */}
+            {/* Thanh tìm kiếm */}
             <div style={{ flex: 1, display: "flex", justifyContent: "center" }}>
                 <input
                     placeholder="Tìm kiếm bài viết, sản phẩm"
@@ -86,35 +114,123 @@ function Header() {
                         borderRadius: "20px",
                         border: "1px solid #ddd",
                         backgroundColor: "#f0f2f5",
-                        outline: "none"
+                        outline: "none",
+                        transition: "all 0.3s"
+                    }}
+                    onFocus={(e) => {
+                        e.target.style.borderColor = "#2e7d32";
+                        e.target.style.backgroundColor = "white";
+                    }}
+                    onBlur={(e) => {
+                        e.target.style.borderColor = "#ddd";
+                        e.target.style.backgroundColor = "#f0f2f5";
                     }}
                 />
             </div>
 
-            {/* Khối 3: Cụm Icon (Bên phải) */}
-            <div style={{ width: "280px", display: "flex", gap: "20px", justifyContent: "flex-end", alignItems: "center", fontSize: "20px" }}>
-                <span style={{ cursor: "pointer", display: "flex", border: "1px solid #ddd", padding: "10px", borderRadius: "50%", backgroundColor: "#f0f2f5" }}>
-                    🔔
+            {/* Cụm Icon */}
+            <div style={{ 
+                width: "280px", 
+                display: "flex", 
+                gap: "20px", 
+                justifyContent: "flex-end", 
+                alignItems: "center", 
+                fontSize: "20px" 
+            }}>
+                {/* Icon Giỏ hàng */}
+                <div style={{ position: "relative", cursor: "pointer" }} onClick={handleCartClick}>
+                    <span style={{ 
+                        display: "flex", 
+                        border: "1px solid #ddd", 
+                        padding: "10px", 
+                        borderRadius: "50%", 
+                        backgroundColor: "#f0f2f5",
+                        transition: "all 0.3s"
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = "#e8f5e9";
+                        e.currentTarget.style.borderColor = "#2e7d32";
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = "#f0f2f5";
+                        e.currentTarget.style.borderColor = "#ddd";
+                    }}>
+                        <FaShoppingCart size={18} color="#2e7d32" />
+                    </span>
+                    {cartCount > 0 && (
+                        <span style={{
+                            position: "absolute",
+                            top: "-5px",
+                            right: "-5px",
+                            background: "#ff4444",
+                            color: "white",
+                            borderRadius: "50%",
+                            width: "18px",
+                            height: "18px",
+                            fontSize: "10px",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontWeight: "bold"
+                        }}>
+                            {cartCount > 99 ? "99+" : cartCount}
+                        </span>
+                    )}
+                </div>
+
+                {/* Icon Thông báo */}
+                <span style={{ 
+                    cursor: "pointer", 
+                    display: "flex", 
+                    border: "1px solid #ddd", 
+                    padding: "10px", 
+                    borderRadius: "50%", 
+                    backgroundColor: "#f0f2f5",
+                    transition: "all 0.3s"
+                }}
+                onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "#e8f5e9";
+                    e.currentTarget.style.borderColor = "#2e7d32";
+                }}
+                onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "#f0f2f5";
+                    e.currentTarget.style.borderColor = "#ddd";
+                }}>
+                    <FaBell size={18} color="#2e7d32" />
                 </span>
 
-                {/* Khu vực chứa Avatar và Dropdown Menu */}
+                {/* Avatar và Dropdown Menu */}
                 <div style={{ position: "relative" }} ref={menuRef}>
-                    
-                    {/* Nút Avatar (Đã thay đổi sự kiện onClick) */}
                     <span 
                         onClick={handleAvatarClick}
-                        style={{ cursor: "pointer", display: "flex", border: "1px solid #ddd", padding: "10px", borderRadius: "50%", backgroundColor: "#f0f2f5" }}
+                        style={{ 
+                            cursor: "pointer", 
+                            display: "flex", 
+                            border: "1px solid #ddd", 
+                            padding: "10px", 
+                            borderRadius: "50%", 
+                            backgroundColor: "#f0f2f5",
+                            transition: "all 0.3s"
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = "#e8f5e9";
+                            e.currentTarget.style.borderColor = "#2e7d32";
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = "#f0f2f5";
+                            e.currentTarget.style.borderColor = "#ddd";
+                        }}
                     >
-                        👤
+                        <FaUser size={18} color="#2e7d32" />
                     </span>
 
-                    {/* Menu Dropdown - Chỉ hiện khi isMenuOpen = true (nghĩa là phải đăng nhập rồi mới mở được) */}
+                    {/* Menu Dropdown */}
                     {isMenuOpen && (
                         <div style={{
                             position: "absolute",
                             top: "55px",
                             right: "0",
-                            width: "240px",
+                            width: "260px",
                             backgroundColor: "white",
                             borderRadius: "12px",
                             boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
@@ -124,64 +240,95 @@ function Header() {
                             flexDirection: "column",
                             fontFamily: "Arial, sans-serif"
                         }}>
-                            
-                            {/* Mục 1: Xem trang cá nhân & Tài khoản */}
-                        <div  
-                            style={{...menuItemStyle, alignItems: "flex-start"}}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f0f2f5"}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-                            
-                            // THÊM GỌI HÀM NAY ĐỂ CHUYỂN TRANG
-                            onClick={() => {
-                                navigate("/profile");
-                                setIsMenuOpen(false); // Tuỳ chọn: Đóng menu sau khi bấm để UI gọn gàng
-                            }}
-                        >
-                            <div style={{ 
-                                width: "35px", height: "35px", borderRadius: "50%", 
-                                backgroundColor: "#e4e6eb", display: "flex", justifyContent: "center", alignItems: "center", fontSize: "16px" 
-                            }}>
-                                👤
+                            {/* Xem trang cá nhân */}
+                            <div  
+                                style={{...menuItemStyle, alignItems: "flex-start"}}
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f0f2f5"}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                                onClick={() => {
+                                    navigate("/profile");
+                                    setIsMenuOpen(false);
+                                }}
+                            >
+                                <div style={{ 
+                                    width: "35px", height: "35px", borderRadius: "50%", 
+                                    backgroundColor: "#e4e6eb", display: "flex", justifyContent: "center", alignItems: "center", fontSize: "16px" 
+                                }}>
+                                    <FaUser size={16} color="#2e7d32" />
+                                </div>
+                                <div style={{ display: "flex", flexDirection: "column", gap: "5px", paddingTop: "5px" }}>
+                                    <span style={{ fontWeight: "bold" }}>Xem trang cá nhân</span>
+                                    <span style={{ fontSize: "14px", color: "#65676B" }}>Tài khoản của tôi</span>
+                                </div>
                             </div>
-                            <div style={{ display: "flex", flexDirection: "column", gap: "5px", paddingTop: "5px" }}>
-                                <span style={{ fontWeight: "bold" }}>Xem trang cá nhân</span>
-                                <span style={{ fontSize: "14px", color: "#65676B" }}>Tài khoản của tôi</span>
-                            </div>
-                        </div>
 
                             <hr style={{ border: "none", borderTop: "1px solid #eee", margin: "5px 20px" }} />
 
-                            {/* Mục 2: Lịch sử mua */}
+                            {/* Lịch sử mua */}
                             <div 
                                 style={menuItemStyle}
                                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f0f2f5"}
                                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                                onClick={() => {
+                                    navigate("/orders");
+                                    setIsMenuOpen(false);
+                                }}
                             >
-                                <span style={{ fontSize: "20px" }}>📖</span>
+                                <FaBook size={18} color="#2e7d32" />
                                 <span>Lịch sử mua</span>
                             </div>
 
-                            {/* Mục 3: Cài đặt */}
+                            {/* Giỏ hàng */}
                             <div 
                                 style={menuItemStyle}
                                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f0f2f5"}
                                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                                onClick={() => {
+                                    navigate("/cart");
+                                    setIsMenuOpen(false);
+                                }}
                             >
-                                <span style={{ fontSize: "20px" }}>⚙️</span>
+                                <FaShoppingCart size={18} color="#2e7d32" />
+                                <span>Giỏ hàng của tôi</span>
+                                {cartCount > 0 && (
+                                    <span style={{
+                                        marginLeft: "auto",
+                                        background: "#ff4444",
+                                        color: "white",
+                                        borderRadius: "12px",
+                                        padding: "2px 6px",
+                                        fontSize: "12px",
+                                        fontWeight: "bold"
+                                    }}>
+                                        {cartCount}
+                                    </span>
+                                )}
+                            </div>
+
+                            {/* Cài đặt */}
+                            <div 
+                                style={menuItemStyle}
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f0f2f5"}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                                onClick={() => {
+                                    navigate("/settings");
+                                    setIsMenuOpen(false);
+                                }}
+                            >
+                                <FaCog size={18} color="#2e7d32" />
                                 <span>Cài đặt</span>
                             </div>
 
-                            {/* Mục 4: Đăng xuất */}
+                            {/* Đăng xuất */}
                             <div 
                                 style={menuItemStyle}
                                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f0f2f5"}
                                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                                 onClick={handleLogout}
                             >
-                                <span style={{ fontSize: "20px" }}>🚪</span>
+                                <FaSignOutAlt size={18} color="#ff4444" />
                                 <span>Đăng xuất</span>
                             </div>
-
                         </div>
                     )}
                 </div>
