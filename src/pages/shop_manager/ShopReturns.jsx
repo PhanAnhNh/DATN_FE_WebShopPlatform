@@ -25,7 +25,7 @@ import {
   FaDownload,
   FaImage
 } from 'react-icons/fa';
-import shopApi from '../../api/api';
+import {shopApi} from '../../api/api';
 import '../../css/ShopReturns.css';
 
 const ShopReturns = () => {

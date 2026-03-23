@@ -1,7 +1,8 @@
+// src/pages/admin/Dashboard.jsx
 import React, { useState, useEffect } from 'react';
 import { Users, ShoppingBag, FileText, AlertOctagon, Download } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import api from '../../api/api';
+import { adminApi } from '../../api/api'; // SỬA: import adminApi
 
 // Dữ liệu mẫu cho biểu đồ đường
 const visitData = [
@@ -33,93 +34,107 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-useEffect(() => {
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // DEBUG: Kiểm tra token và user data
-      const token = localStorage.getItem('admin_token');
-      const userData = localStorage.getItem('admin_data');
-      console.log('Token exists:', !!token);
-      console.log('User data:', userData ? JSON.parse(userData) : null);
-      
-      // Kiểm tra cả user_token nếu có
-      const userToken = localStorage.getItem('user_token');
-      const user = localStorage.getItem('user');
-      console.log('User token exists:', !!userToken);
-      console.log('User:', user ? JSON.parse(user) : null);  // SỬA: console.log
-      
-      if (!token) {
-        setError('Vui lòng đăng nhập lại');
-        setTimeout(() => {
-          window.location.href = '/admin/login';
-        }, 2000);
-        return;
-      }
-
-      // Kiểm tra role từ userData
-      if (userData) {
-        const parsedUser = JSON.parse(userData);
-        if (parsedUser.role !== 'admin') {
-          setError('Tài khoản không có quyền admin');
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // DEBUG: Kiểm tra token
+        const token = localStorage.getItem('admin_token');
+        const userData = localStorage.getItem('admin_data');
+        console.log('Admin token exists:', !!token);
+        console.log('Admin data:', userData ? JSON.parse(userData) : null);
+        
+        if (!token) {
+          setError('Vui lòng đăng nhập lại');
+          setTimeout(() => {
+            window.location.href = '/admin/login';
+          }, 2000);
           return;
         }
-      }
 
-      // Thử gọi từng API riêng để biết API nào lỗi
-      try {
-        console.log('Calling dashboard API...');
-        const dashboardRes = await api.get('/api/v1/admin/dashboard');
-        console.log('Dashboard response:', dashboardRes.data);
-        
-        if (dashboardRes?.data) {
+        // Kiểm tra role từ userData
+        if (userData) {
+          const parsedUser = JSON.parse(userData);
+          if (parsedUser.role !== 'admin') {
+            setError('Tài khoản không có quyền admin');
+            return;
+          }
+        }
+
+        // Gọi dashboard API bằng adminApi
+        try {
+          console.log('Calling admin dashboard API...');
+          const dashboardRes = await adminApi.get('/api/v1/admin/dashboard');
+          console.log('Dashboard response:', dashboardRes.data);
+          
+          if (dashboardRes?.data) {
+            setStats({
+              users: dashboardRes.data.total_users || 0,
+              shops: dashboardRes.data.total_shops || 0,
+              posts: dashboardRes.data.total_posts || 0,
+              reports: dashboardRes.data.total_reports || 0
+            });
+          }
+        } catch (dashboardError) {
+          console.error('Dashboard API error:', dashboardError.response?.data || dashboardError.message);
+          
+          if (dashboardError.response?.status === 401) {
+            localStorage.removeItem('admin_token');
+            localStorage.removeItem('admin_data');
+            window.location.href = '/admin/login';
+            return;
+          }
+          
+          // Dùng dữ liệu mẫu
           setStats({
-            users: dashboardRes.data.total_users || 0,
-            shops: dashboardRes.data.total_shops || 0,
-            posts: dashboardRes.data.total_posts || 0,
-            reports: dashboardRes.data.total_reports || 0
+            users: 1250,
+            shops: 48,
+            posts: 320,
+            reports: 12
           });
         }
-      } catch (dashboardError) {
-        console.error('Dashboard API error:', dashboardError.response?.data || dashboardError.message);
-      }
 
-      // Thử gọi category API
-      try {
-        console.log('Calling category API...');
-        const categoryRes = await api.get('/api/v1/admin/post-category');
-        console.log('Category response:', categoryRes.data);
+        // Gọi category API bằng adminApi
+        try {
+          console.log('Calling admin category API...');
+          const categoryRes = await adminApi.get('/api/v1/admin/post-category');
+          console.log('Category response:', categoryRes.data);
+          
+          if (categoryRes?.data && Array.isArray(categoryRes.data)) {
+            const converted = categoryRes.data.map((item, index) => ({
+              name: item.category || `Danh mục ${index + 1}`,
+              value: item.percentage || 0,
+              count: item.count || 0,
+              color: getColorForKey(item.category, index)
+            }));
+            setPostStats(converted);
+          }
+        } catch (categoryError) {
+          console.error('Category API error:', categoryError.response?.data || categoryError.message);
+          
+          if (categoryError.response?.status === 401) {
+            localStorage.removeItem('admin_token');
+            localStorage.removeItem('admin_data');
+            window.location.href = '/admin/login';
+            return;
+          }
+          
+          // Dùng dữ liệu mẫu
+          setPostStats(defaultPostStats);
+        }
         
-        if (categoryRes?.data && Array.isArray(categoryRes.data)) {
-          const converted = categoryRes.data.map((item, index) => ({
-            name: item.category || `Danh mục ${index + 1}`,
-            value: item.percentage || 0,
-            count: item.count || 0,
-            color: getColorForKey(item.category, index)
-          }));
-          setPostStats(converted);
-        }
-      } catch (categoryError) {
-        console.error('Category API error:', categoryError.response?.data || categoryError.message);
-        // Nếu API chưa có hoặc lỗi 403, dùng dữ liệu mẫu
-        if (categoryError.response?.status === 403) {
-          console.log('User không có quyền truy cập API này, dùng dữ liệu mẫu');
-        }
-        setPostStats(defaultPostStats);
+      } catch (error) {
+        console.error('Lỗi khi tải dữ liệu:', error);
+        setError('Không thể kết nối đến server. Đang hiển thị dữ liệu mẫu.');
+      } finally {
+        setLoading(false);
       }
-      
-    } catch (error) {
-      console.error('Lỗi khi tải dữ liệu:', error);
-      setError('Không thể kết nối đến server. Đang hiển thị dữ liệu mẫu.');
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  fetchData();
-}, []);
+    };
+    
+    fetchData();
+  }, []);
 
   const getColorForKey = (key, index) => {
     const colors = {
@@ -140,27 +155,8 @@ useEffect(() => {
     return num.toLocaleString('vi-VN');
   };
 
-  // Hiển thị lỗi nếu có
-  if (error) {
-    return (
-      <div>
-        <div style={{ 
-          backgroundColor: '#fee2e2', 
-          border: '1px solid #ef4444',
-          borderRadius: '8px',
-          padding: '16px',
-          marginBottom: '20px',
-          color: '#991b1b',
-          textAlign: 'center'
-        }}>
-          ⚠️ {error}
-        </div>
-        {renderDashboardContent()}
-      </div>
-    );
-  }
-
-  function renderDashboardContent() {
+  // Render content
+  const renderDashboardContent = () => {
     return (
       <div>
         <h2 className="dashboard-title">Bảng Điều Khiển</h2>
@@ -299,6 +295,26 @@ useEffect(() => {
             <div className="empty-state">Đang cập nhật danh sách...</div>
           </div>
         </div>
+      </div>
+    );
+  };
+
+  // Hiển thị lỗi nếu có
+  if (error && !loading) {
+    return (
+      <div>
+        <div style={{ 
+          backgroundColor: '#fee2e2', 
+          border: '1px solid #ef4444',
+          borderRadius: '8px',
+          padding: '16px',
+          marginBottom: '20px',
+          color: '#991b1b',
+          textAlign: 'center'
+        }}>
+          ⚠️ {error}
+        </div>
+        {renderDashboardContent()}
       </div>
     );
   }

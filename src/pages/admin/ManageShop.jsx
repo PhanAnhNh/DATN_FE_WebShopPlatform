@@ -5,7 +5,7 @@ import {
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   X, Save, AlertCircle, CheckCircle, Store, MapPin, Link as LinkIcon
 } from 'lucide-react';
-import api from '../../api/api';
+import {adminApi} from '../../api/api';
 import '../../css/AdminManageLayout.css';
 import Toast from '../../components/common/Toast';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
@@ -84,7 +84,7 @@ const ShopsManagement = () => {
   try {
     setLoading(true);
     setError(null);
-    const response = await api.get('/api/v1/admin/shops');
+    const response = await adminApi.get('/api/v1/admin/shops');
     console.log('Shops data:', response.data);
     setShops(response.data);
     setTotalShops(response.data.length);
@@ -279,7 +279,7 @@ Mật khẩu: ${login_info.password}`;
 
   setSubmitting(true);
   try {
-    const response = await api.put(`/api/v1/admin/shops/${selectedShop._id}`, formData);
+    const response = await adminApi.put(`/api/v1/admin/shops/${selectedShop._id}`, formData);
     if (response.data) {
       showToast('Cập nhật cửa hàng thành công!', 'success');
       setShowModal(false);
@@ -302,7 +302,7 @@ Mật khẩu: ${login_info.password}`;
     type: 'warning',
     onConfirm: async () => {
       try {
-        const response = await api.delete(`/api/v1/admin/shops/${shopId}`);
+        const response = await adminApi.delete(`/api/v1/admin/shops/${shopId}`);
         if (response.data) {
           showToast('Xóa cửa hàng thành công!', 'success');
           fetchShops();

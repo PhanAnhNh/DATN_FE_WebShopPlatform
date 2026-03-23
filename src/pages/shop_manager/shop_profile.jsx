@@ -1,4 +1,6 @@
 // src/pages/shop/ShopProfile.jsx
+
+// src/pages/shop/ShopProfile.jsx
 import React, { useState, useEffect } from 'react';
 import { 
   FaStore, 
@@ -13,9 +15,14 @@ import {
   FaEdit,
   FaCheck,
   FaTimes,
-  FaUpload
+  FaUpload,
+  FaPlus,
+  FaTrash,
+  FaHome,
+  FaBuilding,
+  FaAddressCard
 } from 'react-icons/fa';
-import api from '../../api/api';
+import { shopApi } from '../../api/api';  // Import shopApi thay vì api mặc định
 import styles from '../../css/ShopProfile.module.css'; 
 
 const ShopProfile = () => {
@@ -66,6 +73,23 @@ const ShopProfile = () => {
     }
   });
 
+  // State cho địa chỉ
+  const [addresses, setAddresses] = useState([]);
+  const [showAddressForm, setShowAddressForm] = useState(false);
+  const [editingAddress, setEditingAddress] = useState(null);
+  const [addressFormData, setAddressFormData] = useState({
+    name: '',
+    phone: '',
+    street: '',
+    ward: '',
+    district: '',
+    city: '',
+    country: 'Việt Nam',
+    is_default: false,
+    address_type: 'home',
+    note: ''
+  });
+
   const [editMode, setEditMode] = useState({
     shop: false,
     owner: false
@@ -89,12 +113,17 @@ const ShopProfile = () => {
   // Fetch profile data
   useEffect(() => {
     fetchProfile();
+    fetchAddresses();
   }, []);
 
   const fetchProfile = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/api/v1/shop/profile');
+      console.log('Fetching shop profile with shop token...');
+      const response = await shopApi.get('/api/v1/shop/profile');
+      console.log('Shop profile response:', response.data);
+      console.log('Owner ID:', response.data.owner.id);
+      console.log('Owner username:', response.data.owner.username);
       setProfile(response.data);
       setFormData({
         shop: { ...response.data.shop },
@@ -102,12 +131,28 @@ const ShopProfile = () => {
       });
     } catch (error) {
       console.error('Error fetching profile:', error);
+      if (error.response?.status === 401) {
+        // Token hết hạn hoặc không hợp lệ, redirect về login
+        window.location.href = '/shop/login';
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  // Handle input change
+  // Fetch addresses - Dùng shopApi để lấy địa chỉ của shop owner
+  const fetchAddresses = async () => {
+    try {
+      console.log('Fetching addresses with shop token...');
+      const response = await shopApi.get('/api/v1/addresses');
+      console.log('Addresses response:', response.data);
+      setAddresses(response.data || []);
+    } catch (error) {
+      console.error('Error fetching addresses:', error);
+    }
+  };
+
+  // Các hàm còn lại giữ nguyên, chỉ thay api thành shopApi
   const handleInputChange = (type, field, value) => {
     setFormData(prev => ({
       ...prev,
@@ -118,117 +163,237 @@ const ShopProfile = () => {
     }));
   };
 
-// Trong ShopProfile.jsx - Sửa hàm saveOwnerInfo
-const saveOwnerInfo = async () => {
-  try {
-    setSaving(true);
-    const response = await api.put('/api/v1/shop/profile/owner', formData.owner);
-    
-    setProfile(prev => ({
+  const handleAddressFormChange = (field, value) => {
+    setAddressFormData(prev => ({
       ...prev,
-      owner: { ...prev.owner, ...response.data.user }
+      [field]: value
     }));
-    
-    // Cập nhật localStorage
-    const currentShopData = JSON.parse(localStorage.getItem('shop_data') || '{}');
-    const updatedShopData = {
-      ...currentShopData,
-      ...response.data.user
-    };
-    localStorage.setItem('shop_data', JSON.stringify(updatedShopData));
-    
-    // Dispatch CUSTOM event thay vì storage event
-    window.dispatchEvent(new CustomEvent('shopDataUpdate', { 
-      detail: updatedShopData 
-    }));
-    
-    setEditMode(prev => ({ ...prev, owner: false }));
-    alert('Cập nhật thông tin cá nhân thành công!');
-  } catch (error) {
-    console.error('Error saving owner info:', error);
-    alert('Có lỗi xảy ra khi cập nhật thông tin cá nhân');
-  } finally {
-    setSaving(false);
-  }
-};
+  };
 
-// Sửa hàm saveShopInfo
-const saveShopInfo = async () => {
-  try {
-    setSaving(true);
-    const response = await api.put('/api/v1/shop/profile/shop', formData.shop);
-    
-    setProfile(prev => ({
-      ...prev,
-      shop: { ...prev.shop, ...response.data }
-    }));
-    
-    // Cập nhật localStorage
-    const currentShopInfo = JSON.parse(localStorage.getItem('shop_info') || '{}');
-    const updatedShopInfo = {
-      ...currentShopInfo,
-      ...response.data
-    };
-    localStorage.setItem('shop_info', JSON.stringify(updatedShopInfo));
-    
-    // Dispatch CUSTOM event
-    window.dispatchEvent(new CustomEvent('shopInfoUpdate', { 
-      detail: updatedShopInfo 
-    }));
-    
-    setEditMode(prev => ({ ...prev, shop: false }));
-    alert('Cập nhật thông tin shop thành công!');
-  } catch (error) {
-    console.error('Error saving shop info:', error);
-    alert('Có lỗi xảy ra khi cập nhật thông tin shop');
-  } finally {
-    setSaving(false);
-  }
-};
-
-// Sửa hàm uploadAvatar
-const uploadAvatar = async (file) => {
-  const formData = new FormData();
-  formData.append('file', file);
-
-  try {
-    setUploading(prev => ({ ...prev, avatar: true }));
-    const response = await api.post('/api/v1/shop/profile/upload-avatar', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+  const resetAddressForm = () => {
+    setAddressFormData({
+      name: '',
+      phone: '',
+      street: '',
+      ward: '',
+      district: '',
+      city: '',
+      country: 'Việt Nam',
+      is_default: false,
+      address_type: 'home',
+      note: ''
     });
+    setEditingAddress(null);
+    setShowAddressForm(false);
+  };
 
-    setProfile(prev => ({
-      ...prev,
-      owner: { ...prev.owner, avatar_url: response.data.avatar_url }
-    }));
+  const handleAddAddress = () => {
+    setEditingAddress(null);
+    setAddressFormData({
+      name: profile.owner.full_name || '',
+      phone: profile.owner.phone || '',
+      street: '',
+      ward: '',
+      district: '',
+      city: '',
+      country: 'Việt Nam',
+      is_default: addresses.length === 0,
+      address_type: 'home',
+      note: ''
+    });
+    setShowAddressForm(true);
+  };
 
-    // Cập nhật localStorage
-    const shopData = JSON.parse(localStorage.getItem('shop_data') || '{}');
-    shopData.avatar_url = response.data.avatar_url;
-    localStorage.setItem('shop_data', JSON.stringify(shopData));
+  const handleEditAddress = (address) => {
+    setEditingAddress(address);
+    setAddressFormData({
+      name: address.name,
+      phone: address.phone,
+      street: address.street,
+      ward: address.ward,
+      district: address.district,
+      city: address.city,
+      country: address.country,
+      is_default: address.is_default,
+      address_type: address.address_type || 'home',
+      note: address.note || ''
+    });
+    setShowAddressForm(true);
+  };
 
-    // Dispatch CUSTOM event
-    window.dispatchEvent(new CustomEvent('shopDataUpdate', { 
-      detail: shopData 
-    }));
+  const handleSaveAddress = async () => {
+    if (!addressFormData.name.trim()) {
+      alert('Vui lòng nhập tên người nhận');
+      return;
+    }
+    if (!addressFormData.phone.trim()) {
+      alert('Vui lòng nhập số điện thoại');
+      return;
+    }
+    if (!addressFormData.street.trim()) {
+      alert('Vui lòng nhập số nhà và tên đường');
+      return;
+    }
+    if (!addressFormData.ward.trim()) {
+      alert('Vui lòng nhập phường/xã');
+      return;
+    }
+    if (!addressFormData.district.trim()) {
+      alert('Vui lòng nhập quận/huyện');
+      return;
+    }
+    if (!addressFormData.city.trim()) {
+      alert('Vui lòng nhập tỉnh/thành phố');
+      return;
+    }
 
-    alert('Upload avatar thành công!');
-  } catch (error) {
-    console.error('Error uploading avatar:', error);
-    alert('Có lỗi xảy ra khi upload avatar');
-  } finally {
-    setUploading(prev => ({ ...prev, avatar: false }));
-  }
-};
+    try {
+      setSaving(true);
+      
+      let response;
+      if (editingAddress) {
+        response = await shopApi.put(`/api/v1/addresses/${editingAddress.id}`, addressFormData);
+      } else {
+        response = await shopApi.post('/api/v1/addresses', addressFormData);
+      }
+      
+      await fetchAddresses();
+      resetAddressForm();
+      alert(editingAddress ? 'Cập nhật địa chỉ thành công!' : 'Thêm địa chỉ thành công!');
+    } catch (error) {
+      console.error('Error saving address:', error);
+      alert('Có lỗi xảy ra khi lưu địa chỉ');
+    } finally {
+      setSaving(false);
+    }
+  };
 
-  // Upload logo
+  const handleDeleteAddress = async (addressId) => {
+    if (!confirm('Bạn có chắc muốn xóa địa chỉ này?')) return;
+    
+    try {
+      await shopApi.delete(`/api/v1/addresses/${addressId}`);
+      await fetchAddresses();
+      alert('Xóa địa chỉ thành công!');
+    } catch (error) {
+      console.error('Error deleting address:', error);
+      alert('Có lỗi xảy ra khi xóa địa chỉ');
+    }
+  };
+
+  const handleSetDefaultAddress = async (addressId) => {
+    try {
+      await shopApi.post(`/api/v1/addresses/${addressId}/set-default`);
+      await fetchAddresses();
+      alert('Đã đặt địa chỉ mặc định!');
+    } catch (error) {
+      console.error('Error setting default address:', error);
+      alert('Có lỗi xảy ra');
+    }
+  };
+
+  const saveOwnerInfo = async () => {
+    try {
+      setSaving(true);
+      const response = await shopApi.put('/api/v1/shop/profile/owner', formData.owner);
+      
+      setProfile(prev => ({
+        ...prev,
+        owner: { ...prev.owner, ...response.data.user }
+      }));
+      
+      // Cập nhật localStorage
+      const currentShopData = JSON.parse(localStorage.getItem('shop_data') || '{}');
+      const updatedShopData = {
+        ...currentShopData,
+        ...response.data.user
+      };
+      localStorage.setItem('shop_data', JSON.stringify(updatedShopData));
+      
+      window.dispatchEvent(new CustomEvent('shopDataUpdate', { 
+        detail: updatedShopData 
+      }));
+      
+      setEditMode(prev => ({ ...prev, owner: false }));
+      alert('Cập nhật thông tin cá nhân thành công!');
+    } catch (error) {
+      console.error('Error saving owner info:', error);
+      alert('Có lỗi xảy ra khi cập nhật thông tin cá nhân');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveShopInfo = async () => {
+    try {
+      setSaving(true);
+      const response = await shopApi.put('/api/v1/shop/profile/shop', formData.shop);
+      
+      setProfile(prev => ({
+        ...prev,
+        shop: { ...prev.shop, ...response.data }
+      }));
+      
+      const currentShopInfo = JSON.parse(localStorage.getItem('shop_info') || '{}');
+      const updatedShopInfo = {
+        ...currentShopInfo,
+        ...response.data
+      };
+      localStorage.setItem('shop_info', JSON.stringify(updatedShopInfo));
+      
+      window.dispatchEvent(new CustomEvent('shopInfoUpdate', { 
+        detail: updatedShopInfo 
+      }));
+      
+      setEditMode(prev => ({ ...prev, shop: false }));
+      alert('Cập nhật thông tin shop thành công!');
+    } catch (error) {
+      console.error('Error saving shop info:', error);
+      alert('Có lỗi xảy ra khi cập nhật thông tin shop');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const uploadAvatar = async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      setUploading(prev => ({ ...prev, avatar: true }));
+      const response = await shopApi.post('/api/v1/shop/profile/upload-avatar', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      setProfile(prev => ({
+        ...prev,
+        owner: { ...prev.owner, avatar_url: response.data.avatar_url }
+      }));
+
+      const shopData = JSON.parse(localStorage.getItem('shop_data') || '{}');
+      shopData.avatar_url = response.data.avatar_url;
+      localStorage.setItem('shop_data', JSON.stringify(shopData));
+
+      window.dispatchEvent(new CustomEvent('shopDataUpdate', { 
+        detail: shopData 
+      }));
+
+      alert('Upload avatar thành công!');
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      alert('Có lỗi xảy ra khi upload avatar');
+    } finally {
+      setUploading(prev => ({ ...prev, avatar: false }));
+    }
+  };
+
   const uploadLogo = async (file) => {
     const formData = new FormData();
     formData.append('file', file);
 
     try {
       setUploading(prev => ({ ...prev, logo: true }));
-      const response = await api.post('/api/v1/shop/profile/upload-logo', formData, {
+      const response = await shopApi.post('/api/v1/shop/profile/upload-logo', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
@@ -237,7 +402,6 @@ const uploadAvatar = async (file) => {
         shop: { ...prev.shop, logo_url: response.data.logo_url }
       }));
 
-      // Cập nhật localStorage
       const shopInfo = JSON.parse(localStorage.getItem('shop_info') || '{}');
       shopInfo.logo_url = response.data.logo_url;
       localStorage.setItem('shop_info', JSON.stringify(shopInfo));
@@ -251,14 +415,13 @@ const uploadAvatar = async (file) => {
     }
   };
 
-  // Upload banner
   const uploadBanner = async (file) => {
     const formData = new FormData();
     formData.append('file', file);
 
     try {
       setUploading(prev => ({ ...prev, banner: true }));
-      const response = await api.post('/api/v1/shop/profile/upload-banner', formData, {
+      const response = await shopApi.post('/api/v1/shop/profile/upload-banner', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
 
@@ -275,18 +438,15 @@ const uploadAvatar = async (file) => {
     }
   };
 
-  // Handle file selection
   const handleFileSelect = (type, event) => {
     const file = event.target.files[0];
     if (!file) return;
 
-    // Kiểm tra loại file
     if (!file.type.startsWith('image/')) {
       alert('Vui lòng chọn file ảnh');
       return;
     }
 
-    // Kiểm tra kích thước (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       alert('Kích thước file không được vượt quá 5MB');
       return;
@@ -305,12 +465,10 @@ const uploadAvatar = async (file) => {
     }
   };
 
-  // Change password
   const changePassword = async () => {
     setPasswordError('');
     setPasswordSuccess('');
 
-    // Validate
     if (!passwordData.old_password || !passwordData.new_password || !passwordData.confirm_password) {
       setPasswordError('Vui lòng nhập đầy đủ thông tin');
       return;
@@ -328,7 +486,7 @@ const uploadAvatar = async (file) => {
 
     try {
       setSaving(true);
-      await api.post('/api/v1/shop/profile/change-password', {
+      await shopApi.post('/api/v1/shop/profile/change-password', {
         old_password: passwordData.old_password,
         new_password: passwordData.new_password
       });
@@ -363,6 +521,27 @@ const uploadAvatar = async (file) => {
     }).format(amount || 0);
   };
 
+  const formatFullAddress = (address) => {
+    const parts = [address.street, address.ward, address.district, address.city, address.country];
+    return parts.filter(p => p).join(', ');
+  };
+
+  const getAddressTypeIcon = (type) => {
+    switch(type) {
+      case 'home': return <FaHome />;
+      case 'office': return <FaBuilding />;
+      default: return <FaAddressCard />;
+    }
+  };
+
+  const getAddressTypeText = (type) => {
+    switch(type) {
+      case 'home': return 'Nhà riêng';
+      case 'office': return 'Văn phòng';
+      default: return 'Khác';
+    }
+  };
+
   if (loading) {
     return (
       <div className={styles["shop-profile loading"]}>
@@ -372,9 +551,10 @@ const uploadAvatar = async (file) => {
     );
   }
 
+  // Phần render giữ nguyên
   return (
     <div className={styles["shop-profile"]}>
-      {/* Banner */}
+      {/* Banner - giữ nguyên */}
       <div className={styles["profile-banner"]}>
         {profile.shop.banner_url ? (
           <img src={profile.shop.banner_url} alt="Shop Banner" />
@@ -701,19 +881,6 @@ const uploadAvatar = async (file) => {
               )}
             </div>
 
-            <div className={styles["info-item"] + ' ' + styles["full-width"]}>
-              <label>Địa chỉ</label>
-              {editMode.owner ? (
-                <input
-                  type="text"
-                  value={formData.owner.address || ''}
-                  onChange={(e) => handleInputChange('owner', 'address', e.target.value)}
-                />
-              ) : (
-                <p>{profile.owner.address || 'Chưa cập nhật'}</p>
-              )}
-            </div>
-
             <div className={styles["info-item"]}>
               <label>Ngày tham gia</label>
               <p>{formatDate(profile.owner.created_at)}</p>
@@ -721,6 +888,206 @@ const uploadAvatar = async (file) => {
           </div>
         </div>
       </div>
+
+      {/* Address Management Section - NEW */}
+      <div className={styles["profile-section"]}>
+        <div className={styles["section-header"]}>
+          <div className={styles["section-title"]}>
+            <FaMapMarkerAlt />
+            <h2>Danh sách địa chỉ</h2>
+          </div>
+          <button 
+            className={styles["add-btn"]}
+            onClick={handleAddAddress}
+          >
+            <FaPlus /> Thêm địa chỉ mới
+          </button>
+        </div>
+
+        <div className={styles["section-content"]}>
+          {addresses.length === 0 ? (
+            <div className={styles["empty-state"]}>
+              <FaMapMarkerAlt size={48} color="#ccc" />
+              <p>Chưa có địa chỉ nào</p>
+              <button onClick={handleAddAddress} className={styles["add-address-btn"]}>
+                Thêm địa chỉ đầu tiên
+              </button>
+            </div>
+          ) : (
+            <div className={styles["address-list"]}>
+              {addresses.map(address => (
+                <div key={address.id} className={`${styles["address-card"]} ${address.is_default ? styles["default"] : ''}`}>
+                  <div className={styles["address-header"]}>
+                    <div className={styles["address-type"]}>
+                      {getAddressTypeIcon(address.address_type)}
+                      <span>{getAddressTypeText(address.address_type)}</span>
+                      {address.is_default && <span className={styles["default-badge"]}>Mặc định</span>}
+                    </div>
+                    <div className={styles["address-actions"]}>
+                      <button onClick={() => handleEditAddress(address)} className={styles["edit-address-btn"]}>
+                        <FaEdit />
+                      </button>
+                      <button onClick={() => handleDeleteAddress(address.id)} className={styles["delete-address-btn"]}>
+                        <FaTrash />
+                      </button>
+                    </div>
+                  </div>
+                  <div className={styles["address-info"]}>
+                    <p><strong>{address.name}</strong> | {address.phone}</p>
+                    <p>{formatFullAddress(address)}</p>
+                    {address.note && <p className={styles["address-note"]}>Ghi chú: {address.note}</p>}
+                  </div>
+                  {!address.is_default && (
+                    <button 
+                      onClick={() => handleSetDefaultAddress(address.id)}
+                      className={styles["set-default-btn"]}
+                    >
+                      Đặt làm mặc định
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Address Form Modal */}
+      {showAddressForm && (
+        <div className={styles["modal-overlay"]}>
+          <div className={styles["modal-content"] + ' ' + styles["address-modal"]}>
+            <div className={styles["modal-header"]}>
+              <h3>{editingAddress ? 'Chỉnh sửa địa chỉ' : 'Thêm địa chỉ mới'}</h3>
+              <button className={styles["close-btn"]} onClick={resetAddressForm}>
+                <FaTimes />
+              </button>
+            </div>
+
+            <div className={styles["modal-body"]}>
+              <div className={styles["form-row"]}>
+                <div className={styles["form-group"]}>
+                  <label>Họ và tên <span className={styles["required"]}>*</span></label>
+                  <input
+                    type="text"
+                    value={addressFormData.name}
+                    onChange={(e) => handleAddressFormChange('name', e.target.value)}
+                    placeholder="Nhập họ tên người nhận"
+                  />
+                </div>
+                <div className={styles["form-group"]}>
+                  <label>Số điện thoại <span className={styles["required"]}>*</span></label>
+                  <input
+                    type="tel"
+                    value={addressFormData.phone}
+                    onChange={(e) => handleAddressFormChange('phone', e.target.value)}
+                    placeholder="Nhập số điện thoại"
+                  />
+                </div>
+              </div>
+
+              <div className={styles["form-group"]}>
+                <label>Số nhà, tên đường <span className={styles["required"]}>*</span></label>
+                <input
+                  type="text"
+                  value={addressFormData.street}
+                  onChange={(e) => handleAddressFormChange('street', e.target.value)}
+                  placeholder="VD: 123 Nguyễn Văn A"
+                />
+              </div>
+
+              <div className={styles["form-row"]}>
+                <div className={styles["form-group"]}>
+                  <label>Phường/Xã <span className={styles["required"]}>*</span></label>
+                  <input
+                    type="text"
+                    value={addressFormData.ward}
+                    onChange={(e) => handleAddressFormChange('ward', e.target.value)}
+                    placeholder="VD: Phường Hòa Hải"
+                  />
+                </div>
+                <div className={styles["form-group"]}>
+                  <label>Quận/Huyện <span className={styles["required"]}>*</span></label>
+                  <input
+                    type="text"
+                    value={addressFormData.district}
+                    onChange={(e) => handleAddressFormChange('district', e.target.value)}
+                    placeholder="VD: Quận Ngũ Hành Sơn"
+                  />
+                </div>
+              </div>
+
+              <div className={styles["form-row"]}>
+                <div className={styles["form-group"]}>
+                  <label>Tỉnh/Thành phố <span className={styles["required"]}>*</span></label>
+                  <input
+                    type="text"
+                    value={addressFormData.city}
+                    onChange={(e) => handleAddressFormChange('city', e.target.value)}
+                    placeholder="VD: Đà Nẵng"
+                  />
+                </div>
+                <div className={styles["form-group"]}>
+                  <label>Quốc gia</label>
+                  <input
+                    type="text"
+                    value={addressFormData.country}
+                    onChange={(e) => handleAddressFormChange('country', e.target.value)}
+                    placeholder="Việt Nam"
+                  />
+                </div>
+              </div>
+
+              <div className={styles["form-row"]}>
+                <div className={styles["form-group"]}>
+                  <label>Loại địa chỉ</label>
+                  <select
+                    value={addressFormData.address_type}
+                    onChange={(e) => handleAddressFormChange('address_type', e.target.value)}
+                  >
+                    <option value="home">Nhà riêng</option>
+                    <option value="office">Văn phòng</option>
+                    <option value="other">Khác</option>
+                  </select>
+                </div>
+                <div className={styles["form-group"]}>
+                  <label>&nbsp;</label>
+                  <label className={styles["checkbox-label"]}>
+                    <input
+                      type="checkbox"
+                      checked={addressFormData.is_default}
+                      onChange={(e) => handleAddressFormChange('is_default', e.target.checked)}
+                    />
+                    <span>Đặt làm địa chỉ mặc định</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className={styles["form-group"]}>
+                <label>Ghi chú</label>
+                <textarea
+                  value={addressFormData.note}
+                  onChange={(e) => handleAddressFormChange('note', e.target.value)}
+                  placeholder="Ghi chú thêm (ví dụ: gần trường, có cổng riêng...)"
+                  rows="2"
+                />
+              </div>
+            </div>
+
+            <div className={styles["modal-footer"]}>
+              <button className={styles["cancel-btn"]} onClick={resetAddressForm}>
+                Hủy
+              </button>
+              <button 
+                className={styles["save-btn"]}
+                onClick={handleSaveAddress}
+                disabled={saving}
+              >
+                {saving ? <FaSpinner className={styles["spinning"]} /> : 'Lưu địa chỉ'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Security Section */}
       <div className={styles["profile-section"] + ' ' + styles["security-section"]}>

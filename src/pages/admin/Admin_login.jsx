@@ -1,14 +1,16 @@
+// src/pages/admin/auth/AdminLogin.jsx (hoặc vị trí của bạn)
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Toast from "../../components/common/Toast"; // Import Toast
-import "../../css/AdminManageLayout.css"; // Import CSS
-import { CheckCircle, AlertCircle } from 'lucide-react'; // Import icons
+import Toast from "../../components/common/Toast";
+import "../../css/AdminManageLayout.css";
+import { CheckCircle, AlertCircle, Shield } from 'lucide-react';
 
 function AdminLogin() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
   
   // Toast states
   const [toast, setToast] = useState({
@@ -19,54 +21,72 @@ function AdminLogin() {
 
   const navigate = useNavigate();
 
-  // Hàm hiển thị toast
   const showToast = (message, type = 'success') => {
     setToast({ show: true, message, type });
   };
 
-const handleLogin = async (e) => {
-  e.preventDefault();
-  setError("");
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
 
-  try {
-    const response = await fetch("http://localhost:8000/api/v1/admin/login", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        login_identifier: username, 
-        password: password
-      })
-    });
+    try {
+      const response = await fetch("http://localhost:8000/api/v1/admin/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          login_identifier: username,
+          password: password
+        })
+      });
 
-    const data = await response.json();
-    console.log("Admin login response:", data);
+      const data = await response.json();
+      console.log("Admin login response:", data);
 
-    if (!response.ok) {
-      throw new Error(data.detail || "Đăng nhập thất bại");
+      if (!response.ok) {
+        throw new Error(data.detail || "Đăng nhập thất bại");
+      }
+
+      // Kiểm tra role
+      if (data.user && data.user.role !== "admin") {
+        throw new Error("Tài khoản không phải là admin");
+      }
+
+      // Lưu token với key RIÊNG cho admin
+      localStorage.setItem("admin_token", data.access_token);
+      localStorage.setItem("admin_data", JSON.stringify(data.user));
+
+      showToast("Đăng nhập Admin thành công!", "success");
+      
+      setTimeout(() => {
+        navigate("/admin/dashboard");
+      }, 1500);
+
+    } catch (err) {
+      setError(err.message);
+      showToast(err.message, "error");
+    } finally {
+      setLoading(false);
     }
+  };
 
-    // Dùng key RIÊNG cho admin
-    localStorage.setItem("admin_token", data.access_token); // Key riêng
-    localStorage.setItem("admin_data", JSON.stringify(data.user)); // Key riêng
-
-    showToast("Đăng nhập Admin thành công!", "success");
-    
-    setTimeout(() => {
-      navigate("/admin/dashboard");
-    }, 1500);
-
-  } catch (err) {
-    setError(err.message);
-    showToast(err.message, "error");
-  }
-};
+  const handleDemoLogin = () => {
+    setUsername("admin");
+    setPassword("admin123");
+  };
 
   return (
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column", fontFamily: "Arial" }}>
-
-      {/* Toast Container - Thêm vào đây */}
+    <div style={{ 
+      height: "100vh", 
+      display: "flex", 
+      flexDirection: "column", 
+      fontFamily: "Arial, sans-serif",
+      background: "linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)"
+    }}>
+      
+      {/* Toast Container */}
       {toast.show && (
         <div className="toast-container">
           <Toast 
@@ -84,30 +104,41 @@ const handleLogin = async (e) => {
         display: "flex",
         alignItems: "center",
         gap: "10px",
-        borderBottom: "1px solid #ddd"
+        borderBottom: "1px solid #ddd",
+        boxShadow: "0 2px 10px rgba(0,0,0,0.1)"
       }}>
-        <img src="https://placehold.co/40x40/2e7d32/white?text=Logo" alt="Logo" style={{ borderRadius: "50%" }} />
-        <h2 style={{ margin: 0, color: "#2e7d32" }}>Đặc Sản Quê Tôi - ADMIN</h2>
+        <div style={{
+          width: "40px",
+          height: "40px",
+          borderRadius: "50%",
+          background: "#2a5298",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "white"
+        }}>
+          <Shield size={24} />
+        </div>
+        <h2 style={{ margin: 0, color: "#2a5298" }}>Đặc Sản Quê Tôi - ADMIN</h2>
       </div>
 
-      {/* Main */}
+      {/* Main Content */}
       <div style={{
         flex: 1,
-        backgroundColor: "#f5eee1",
         display: "flex",
         justifyContent: "center",
-        alignItems: "center"
+        alignItems: "center",
+        padding: "20px"
       }}>
-
         <div style={{
           display: "flex",
           width: "900px",
           minHeight: "500px",
           background: "white",
-          borderRadius: "12px",
-          boxShadow: "0 5px 15px rgba(0,0,0,0.1)"
+          borderRadius: "20px",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+          overflow: "hidden"
         }}>
-
           {/* Left Form */}
           <div style={{
             flex: 1,
@@ -116,14 +147,11 @@ const handleLogin = async (e) => {
             flexDirection: "column",
             justifyContent: "center"
           }}>
-
-            <h2 style={{ textAlign: "center", marginBottom: "30px" }}>
+            <h2 style={{ textAlign: "center", marginBottom: "30px", color: "#2a5298" }}>
               Admin Login
             </h2>
 
             <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
-
-              {/* USERNAME */}
               <input
                 type="text"
                 placeholder="Admin username"
@@ -132,13 +160,17 @@ const handleLogin = async (e) => {
                 required
                 style={{
                   padding: "14px",
-                  borderRadius: "8px",
-                  border: "1px solid #ccc",
-                  background: "#f1f1f1"
+                  borderRadius: "10px",
+                  border: "2px solid #e0e0e0",
+                  backgroundColor: "#fafafa",
+                  outline: "none",
+                  fontSize: "15px",
+                  transition: "all 0.3s"
                 }}
+                onFocus={(e) => e.target.style.borderColor = "#2a5298"}
+                onBlur={(e) => e.target.style.borderColor = "#e0e0e0"}
               />
 
-              {/* PASSWORD */}
               <div style={{ position: "relative" }}>
                 <input
                   type={showPassword ? "text" : "password"}
@@ -149,12 +181,17 @@ const handleLogin = async (e) => {
                   style={{
                     width: "100%",
                     padding: "14px",
-                    borderRadius: "8px",
-                    border: "1px solid #ccc",
-                    background: "#f1f1f1"
+                    paddingRight: "45px",
+                    borderRadius: "10px",
+                    border: "2px solid #e0e0e0",
+                    backgroundColor: "#fafafa",
+                    outline: "none",
+                    fontSize: "15px",
+                    boxSizing: "border-box"
                   }}
+                  onFocus={(e) => e.target.style.borderColor = "#2a5298"}
+                  onBlur={(e) => e.target.style.borderColor = "#e0e0e0"}
                 />
-
                 <span
                   onClick={() => setShowPassword(!showPassword)}
                   style={{
@@ -162,37 +199,89 @@ const handleLogin = async (e) => {
                     right: "15px",
                     top: "50%",
                     transform: "translateY(-50%)",
-                    cursor: "pointer"
+                    cursor: "pointer",
+                    fontSize: "18px"
                   }}
                 >
                   {showPassword ? "👁️" : "🙈"}
                 </span>
               </div>
 
-              {/* Error message cũ - có thể giữ lại hoặc bỏ */}
               {error && (
-                <div style={{ color: "red", fontSize: "14px" }}>
+                <div style={{ 
+                  color: "#f44336", 
+                  fontSize: "14px", 
+                  textAlign: "center",
+                  padding: "10px",
+                  background: "#ffebee",
+                  borderRadius: "8px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "5px"
+                }}>
+                  <AlertCircle size={16} />
                   {error}
                 </div>
               )}
 
               <button
                 type="submit"
+                disabled={loading}
                 style={{
                   padding: "14px",
-                  background: "#2e7d32",
+                  background: loading ? "#a5a5a5" : "linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)",
                   color: "white",
                   border: "none",
-                  borderRadius: "8px",
+                  borderRadius: "10px",
                   fontWeight: "bold",
-                  cursor: "pointer"
+                  fontSize: "16px",
+                  cursor: loading ? "not-allowed" : "pointer",
+                  marginTop: "10px",
+                  transition: "all 0.3s",
+                  opacity: loading ? 0.7 : 1
                 }}
               >
-                Login Admin
+                {loading ? "Đang đăng nhập..." : "Login Admin"}
               </button>
 
+              {/* Demo account info */}
+              <div style={{
+                marginTop: "20px",
+                padding: "15px",
+                background: "#f5f5f5",
+                borderRadius: "10px",
+                border: "1px dashed #2a5298"
+              }}>
+                <p style={{ fontSize: "13px", color: "#666", margin: "0 0 10px 0", fontWeight: "600" }}>
+                  Tài khoản demo:
+                </p>
+                <p style={{ fontSize: "13px", margin: "5px 0", color: "#555" }}>
+                  <span style={{ fontWeight: "600" }}>Username:</span> admin
+                </p>
+                <p style={{ fontSize: "13px", margin: "5px 0", color: "#555" }}>
+                  <span style={{ fontWeight: "600" }}>Mật khẩu:</span> admin123
+                </p>
+                <button
+                  type="button"
+                  onClick={handleDemoLogin}
+                  style={{
+                    marginTop: "10px",
+                    padding: "8px",
+                    width: "100%",
+                    background: "white",
+                    border: "1px solid #2a5298",
+                    borderRadius: "5px",
+                    color: "#2a5298",
+                    cursor: "pointer",
+                    fontSize: "13px",
+                    fontWeight: "600"
+                  }}
+                >
+                  Điền tài khoản demo
+                </button>
+              </div>
             </form>
-
           </div>
 
           {/* Right Image */}
@@ -201,22 +290,31 @@ const handleLogin = async (e) => {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            background: "#e8f5e9"
+            background: "linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)"
           }}>
-            <img
-              src="https://placehold.co/350x450/4caf50/white?text=ADMIN"
-              alt="admin"
-              style={{
-                width: "80%",
-                borderRadius: "10px"
-              }}
-            />
+            <div style={{ textAlign: "center", color: "white", padding: "40px" }}>
+              <Shield size={100} style={{ marginBottom: "20px", opacity: 0.9 }} />
+              <h3 style={{ fontSize: "24px", marginBottom: "15px" }}>Quản trị hệ thống</h3>
+              <p style={{ fontSize: "14px", lineHeight: "1.6", opacity: 0.9 }}>
+                Quản lý người dùng, cửa hàng,<br />
+                sản phẩm và toàn bộ hệ thống
+              </p>
+            </div>
           </div>
-
         </div>
-
       </div>
 
+      {/* Footer */}
+      <div style={{
+        padding: "15px 30px",
+        background: "white",
+        textAlign: "center",
+        borderTop: "1px solid #eee",
+        fontSize: "13px",
+        color: "#666"
+      }}>
+        © 2024 Đặc Sản Quê Tôi. Phiên bản dành cho Admin.
+      </div>
     </div>
   );
 }

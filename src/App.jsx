@@ -27,6 +27,7 @@ import { Layout } from "lucide-react";
 import ShopDetailPage from "./pages/user/shop/shop_detail.jsx";
 import ProductDetailPage from "./pages/user/shop/detail_products.jsx";
 import CartPage from "./pages/user/cart.jsx";
+import CheckoutPage from "./pages/user/shop/CheckoutPage.jsx";
 
 function App() {
   return (
@@ -40,6 +41,7 @@ function App() {
       <Route path="/use/shop" element={<ShopPage />} />
       <Route path="/shop/:shop_id" element={<ShopDetailPage />} />
       <Route path="/product/:product_id" element={<ProductDetailPage />} />
+      <Route path="/checkout" element={<CheckoutPage />} />
       <Route path="/cart" element={<CartPage />} />
       <Route 
         path="/admin/dashboard" 

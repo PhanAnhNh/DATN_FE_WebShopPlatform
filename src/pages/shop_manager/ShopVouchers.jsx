@@ -25,7 +25,7 @@ import {
   FaCheckCircle,
   FaClock
 } from 'react-icons/fa';
-import shopApi from '../../api/api';
+import { shopApi } from '../../api/api'; // SỬA: import shopApi dạng named export
 import '../../css/ShopVouchers.css';
 
 const ShopVouchers = () => {
@@ -94,7 +94,15 @@ const ShopVouchers = () => {
         }
       });
       
-      setVouchers(response.data.data || []);
+      console.log('Vouchers response:', response.data);
+      
+      // Chuẩn hóa dữ liệu: đảm bảo có trường id
+      const normalizedData = (response.data.data || []).map(voucher => ({
+        ...voucher,
+        id: voucher.id || voucher._id
+      }));
+      
+      setVouchers(normalizedData);
       setPagination(response.data.pagination || {
         page: 1,
         limit: 10,
@@ -103,13 +111,26 @@ const ShopVouchers = () => {
       });
     } catch (error) {
       console.error('Error fetching vouchers:', error);
+      
+      if (error.response?.status === 401) {
+        localStorage.removeItem('shop_token');
+        localStorage.removeItem('shop_data');
+        localStorage.removeItem('shop_info');
+        window.location.href = '/shop/login';
+        return;
+      }
+      
       // Dữ liệu mẫu nếu API lỗi
-      setVouchers(mockVouchers);
+      const mockData = mockVouchers.map(v => ({
+        ...v,
+        id: v.id || v._id
+      }));
+      setVouchers(mockData);
       setPagination({
         page: 1,
         limit: 10,
-        total: mockVouchers.length,
-        total_pages: Math.ceil(mockVouchers.length / 10)
+        total: mockData.length,
+        total_pages: Math.ceil(mockData.length / 10)
       });
     } finally {
       setLoading(false);
@@ -124,43 +145,30 @@ const ShopVouchers = () => {
       discount_type: 'percent',
       discount_value: 10,
       max_discount: 50000,
-      min_order_value: 200000,
+      min_order_value: 100000,
       usage_limit: 100,
-      used_count: 23,
+      used_count: 45,
       target_type: 'shop',
+      start_date: '2024-01-01T00:00:00Z',
+      end_date: '2024-12-31T23:59:59Z',
       status: 'active',
-      start_date: '2024-01-01T00:00:00',
-      end_date: '2024-12-31T23:59:59',
-      created_at: '2024-01-01T00:00:00'
+      description: 'Giảm 10% cho đơn hàng từ 100k',
+      created_at: '2024-01-01T00:00:00Z'
     },
     {
       id: '2',
-      code: 'FIX50K',
+      code: 'FREESHIP',
       discount_type: 'fixed',
-      discount_value: 50000,
-      min_order_value: 300000,
+      discount_value: 30000,
+      min_order_value: 200000,
       usage_limit: 50,
       used_count: 12,
       target_type: 'shop',
+      start_date: '2024-02-01T00:00:00Z',
+      end_date: '2024-12-31T23:59:59Z',
       status: 'active',
-      start_date: '2024-01-01T00:00:00',
-      end_date: '2024-06-30T23:59:59',
-      created_at: '2024-01-01T00:00:00'
-    },
-    {
-      id: '3',
-      code: 'NEWUSER20',
-      discount_type: 'percent',
-      discount_value: 20,
-      max_discount: 100000,
-      min_order_value: 100000,
-      usage_limit: 200,
-      used_count: 145,
-      target_type: 'shop',
-      status: 'active',
-      start_date: '2024-01-01T00:00:00',
-      end_date: '2024-03-31T23:59:59',
-      created_at: '2024-01-01T00:00:00'
+      description: 'Miễn phí vận chuyển đơn từ 200k',
+      created_at: '2024-02-01T00:00:00Z'
     }
   ];
 
@@ -197,6 +205,8 @@ const ShopVouchers = () => {
         created_by: 'shop'
       };
 
+      console.log('Adding voucher:', voucherData);
+      
       const response = await shopApi.post('/api/v1/shop/vouchers', voucherData);
       
       fetchVouchers();
@@ -205,6 +215,15 @@ const ShopVouchers = () => {
       alert('Thêm voucher thành công!');
     } catch (error) {
       console.error('Error adding voucher:', error);
+      
+      if (error.response?.status === 401) {
+        localStorage.removeItem('shop_token');
+        localStorage.removeItem('shop_data');
+        localStorage.removeItem('shop_info');
+        window.location.href = '/shop/login';
+        return;
+      }
+      
       alert(error.response?.data?.detail || 'Có lỗi xảy ra');
     } finally {
       setSaving(false);
@@ -213,6 +232,7 @@ const ShopVouchers = () => {
 
   // Edit voucher
   const handleEditVoucher = (voucher) => {
+    console.log("Editing voucher:", voucher);
     setSelectedVoucher(voucher);
     setFormData({
       code: voucher.code,
@@ -224,14 +244,25 @@ const ShopVouchers = () => {
       target_type: voucher.target_type,
       start_date: new Date(voucher.start_date).toISOString().split('T')[0],
       end_date: new Date(voucher.end_date).toISOString().split('T')[0],
-      description: voucher.description || ''
+      description: voucher.description || '',
+      status: voucher.status
     });
     setShowEditModal(true);
   };
 
   // Update voucher
   const handleUpdateVoucher = async () => {
-    if (!selectedVoucher) return;
+    if (!selectedVoucher) {
+      console.error("No voucher selected");
+      return;
+    }
+
+    const voucherId = selectedVoucher.id || selectedVoucher._id;
+    if (!voucherId) {
+      console.error("Voucher ID is undefined", selectedVoucher);
+      alert("Không tìm thấy ID voucher");
+      return;
+    }
 
     try {
       setSaving(true);
@@ -246,7 +277,9 @@ const ShopVouchers = () => {
         status: formData.status || selectedVoucher.status
       };
 
-      await shopApi.put(`/api/v1/shop/vouchers/${selectedVoucher.id}`, updateData);
+      console.log("Updating voucher:", voucherId, updateData);
+      
+      await shopApi.put(`/api/v1/shop/vouchers/${voucherId}`, updateData);
       
       fetchVouchers();
       setShowEditModal(false);
@@ -254,7 +287,16 @@ const ShopVouchers = () => {
       alert('Cập nhật voucher thành công!');
     } catch (error) {
       console.error('Error updating voucher:', error);
-      alert('Có lỗi xảy ra');
+      
+      if (error.response?.status === 401) {
+        localStorage.removeItem('shop_token');
+        localStorage.removeItem('shop_data');
+        localStorage.removeItem('shop_info');
+        window.location.href = '/shop/login';
+        return;
+      }
+      
+      alert(error.response?.data?.detail || 'Có lỗi xảy ra khi cập nhật');
     } finally {
       setSaving(false);
     }
@@ -275,30 +317,61 @@ const ShopVouchers = () => {
   const confirmDelete = async () => {
     if (!selectedVoucher) return;
 
+    const voucherId = selectedVoucher.id || selectedVoucher._id;
+    if (!voucherId) {
+      console.error("Voucher ID is undefined", selectedVoucher);
+      alert("Không tìm thấy ID voucher");
+      return;
+    }
+
     try {
-      await shopApi.delete(`/api/v1/shop/vouchers/${selectedVoucher.id}`);
+      await shopApi.delete(`/api/v1/shop/vouchers/${voucherId}`);
       fetchVouchers();
       setShowDeleteConfirm(false);
       setSelectedVoucher(null);
       alert('Xóa voucher thành công!');
     } catch (error) {
       console.error('Error deleting voucher:', error);
-      alert('Có lỗi xảy ra khi xóa voucher');
+      
+      if (error.response?.status === 401) {
+        localStorage.removeItem('shop_token');
+        localStorage.removeItem('shop_data');
+        localStorage.removeItem('shop_info');
+        window.location.href = '/shop/login';
+        return;
+      }
+      
+      alert(error.response?.data?.detail || 'Có lỗi xảy ra khi xóa voucher');
     }
   };
 
-  // Toggle voucher status
+  // Toggle status
   const handleToggleStatus = async (voucher) => {
+    const voucherId = voucher.id || voucher._id;
+    if (!voucherId) {
+      console.error("Voucher ID is undefined", voucher);
+      return;
+    }
+
     try {
       const newStatus = voucher.status === 'active' ? 'inactive' : 'active';
-      await shopApi.put(`/api/v1/shop/vouchers/${voucher.id}/status`, { status: newStatus });
+      await shopApi.put(`/api/v1/shop/vouchers/${voucherId}/status`, { status: newStatus });
       fetchVouchers();
     } catch (error) {
       console.error('Error toggling status:', error);
+      
+      if (error.response?.status === 401) {
+        localStorage.removeItem('shop_token');
+        localStorage.removeItem('shop_data');
+        localStorage.removeItem('shop_info');
+        window.location.href = '/shop/login';
+        return;
+      }
+      
       alert('Có lỗi xảy ra');
     }
   };
-
+  
   // Reset form
   const resetForm = () => {
     setFormData({
@@ -371,6 +444,7 @@ const ShopVouchers = () => {
     setPagination(prev => ({ ...prev, page: 1 }));
   };
 
+  // Phần render giữ nguyên như code của bạn
   return (
     <div className="shop-vouchers">
       {/* Header */}
@@ -447,118 +521,117 @@ const ShopVouchers = () => {
       )}
 
       {/* Vouchers Table */}
-      {/* Vouchers Table */}
-<div className="vouchers-table-container">
-  {loading ? (
-    <div className="loading-state">
-      <FaSpinner className="spinning" />
-      <p>Đang tải dữ liệu...</p>
-    </div>
-  ) : (
-    <table className="vouchers-table">
-      <thead>
-        <tr>
-          <th>Thứ tự</th>
-          <th>Mã voucher</th>
-          <th>Giảm giá</th>
-          <th>Đơn tối thiểu</th>
-          <th>Đã dùng</th>
-          <th>Hạn sử dụng</th>
-          <th>Trạng thái</th>
-          <th>Thao tác</th>
-        </tr>
-      </thead>
-      <tbody>
-        {vouchers.length > 0 ? (
-          vouchers.map((voucher, index) => {
-            const StatusIcon = getStatusBadge(voucher.status).icon;
-            const isExpired = new Date(voucher.end_date) < new Date();
-            
-            return (
-              <tr key={voucher.id}>
-                <td>{(pagination.page - 1) * pagination.limit + index + 1}</td>
-                <td>
-                  <div className="voucher-code">
-                    <FaTag className="code-icon" />
-                    {voucher.code}
-                  </div>
-                </td>
-                <td className="discount-cell">{getDiscountText(voucher)}</td>
-                <td className="min-order">{formatCurrency(voucher.min_order_value)}</td>
-                <td className="usage-cell">
-                  <FaUsers className="usage-icon" />
-                  {voucher.used_count}/{voucher.usage_limit || '∞'}
-                </td>
-                <td className="date-cell">
-                  <FaCalendarAlt className="date-icon" />
-                  {formatDate(voucher.end_date)}
-                  {isExpired && <span className="expired-badge">Đã hết hạn</span>}
-                </td>
-                <td>
-                  <span 
-                    className={`status-badge ${voucher.status}`}
-                    style={{ 
-                      backgroundColor: getStatusBadge(voucher.status).color + '20', 
-                      color: getStatusBadge(voucher.status).color 
-                    }}
-                  >
-                    <StatusIcon size={12} />
-                    {isExpired ? 'Đã hết hạn' : getStatusBadge(voucher.status).label}
-                  </span>
-                </td>
-                <td>
-                  <div className="action-buttons">
-                    <button 
-                      className="action-btn view"
-                      onClick={() => handleViewVoucher(voucher)}
-                      title="Xem chi tiết"
-                    >
-                      <FaEye />
-                    </button>
-                    {!isExpired && (
-                      <>
-                        <button 
-                          className="action-btn edit"
-                          onClick={() => handleEditVoucher(voucher)}
-                          title="Sửa"
-                        >
-                          <FaEdit />
-                        </button>
-                        <button 
-                          className={`action-btn ${voucher.status === 'active' ? 'disable' : 'enable'}`}
-                          onClick={() => handleToggleStatus(voucher)}
-                          title={voucher.status === 'active' ? 'Tạm ngưng' : 'Kích hoạt'}
-                        >
-                          {voucher.status === 'active' ? <FaTimes /> : <FaCheckCircle />}
-                        </button>
-                        <button 
-                          className="action-btn delete"
-                          onClick={() => handleDeleteVoucher(voucher)}
-                          title="Xóa"
-                        >
-                          <FaTrash />
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            );
-          })
+      <div className="vouchers-table-container">
+        {loading ? (
+          <div className="loading-state">
+            <FaSpinner className="spinning" />
+            <p>Đang tải dữ liệu...</p>
+          </div>
         ) : (
-          <tr>
-            <td colSpan="8" className="empty-state">
-              Không tìm thấy voucher nào
-            </td>
-          </tr>
+          <table className="vouchers-table">
+            <thead>
+              <tr>
+                <th>Thứ tự</th>
+                <th>Mã voucher</th>
+                <th>Giảm giá</th>
+                <th>Đơn tối thiểu</th>
+                <th>Đã dùng</th>
+                <th>Hạn sử dụng</th>
+                <th>Trạng thái</th>
+                <th>Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              {vouchers.length > 0 ? (
+                vouchers.map((voucher, index) => {
+                  const StatusIcon = getStatusBadge(voucher.status).icon;
+                  const isExpired = new Date(voucher.end_date) < new Date();
+                  
+                  return (
+                    <tr key={voucher.id}>
+                      <td>{(pagination.page - 1) * pagination.limit + index + 1}</td>
+                      <td>
+                        <div className="voucher-code">
+                          <FaTag className="code-icon" />
+                          {voucher.code}
+                        </div>
+                      </td>
+                      <td className="discount-cell">{getDiscountText(voucher)}</td>
+                      <td className="min-order">{formatCurrency(voucher.min_order_value)}</td>
+                      <td className="usage-cell">
+                        <FaUsers className="usage-icon" />
+                        {voucher.used_count}/{voucher.usage_limit || '∞'}
+                      </td>
+                      <td className="date-cell">
+                        <FaCalendarAlt className="date-icon" />
+                        {formatDate(voucher.end_date)}
+                        {isExpired && <span className="expired-badge">Đã hết hạn</span>}
+                      </td>
+                      <td>
+                        <span 
+                          className={`status-badge ${voucher.status}`}
+                          style={{ 
+                            backgroundColor: getStatusBadge(voucher.status).color + '20', 
+                            color: getStatusBadge(voucher.status).color 
+                          }}
+                        >
+                          <StatusIcon size={12} />
+                          {isExpired ? 'Đã hết hạn' : getStatusBadge(voucher.status).label}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="action-buttons">
+                          <button 
+                            className="action-btn view"
+                            onClick={() => handleViewVoucher(voucher)}
+                            title="Xem chi tiết"
+                          >
+                            <FaEye />
+                          </button>
+                          {!isExpired && (
+                            <>
+                              <button 
+                                className="action-btn edit"
+                                onClick={() => handleEditVoucher(voucher)}
+                                title="Sửa"
+                              >
+                                <FaEdit />
+                              </button>
+                              <button 
+                                className={`action-btn ${voucher.status === 'active' ? 'disable' : 'enable'}`}
+                                onClick={() => handleToggleStatus(voucher)}
+                                title={voucher.status === 'active' ? 'Tạm ngưng' : 'Kích hoạt'}
+                              >
+                                {voucher.status === 'active' ? <FaTimes /> : <FaCheckCircle />}
+                              </button>
+                              <button 
+                                className="action-btn delete"
+                                onClick={() => handleDeleteVoucher(voucher)}
+                                title="Xóa"
+                              >
+                                <FaTrash />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan="8" className="empty-state">
+                    Không tìm thấy voucher nào
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         )}
-      </tbody>
-    </table>
-  )}
-</div>
+      </div>
 
       {/* Pagination */}
-      {pagination.total_pages > 1 && (
+      {pagination.total_pages > 1 && !loading && (
         <div className="pagination">
           <div className="pagination-info">
             Trang hiển thị {pagination.page}/{pagination.total_pages}
@@ -604,6 +677,7 @@ const ShopVouchers = () => {
         </div>
       )}
 
+      {/* Modals - giữ nguyên code của bạn */}
       {/* Add Voucher Modal */}
       {showAddModal && (
         <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
@@ -979,6 +1053,16 @@ const ShopVouchers = () => {
           </div>
         </div>
       )}
+
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        .spinning {
+          animation: spin 1s linear infinite;
+        }
+      `}</style>
     </div>
   );
 };

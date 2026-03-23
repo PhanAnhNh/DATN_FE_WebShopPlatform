@@ -5,7 +5,7 @@ import {
   X, Save, AlertCircle, CheckCircle, Image, Video,
   Globe, Users, Lock, Filter, Calendar, Tag
 } from 'lucide-react';
-import api from '../../api/api';
+import {adminApi} from '../../api/api';
 import '../../css/AdminManageLayout.css';
 import Toast from '../../components/common/Toast';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
@@ -80,7 +80,7 @@ const PostsManagement = () => {
     setError(null);
     
     // Dùng API admin để lấy tất cả bài viết
-    const response = await api.get('/api/v1/admin/posts?limit=100');
+    const response = await adminApi.get('/api/v1/admin/posts?limit=100');
     console.log('Posts data:', response.data);
     
     setPosts(response.data);
@@ -217,7 +217,7 @@ const PostsManagement = () => {
     setSubmitting(true);
     try {
         // Vẫn dùng API user để tạo bài viết
-        const response = await api.post('/posts/', formData);
+        const response = await adminApi.post('/posts/', formData);
         console.log('Add post response:', response.data);
         
         showToast('Thêm bài viết thành công!', 'success');
@@ -245,7 +245,7 @@ const PostsManagement = () => {
     setSubmitting(true);
     try {
         // Dùng API admin để cập nhật (không cần check quyền)
-        const response = await api.put(`/admin/posts/${selectedPost._id}`, formData);
+        const response = await adminApi.put(`/admin/posts/${selectedPost._id}`, formData);
         console.log('Update post response:', response.data);
         
         showToast('Cập nhật bài viết thành công!', 'success');
@@ -269,7 +269,7 @@ const PostsManagement = () => {
         onConfirm: async () => {
         try {
             // Dùng API admin để xóa
-            const response = await api.delete(`/admin/posts/${postId}`);
+            const response = await adminApi.delete(`/admin/posts/${postId}`);
             console.log('Delete post response:', response.data);
             
             showToast('Xóa bài viết thành công!', 'success');
@@ -293,7 +293,7 @@ const PostsManagement = () => {
         onConfirm: async () => {
         try {
             // Dùng API admin để cập nhật trạng thái
-            const response = await api.put(`/admin/posts/${post._id}/status?is_active=${newStatus}`);
+            const response = await adminApi.put(`/admin/posts/${post._id}/status?is_active=${newStatus}`);
             console.log('Update status response:', response.data);
             
             showToast(`Cập nhật trạng thái thành công!`, 'success');

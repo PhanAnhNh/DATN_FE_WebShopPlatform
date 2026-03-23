@@ -18,49 +18,51 @@ function Profile() {
     const [activePostMenu, setActivePostMenu] = useState(null);
     const [editingPost, setEditingPost] = useState(null);
 
+    // pages/user/profile.jsx
     useEffect(() => {
-        // Lấy thông tin user đăng nhập từ localStorage (hoặc thay bằng state management của bạn)
+        // Lấy thông tin user đăng nhập từ localStorage
         const storedUserStr = localStorage.getItem("user");
         if (storedUserStr) {
             const parsedUser = JSON.parse(storedUserStr);
             setCurrentUser(parsedUser);
-            // Gọi API lấy bài viết CHỈ CỦA USER NÀY
-            fetchUserPostsAndLikes(parsedUser.id || parsedUser._id);
+            // Gọi API lấy bài viết với user id
+            const userId = parsedUser.id || parsedUser._id;
+            if (userId) {
+                fetchUserPostsAndLikes(userId);
+            } else {
+                console.error("User ID không tồn tại");
+            }
         } else {
-            // Xử lý nếu chưa đăng nhập (có thể redirect về login)
             console.warn("Chưa có thông tin user đăng nhập");
         }
     }, []);
 
-    const fetchUserPostsAndLikes = async (userId) => {
-        try {
-            const res = await api.get(`/posts/user/${userId}`);
-            
-            // 1. LỌC BỎ CÁC BÀI BỊ XÓA (is_active là false) TỪ BE TRẢ VỀ
-            const activePosts = res.data.filter(post => post.is_active !== false);
-            
-            // 2. Chỉ set vào state những bài viết đang active
-            setPosts(activePosts);
-
-            // 3. Đổi fetchedPosts thành activePosts ở vòng lặp check like
-            // (Để tránh gọi API check like lãng phí cho những bài đã bị xóa)
-            const likeChecks = activePosts.map(post =>
-                api.get(`/likes/check/${post._id}`)
-                    .then(res => ({ id: post._id, isLiked: res.data.liked }))
-                    .catch(() => ({ id: post._id, isLiked: false }))
-            );
-
-            const likeResults = await Promise.all(likeChecks);
-            const likeMap = {};
-            likeResults.forEach(result => {
-                likeMap[result.id] = result.isLiked;
-            });
-            setLikedPosts(likeMap);
-
-        } catch (err) {
-            console.error("Lỗi khi tải bài viết cá nhân:", err);
-        }
-    };
+    // pages/user/profile.jsx - sửa lại URL
+const fetchUserPostsAndLikes = async (userId) => {
+    try {
+        // SỬA: Thêm /api/v1 vào URL
+        const res = await api.get(`/api/v1/posts/user/${userId}`);
+        
+        const activePosts = res.data.filter(post => post.is_active !== false);
+        setPosts(activePosts);
+        
+        const likeChecks = activePosts.map(post =>
+            api.get(`/api/v1/likes/check/${post._id}`)
+                .then(res => ({ id: post._id, isLiked: res.data.liked }))
+                .catch(() => ({ id: post._id, isLiked: false }))
+        );
+        
+        const likeResults = await Promise.all(likeChecks);
+        const likeMap = {};
+        likeResults.forEach(result => {
+            likeMap[result.id] = result.isLiked;
+        });
+        setLikedPosts(likeMap);
+        
+    } catch (err) {
+        console.error("Lỗi khi tải bài viết cá nhân:", err);
+    }
+};
     // --- CÁC HÀM XỬ LÝ TƯƠNG TÁC (Giữ nguyên như Home.js) ---
     const handleToggleComments = async (postId) => {
         const isCurrentlyShown = showComments[postId];
@@ -109,7 +111,7 @@ function Profile() {
         }));
 
         try {
-            await api.post(`/likes/${postId}`);
+            await api.post(`/api/v1/likes/${postId}`);
         } catch (error) {
             // Hoàn tác nếu lỗi
             setLikedPosts(prev => ({ ...prev, [postId]: isCurrentlyLiked }));
@@ -153,7 +155,7 @@ function Profile() {
         try {
             if (editingPost) {
                 // SỬA BÀI VIẾT (Lưu ý: Thay đổi method PUT/PATCH tuỳ vào backend của bạn)
-                const res = await api.put(`/posts/${editingPost._id}`, { content: newPostContent });
+                const res = await api.put(`/api/v1/posts/${editingPost._id}`, { content: newPostContent });
                 
                 // Cập nhật lại bài viết trong danh sách UI
                 setPosts(posts.map(p => 
@@ -162,7 +164,7 @@ function Profile() {
             } else {
                 // TẠO BÀI VIẾT MỚI
                 const newPostData = { content: newPostContent };
-                const res = await api.post("/posts/", newPostData);
+                const res = await api.post("/api/v1/posts/", newPostData);
                 
                 // Thêm bài viết mới vào đầu danh sách
                 setPosts([res.data, ...posts]);
@@ -183,7 +185,7 @@ function Profile() {
         if (window.confirm("Bạn có chắc chắn muốn xóa bài viết này không?")) {
             try {
                 // Gọi API xóa bài viết (thay đổi route tùy theo backend của bạn)
-                await api.delete(`/posts/${postId}`);
+                await api.delete(`/api/v1/posts/${postId}`);
                 
                 // Cập nhật lại UI: Lọc bỏ bài viết đã xóa khỏi danh sách
                 setPosts(posts.filter(p => p._id !== postId));

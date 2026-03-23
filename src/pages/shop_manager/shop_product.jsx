@@ -24,7 +24,7 @@ import {
   FaMinusCircle,
   FaLink
 } from 'react-icons/fa';
-import shopApi from '../../api/api';
+import { shopApi } from '../../api/api';
 import '../../css/ShopProducts.css';
 
 const ShopProducts = () => {
@@ -71,8 +71,8 @@ const ShopProducts = () => {
   const [saving, setSaving] = useState(false);
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
-  const [imageUrlInput, setImageUrlInput] = useState(''); // State cho input URL
-  const [imageUploadMethod, setImageUploadMethod] = useState('url'); // 'url' hoặc 'file'
+  const [imageUrlInput, setImageUrlInput] = useState('');
+  const [imageUploadMethod, setImageUploadMethod] = useState('url');
 
   // Debounce search
   useEffect(() => {
@@ -114,6 +114,16 @@ const ShopProducts = () => {
       });
     } catch (error) {
       console.error('Error fetching products:', error);
+      
+      if (error.response?.status === 401) {
+        localStorage.removeItem('shop_token');
+        localStorage.removeItem('shop_data');
+        localStorage.removeItem('shop_info');
+        window.location.href = '/shop/login';
+        return;
+      }
+      
+      alert('Không thể tải danh sách sản phẩm. Vui lòng thử lại sau.');
     } finally {
       setLoading(false);
     }
@@ -131,10 +141,16 @@ const ShopProducts = () => {
       setCategories(normalizedCategories);
     } catch (error) {
       console.error('Error fetching categories:', error);
+      
+      if (error.response?.status === 401) {
+        localStorage.removeItem('shop_token');
+        localStorage.removeItem('shop_data');
+        localStorage.removeItem('shop_info');
+        window.location.href = '/shop/login';
+      }
     }
   };
 
-  // Handle form input change
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -143,14 +159,12 @@ const ShopProducts = () => {
     }));
   };
 
-  // Handle variant change
   const handleVariantChange = (index, field, value) => {
     const updatedVariants = [...variants];
     updatedVariants[index][field] = value;
     setVariants(updatedVariants);
   };
 
-  // Add new variant
   const addVariant = () => {
     setVariants([
       ...variants,
@@ -163,27 +177,22 @@ const ShopProducts = () => {
     ]);
   };
 
-  // Remove variant
   const removeVariant = (index) => {
     const updatedVariants = variants.filter((_, i) => i !== index);
     setVariants(updatedVariants);
   };
 
-  // Handle image URL input
   const handleImageUrlChange = (e) => {
     const url = e.target.value;
     setImageUrlInput(url);
     setImagePreview(url);
-    // Không set imageFile khi dùng URL
     setImageFile(null);
-    // Lưu URL vào formData
     setFormData(prev => ({
       ...prev,
       image_url: url
     }));
   };
 
-  // Handle image file selection
   const handleImageSelect = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -200,7 +209,6 @@ const ShopProducts = () => {
 
     setImageFile(file);
     setImagePreview(URL.createObjectURL(file));
-    // Xóa URL input khi chọn file
     setImageUrlInput('');
     setFormData(prev => ({
       ...prev,
@@ -208,7 +216,6 @@ const ShopProducts = () => {
     }));
   };
 
-  // Reset image states
   const resetImage = () => {
     setImageFile(null);
     setImagePreview('');
@@ -220,9 +227,8 @@ const ShopProducts = () => {
     }));
   };
 
-  // Upload image (chỉ khi có file upload)
   const uploadImage = async (productId) => {
-    if (!imageFile) return formData.image_url; // Trả về URL nếu có
+    if (!imageFile) return formData.image_url;
 
     const formDataUpload = new FormData();
     formDataUpload.append('file', imageFile);
@@ -242,19 +248,16 @@ const ShopProducts = () => {
   };
 
   const handleAddProduct = async () => {
-    // Validate
     if (!formData.name || !formData.category_id) {
       alert('Vui lòng nhập tên sản phẩm và chọn danh mục');
       return;
     }
 
-    // Kiểm tra variants
     if (variants.length === 0 && !formData.price) {
       alert('Vui lòng nhập giá sản phẩm hoặc thêm biến thể');
       return;
     }
 
-    // Validate variants
     for (let i = 0; i < variants.length; i++) {
       const v = variants[i];
       if (!v.name || !v.price) {
@@ -263,7 +266,6 @@ const ShopProducts = () => {
       }
     }
 
-    // Kiểm tra category hợp lệ
     const selectedCat = categories.find(c => c.id === formData.category_id);
     if (!selectedCat) {
       alert('Vui lòng chọn danh mục hợp lệ');
@@ -273,14 +275,13 @@ const ShopProducts = () => {
     try {
       setSaving(true);
       
-      // Chuẩn bị dữ liệu gửi lên
       const productData = {
         name: formData.name,
         description: formData.description,
         category_id: formData.category_id,
         origin: formData.origin,
         certification: formData.certification,
-        image_url: formData.image_url || null, // Sử dụng URL nếu có
+        image_url: formData.image_url || null,
         variants: variants.map(v => ({
           name: v.name,
           price: parseFloat(v.price),
@@ -289,7 +290,6 @@ const ShopProducts = () => {
         }))
       };
 
-      // Nếu không có variants, thêm price và stock
       if (variants.length === 0) {
         productData.price = parseFloat(formData.price);
         productData.stock = parseInt(formData.stock) || 0;
@@ -297,18 +297,14 @@ const ShopProducts = () => {
 
       console.log('Sending product data:', JSON.stringify(productData, null, 2));
       
-      // Tạo sản phẩm
       const response = await shopApi.post('/api/v1/shop/products', productData);
       console.log('Product created:', response.data);
 
-      // Upload ảnh nếu có file upload
       if (imageFile) {
         await uploadImage(response.data.id);
       }
 
-      // Refresh danh sách
       fetchProducts();
-      
       setShowAddModal(false);
       resetForm();
       alert('Thêm sản phẩm thành công!');
@@ -316,7 +312,7 @@ const ShopProducts = () => {
       console.error('Error adding product:', error);
       if (error.response) {
         console.error('Server response:', error.response.data);
-        alert(`Lỗi: ${JSON.stringify(error.response.data.detail) || 'Có lỗi xảy ra'}`);
+        alert(`Lỗi: ${error.response.data.detail || 'Có lỗi xảy ra'}`);
       } else {
         alert('Có lỗi xảy ra khi thêm sản phẩm');
       }
@@ -325,7 +321,6 @@ const ShopProducts = () => {
     }
   };
 
-  // Edit product
   const handleEditProduct = (product) => {
     setSelectedProduct(product);
     setFormData({
@@ -346,7 +341,6 @@ const ShopProducts = () => {
     setShowEditModal(true);
   };
 
-  // Update product
   const handleUpdateProduct = async () => {
     if (!selectedProduct) return;
 
@@ -361,12 +355,11 @@ const ShopProducts = () => {
         certification: formData.certification,
         price: parseFloat(formData.price),
         stock: parseInt(formData.stock),
-        image_url: formData.image_url || null // Cập nhật URL nếu có
+        image_url: formData.image_url || null
       };
 
       await shopApi.put(`/api/v1/shop/products/${selectedProduct.id}`, updateData);
 
-      // Upload ảnh mới nếu có file upload
       if (imageFile) {
         await uploadImage(selectedProduct.id);
       }
@@ -377,13 +370,21 @@ const ShopProducts = () => {
       alert('Cập nhật sản phẩm thành công!');
     } catch (error) {
       console.error('Error updating product:', error);
+      
+      if (error.response?.status === 401) {
+        localStorage.removeItem('shop_token');
+        localStorage.removeItem('shop_data');
+        localStorage.removeItem('shop_info');
+        window.location.href = '/shop/login';
+        return;
+      }
+      
       alert('Có lỗi xảy ra khi cập nhật sản phẩm');
     } finally {
       setSaving(false);
     }
   };
 
-  // View product detail
   const handleViewProduct = async (product) => {
     try {
       const response = await shopApi.get(`/api/v1/shop/products/${product.id}`);
@@ -391,11 +392,19 @@ const ShopProducts = () => {
       setShowDetailModal(true);
     } catch (error) {
       console.error('Error fetching product detail:', error);
+      
+      if (error.response?.status === 401) {
+        localStorage.removeItem('shop_token');
+        localStorage.removeItem('shop_data');
+        localStorage.removeItem('shop_info');
+        window.location.href = '/shop/login';
+        return;
+      }
+      
       alert('Không thể tải chi tiết sản phẩm');
     }
   };
 
-  // Delete product
   const handleDeleteProduct = (product) => {
     setSelectedProduct(product);
     setShowDeleteConfirm(true);
@@ -412,11 +421,19 @@ const ShopProducts = () => {
       alert('Xóa sản phẩm thành công!');
     } catch (error) {
       console.error('Error deleting product:', error);
+      
+      if (error.response?.status === 401) {
+        localStorage.removeItem('shop_token');
+        localStorage.removeItem('shop_data');
+        localStorage.removeItem('shop_info');
+        window.location.href = '/shop/login';
+        return;
+      }
+      
       alert('Có lỗi xảy ra khi xóa sản phẩm');
     }
   };
 
-  // Reset form
   const resetForm = () => {
     setFormData({
       name: '',
@@ -436,7 +453,6 @@ const ShopProducts = () => {
     setSelectedProduct(null);
   };
 
-  // Format functions
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('vi-VN', {
       style: 'currency',
@@ -462,7 +478,6 @@ const ShopProducts = () => {
     setPagination(prev => ({ ...prev, page: 1 }));
   };
 
-  // Image upload section component
   const ImageUploadSection = () => (
     <div className="form-group full-width">
       <label>Hình ảnh</label>
@@ -792,7 +807,6 @@ const ShopProducts = () => {
                   </select>
                 </div>
 
-                {/* Nếu không có variants, hiển thị price và stock */}
                 {variants.length === 0 && (
                   <>
                     <div className="form-group">
@@ -906,7 +920,6 @@ const ShopProducts = () => {
                   )}
                 </div>
 
-                {/* Image Upload Section - SỬA LẠI PHẦN NÀY */}
                 <ImageUploadSection />
               </div>
             </div>
@@ -931,7 +944,7 @@ const ShopProducts = () => {
         </div>
       )}
 
-      {/* Edit Product Modal - SỬA LẠI PHẦN HÌNH ẢNH TƯƠNG TỰ */}
+      {/* Edit Product Modal */}
       {showEditModal && (
         <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
           <div className="modal-content product-modal" onClick={e => e.stopPropagation()}>
@@ -1027,7 +1040,6 @@ const ShopProducts = () => {
                   />
                 </div>
 
-                {/* Image Upload Section for Edit */}
                 <ImageUploadSection />
               </div>
             </div>
@@ -1136,7 +1148,7 @@ const ShopProducts = () => {
                             </tr>
                           ))}
                         </tbody>
-                      </table>
+                       </table>
                     </div>
                   </div>
                 )}
@@ -1146,16 +1158,6 @@ const ShopProducts = () => {
                     <h3>Hình ảnh</h3>
                     <div className="product-image">
                       <img src={selectedProduct.image_url} alt={selectedProduct.name} />
-                    </div>
-                  </div>
-                )}
-
-                {selectedProduct.qr_code_url && (
-                  <div className="detail-section">
-                    <h3>Mã QR truy xuất</h3>
-                    <div className="qr-code">
-                      <img src={selectedProduct.qr_code_url} alt="QR Code" />
-                      <p>Quét mã để xem thông tin truy xuất nguồn gốc</p>
                     </div>
                   </div>
                 )}
@@ -1192,6 +1194,16 @@ const ShopProducts = () => {
           </div>
         </div>
       )}
+
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        .spinning {
+          animation: spin 1s linear infinite;
+        }
+      `}</style>
     </div>
   );
 };

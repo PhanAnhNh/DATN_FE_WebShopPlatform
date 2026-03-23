@@ -39,7 +39,7 @@ import {
   FaEdit,
   FaKey
 } from 'react-icons/fa';
-import shopApi from '../../api/api';
+import {shopApi} from '../../api/api';
 import '../../css/ShopSettings.css';
 
 const ShopSettings = () => {

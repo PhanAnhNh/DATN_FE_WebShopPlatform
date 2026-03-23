@@ -5,7 +5,8 @@ import {
   FaBox, 
   FaMoneyBillWave, 
   FaExchangeAlt,
-  FaDownload
+  FaDownload,
+  FaSpinner
 } from 'react-icons/fa';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import {
@@ -21,7 +22,7 @@ import {
   ArcElement,
   Filler
 } from 'chart.js';
-import api from '../../api/api';
+import { shopApi } from '../../api/api'; // SỬA: import shopApi thay vì api mặc định
 import '../../css/Dashboard.css';
 
 // Đăng ký các components cần thiết cho Chart.js
@@ -68,8 +69,17 @@ const ShopDashboard = () => {
     revenue: []
   });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
+    // Kiểm tra token trước khi fetch
+    const shopToken = localStorage.getItem('shop_token');
+    if (!shopToken) {
+      console.log('No shop token found, redirecting to login...');
+      window.location.href = '/shop/login';
+      return;
+    }
+    
     fetchDashboardData();
     fetchChartData();
     
@@ -83,64 +93,76 @@ const ShopDashboard = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
+      setError(null);
       
-      try {
-        // Gọi API dashboard stats
-        const statsRes = await api.get('/api/v1/shop/dashboard/stats');
-        console.log('Dashboard stats:', statsRes.data);
-        setStats(statsRes.data);
-        
-        // Gọi API recent activities
-        const activitiesRes = await api.get('/api/v1/shop/dashboard/recent-activities');
-        setRecentActivities(activitiesRes.data);
-        
-        // Gọi API sản phẩm mới
-        const productsRes = await api.get('/api/v1/shop/products?limit=5&sort=newest');
-        setNewProducts(productsRes.data.data || []);
-        
-      } catch (apiError) {
-        console.error('API Error:', apiError);
-        // Dữ liệu mẫu nếu API lỗi
-        setStats({
-          products: {
-            total: 1000,
-            in_stock: 950,
-            out_of_stock: 50
-          },
-          orders: {
-            total: 15000,
-            today: 45
-          },
-          revenue: {
-            total: 10000000,
-            this_month: 2500000
-          },
-          shop: {
-            name: 'Đặc Sản Quê Tôi',
-            logo_url: null,
-            is_verified: true,
-            followers_count: 1200
-          }
-        });
-        
-        setRecentActivities([
-          { type: 'order', description: 'Đơn hàng #DH001 đã được thanh toán', time: '5 phút trước' },
-          { type: 'product', description: 'Sản phẩm mới "Cà phê đặc sản" được thêm', time: '1 giờ trước' },
-          { type: 'return', description: 'Yêu cầu đổi trả #RT001 đã được xử lý', time: '2 giờ trước' },
-          { type: 'order', description: 'Đơn hàng #DH002 đã được giao thành công', time: '3 giờ trước' },
-          { type: 'product', description: 'Sản phẩm "Mật ong rừng" hết hàng', time: '5 giờ trước' }
-        ]);
-        
-        setNewProducts([
-          { id: '1', name: 'Cà phê đặc sản', price: 250000, stock: 50, image_url: null },
-          { id: '2', name: 'Mật ong rừng', price: 180000, stock: 30, image_url: null },
-          { id: '3', name: 'Gạo lứt đen', price: 120000, stock: 100, image_url: null },
-          { id: '4', name: 'Nấm linh chi', price: 350000, stock: 25, image_url: null },
-          { id: '5', name: 'Trà shan tuyết', price: 280000, stock: 40, image_url: null }
-        ]);
-      }
+      console.log('Fetching dashboard data with shop token...');
+      
+      // Gọi API dashboard stats - DÙNG shopApi
+      const statsRes = await shopApi.get('/api/v1/shop/dashboard/stats');
+      console.log('Dashboard stats:', statsRes.data);
+      setStats(statsRes.data);
+      
+      // Gọi API recent activities
+      const activitiesRes = await shopApi.get('/api/v1/shop/dashboard/recent-activities');
+      setRecentActivities(activitiesRes.data);
+      
+      // Gọi API sản phẩm mới
+      const productsRes = await shopApi.get('/api/v1/shop/products?limit=5&sort=newest');
+      setNewProducts(productsRes.data.data || []);
+      
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error fetching dashboard data:', error);
+      
+      if (error.response?.status === 401) {
+        // Token hết hạn hoặc không hợp lệ
+        console.log('Token expired or invalid, redirecting to login...');
+        localStorage.removeItem('shop_token');
+        localStorage.removeItem('shop_data');
+        localStorage.removeItem('shop_info');
+        window.location.href = '/shop/login';
+        return;
+      }
+      
+      setError('Không thể tải dữ liệu. Vui lòng thử lại sau.');
+      
+      // Dữ liệu mẫu nếu API lỗi
+      setStats({
+        products: {
+          total: 1000,
+          in_stock: 950,
+          out_of_stock: 50
+        },
+        orders: {
+          total: 15000,
+          today: 45
+        },
+        revenue: {
+          total: 10000000,
+          this_month: 2500000
+        },
+        shop: {
+          name: 'Đặc Sản Quê Tôi',
+          logo_url: null,
+          is_verified: true,
+          followers_count: 1200
+        }
+      });
+      
+      setRecentActivities([
+        { type: 'order', description: 'Đơn hàng #DH001 đã được thanh toán', time: '5 phút trước' },
+        { type: 'product', description: 'Sản phẩm mới "Cà phê đặc sản" được thêm', time: '1 giờ trước' },
+        { type: 'return', description: 'Yêu cầu đổi trả #RT001 đã được xử lý', time: '2 giờ trước' },
+        { type: 'order', description: 'Đơn hàng #DH002 đã được giao thành công', time: '3 giờ trước' },
+        { type: 'product', description: 'Sản phẩm "Mật ong rừng" hết hàng', time: '5 giờ trước' }
+      ]);
+      
+      setNewProducts([
+        { id: '1', name: 'Cà phê đặc sản', price: 250000, stock: 50, image_url: null },
+        { id: '2', name: 'Mật ong rừng', price: 180000, stock: 30, image_url: null },
+        { id: '3', name: 'Gạo lứt đen', price: 120000, stock: 100, image_url: null },
+        { id: '4', name: 'Nấm linh chi', price: 350000, stock: 25, image_url: null },
+        { id: '5', name: 'Trà shan tuyết', price: 280000, stock: 40, image_url: null }
+      ]);
     } finally {
       setLoading(false);
     }
@@ -148,7 +170,7 @@ const ShopDashboard = () => {
 
   const fetchChartData = async () => {
     try {
-      const response = await api.get('/api/v1/shop/dashboard/chart-data?days=7');
+      const response = await shopApi.get('/api/v1/shop/dashboard/chart-data?days=7');
       setChartData(response.data);
     } catch (error) {
       console.error('Error fetching chart data:', error);
@@ -343,8 +365,42 @@ const ShopDashboard = () => {
   if (loading) {
     return (
       <div className="dashboard">
-        <div className="dashboard-loading">
-          <div>Đang tải dữ liệu...</div>
+        <div className="dashboard-loading" style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          height: '400px' 
+        }}>
+          <FaSpinner className="spinning" size={40} color="#2e7d32" />
+          <p style={{ marginLeft: '10px' }}>Đang tải dữ liệu...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="dashboard">
+        <div className="dashboard-error" style={{ 
+          textAlign: 'center', 
+          padding: '50px',
+          color: '#dc3545'
+        }}>
+          <p>{error}</p>
+          <button 
+            onClick={fetchDashboardData}
+            style={{
+              marginTop: '20px',
+              padding: '10px 20px',
+              background: '#2e7d32',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer'
+            }}
+          >
+            Thử lại
+          </button>
         </div>
       </div>
     );
@@ -513,6 +569,16 @@ const ShopDashboard = () => {
           </div>
         </div>
       </div>
+
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        .spinning {
+          animation: spin 1s linear infinite;
+        }
+      `}</style>
     </div>
   );
 };

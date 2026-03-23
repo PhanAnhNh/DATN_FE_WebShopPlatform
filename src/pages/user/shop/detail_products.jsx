@@ -66,58 +66,60 @@ const ProductDetailPage = () => {
     }, [product_id]);
 
     const fetchProductDetail = async () => {
-        setLoading(true);
-        try {
-            // Lấy chi tiết sản phẩm
-            const productRes = await api.get(`/api/v1/products/${product_id}`);
-            console.log("Product data:", productRes.data);
-            setProduct(productRes.data);
-            
-            // Lấy thông tin shop
-            if (productRes.data.shop_id) {
-                const shopRes = await api.get(`/api/v1/shops/${productRes.data.shop_id}`);
-                setShop(shopRes.data);
-            }
-            
-            // Set variant mặc định nếu có
-            if (productRes.data.variants && productRes.data.variants.length > 0) {
-                setSelectedVariant(productRes.data.variants[0]);
-            }
-        } catch (error) {
-            console.error("Error fetching product detail:", error);
-            // Mock data
-            setProduct({
-                id: product_id,
-                name: "Táo đỏ tươi",
-                description: "Táo đỏ tươi ngon, được trồng theo tiêu chuẩn VietGAP, không sử dụng thuốc bảo vệ thực vật. Sản phẩm được thu hoạch và đóng gói ngay trong ngày để đảm bảo độ tươi ngon nhất.",
-                price: 60000,
-                stock: 150,
-                image_url: "https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=600",
-                origin: "Đà Lạt, Lâm Đồng",
-                certification: "VietGAP, Hữu cơ",
-                rating: 4.8,
-                total_reviews: 234,
-                qr_code_url: "static/qr_codes/69bc34980596c5978179a103.png",
-                variants: [
-                    { id: 1, name: "1kg", price: 60000, stock: 100 },
-                    { id: 2, name: "2kg", price: 115000, stock: 80 },
-                    { id: 3, name: "5kg", price: 280000, stock: 50 }
-                ],
-                created_at: "2026-01-15T00:00:00Z"
-            });
-            setShop({
-                id: "shop1",
-                name: "Shop rau củ Đà Lạt",
-                address: "123 Đường Láng, Đống Đa, Hà Nội",
-                phone: "0987654321",
-                email: "shop@dacsan.com",
-                rating: 4.9,
-                followers_count: 12500
-            });
-        } finally {
-            setLoading(false);
+    setLoading(true);
+    try {
+        // Lấy chi tiết sản phẩm
+        const productRes = await api.get(`/api/v1/products/${product_id}`);
+        console.log("Product data:", productRes.data);
+        console.log("Product shop_id:", productRes.data.shop_id); // Kiểm tra shop_id
+        
+        setProduct(productRes.data);
+        
+        // Lấy thông tin shop
+        if (productRes.data.shop_id) {
+            const shopRes = await api.get(`/api/v1/shops/${productRes.data.shop_id}`);
+            setShop(shopRes.data);
         }
-    };
+        
+        // Set variant mặc định nếu có
+        if (productRes.data.variants && productRes.data.variants.length > 0) {
+            setSelectedVariant(productRes.data.variants[0]);
+        }
+    } catch (error) {
+        console.error("Error fetching product detail:", error);
+        // Mock data - đảm bảo có shop_id
+        setProduct({
+            id: product_id,
+            name: "Táo đỏ tươi",
+            description: "Táo đỏ tươi ngon, được trồng theo tiêu chuẩn VietGAP...",
+            price: 60000,
+            stock: 150,
+            image_url: "https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=600",
+            origin: "Đà Lạt, Lâm Đồng",
+            certification: "VietGAP, Hữu cơ",
+            rating: 4.8,
+            total_reviews: 234,
+            shop_id: "69b9170027a68c9753b5290a", // Thêm shop_id vào mock data
+            variants: [
+                { id: "69becd0a2f6745a41a3aba96", name: "1kg", price: 60000, stock: 100 },
+                { id: "69becd0b2f6745a41a3aba97", name: "2kg", price: 115000, stock: 80 },
+                { id: "69becd0c2f6745a41a3aba98", name: "5kg", price: 280000, stock: 50 }
+            ],
+            created_at: "2026-01-15T00:00:00Z"
+        });
+        setShop({
+            id: "69b9170027a68c9753b5290a",
+            name: "Shop rau củ Đà Lạt",
+            address: "123 Đường Láng, Đống Đa, Hà Nội",
+            phone: "0987654321",
+            email: "shop@dacsan.com",
+            rating: 4.9,
+            followers_count: 12500
+        });
+    } finally {
+        setLoading(false);
+    }
+};
 
     const formatCurrency = (amount) => {
         return new Intl.NumberFormat('vi-VN', {
@@ -143,37 +145,44 @@ const ProductDetailPage = () => {
         return stars;
     };
     // pages/user/product/ProductDetailPage.jsx
+    // pages/user/product/ProductDetailPage.jsx
 const handleAddToCart = async () => {
-        setAddingToCart(true);
-        try {
-            const response = await api.post('/api/v1/cart/add', null, {
-                params: {
-                    product_id: product.id,
-                    quantity: quantity,
-                    variant_id: selectedVariant?.id || null
-                }
-            });
-            
-            const itemName = selectedVariant 
-                ? `${product.name} - ${selectedVariant.name}` 
-                : product.name;
-            
-            showToast(`Đã thêm ${quantity} ${itemName} vào giỏ hàng!`, 'Success')
-            
-            // Dispatch event để cập nhật số lượng giỏ hàng
-            window.dispatchEvent(new Event('cartUpdated'));
-            
-        } catch (error) {
-            console.error("Error adding to cart:", error);
-            if (error.response) {
-                alert(`Lỗi: ${error.response.data.detail || "Có lỗi xảy ra"}`);
-            } else {
-                alert("Có lỗi xảy ra khi thêm vào giỏ hàng. Vui lòng thử lại!");
+    setAddingToCart(true);
+    try {
+        // Lấy shop_id từ product data
+        const shopId = product.shop_id;
+        
+        console.log("Adding to cart with shop_id:", shopId);
+        
+        const response = await api.post('/api/v1/cart/add', null, {
+            params: {
+                product_id: product.id,
+                quantity: quantity,
+                variant_id: selectedVariant?.id || null,
+                shop_id: shopId  // Thêm shop_id vào đây
             }
-        } finally {
-            setAddingToCart(false);
+        });
+        
+        const itemName = selectedVariant 
+            ? `${product.name} - ${selectedVariant.name}` 
+            : product.name;
+        
+        showToast(`Đã thêm ${quantity} ${itemName} vào giỏ hàng!`, 'success');
+        
+        // Dispatch event để cập nhật số lượng giỏ hàng
+        window.dispatchEvent(new Event('cartUpdated'));
+        
+    } catch (error) {
+        console.error("Error adding to cart:", error);
+        if (error.response) {
+            showToast(error.response.data.detail || "Có lỗi xảy ra", "error");
+        } else {
+            showToast("Có lỗi xảy ra khi thêm vào giỏ hàng. Vui lòng thử lại!", "error");
         }
-    };
+    } finally {
+        setAddingToCart(false);
+    }
+};
 
     const handleBuyNow = () => {
         handleAddToCart();

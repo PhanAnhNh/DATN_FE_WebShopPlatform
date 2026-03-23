@@ -1,14 +1,15 @@
+// src/pages/user/account/signin.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import Toast from '../../../components/common/Toast'; // Import Toast
-import "../../../css/AdminManageLayout.css"; // Import CSS
-import { CheckCircle, AlertCircle } from 'lucide-react';
+import Toast from '../../../components/common/Toast';
+import "../../../css/AdminManageLayout.css";
 
 function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
   
   // Toast states
   const [toast, setToast] = useState({
@@ -19,54 +20,63 @@ function Login() {
   
   const navigate = useNavigate();
 
-  // Hàm hiển thị toast
   const showToast = (message, type = 'success') => {
     setToast({ show: true, message, type });
   };
 
-  // src/pages/user/account/signin.jsx - SỬA handleLogin
-const handleLogin = async (e) => {
-  e.preventDefault();
-  setError("");
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
 
-  try {
-    const formData = new URLSearchParams();
-    formData.append("username", email); 
-    formData.append("password", password);
+    try {
+      const formData = new URLSearchParams();
+      formData.append("username", email);
+      formData.append("password", password);
 
-    const response = await fetch("http://localhost:8000/api/v1/auth/login", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: formData,
-    });
+      const response = await fetch("http://localhost:8000/api/v1/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: formData,
+      });
 
-    if (!response.ok) {
-      throw new Error("Email hoặc mật khẩu không chính xác!");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || "Email hoặc mật khẩu không chính xác!");
+      }
+
+      const data = await response.json();
+      console.log("User login response:", data);
+
+      // Kiểm tra role - user không được đăng nhập vào shop hoặc admin
+      if (data.user && data.user.role === "shop_owner") {
+        throw new Error("Vui lòng đăng nhập qua cổng dành cho shop");
+      }
+      
+      if (data.user && data.user.role === "admin") {
+        throw new Error("Vui lòng đăng nhập qua cổng dành cho admin");
+      }
+
+      // Lưu token với key RIÊNG cho user
+      localStorage.setItem("user_token", data.access_token);
+      localStorage.setItem("user_data", JSON.stringify(data.user));
+      localStorage.setItem("user", JSON.stringify(data.user));
+
+      showToast("Đăng nhập thành công!", "success");
+      
+      setTimeout(() => {
+        navigate("/");
+      }, 1500);
+
+    } catch (err) {
+      setError(err.message);
+      showToast(err.message, "error");
+    } finally {
+      setLoading(false);
     }
-
-    const data = await response.json();
-    console.log("User login response:", data);
-
-    // Lưu token và user data với key thống nhất
-    localStorage.setItem("user_token", data.access_token);
-    localStorage.setItem("user_data", JSON.stringify(data.user));
-    
-    // THÊM: Lưu cả user với key "user" cho tương thích với code cũ
-    localStorage.setItem("user", JSON.stringify(data.user));
-
-    showToast("Đăng nhập thành công!", "success");
-    
-    setTimeout(() => {
-      navigate("/");
-    }, 1500);
-
-  } catch (err) {
-    setError(err.message);
-    showToast(err.message, "error");
-  }
-};
+  };
 
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", fontFamily: "Arial, sans-serif" }}>
@@ -108,10 +118,8 @@ const handleLogin = async (e) => {
               />
               
               <div>
-                {/* 2. BỌC INPUT MẬT KHẨU VÀO MỘT DIV RELATIVE */}
                 <div style={{ position: "relative", width: "100%" }}>
                   <input
-                    // 3. ĐỔI TYPE DỰA TRÊN STATE
                     type={showPassword ? "text" : "password"}
                     placeholder="Nhập mật khẩu"
                     value={password}
@@ -120,7 +128,7 @@ const handleLogin = async (e) => {
                     style={{ 
                       width: "100%", 
                       padding: "15px", 
-                      paddingRight: "45px", // Chừa chỗ trống bên phải để chữ không đè lên icon
+                      paddingRight: "45px",
                       borderRadius: "8px", 
                       border: "1px solid #ccc", 
                       backgroundColor: "#e9ecef", 
@@ -128,7 +136,6 @@ const handleLogin = async (e) => {
                       boxSizing: "border-box" 
                     }}
                   />
-                  {/* 4. NÚT MẮT ĐỂ TOGGLE */}
                   <span 
                     onClick={() => setShowPassword(!showPassword)}
                     style={{ 
@@ -138,7 +145,7 @@ const handleLogin = async (e) => {
                       transform: "translateY(-50%)", 
                       cursor: "pointer",
                       fontSize: "18px",
-                      userSelect: "none" // Ngăn bôi đen nhầm khi click nhanh
+                      userSelect: "none"
                     }}
                     title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
                   >
@@ -151,17 +158,31 @@ const handleLogin = async (e) => {
                 </div>
               </div>
 
-              {/* Có thể giữ lại error hoặc bỏ, vì đã có toast hiển thị lỗi */}
               {error && <div style={{ color: "red", fontSize: "13px", textAlign: "center" }}>{error}</div>}
 
-              <button type="submit" style={{ padding: "15px", borderRadius: "8px", border: "none", backgroundColor: "#558b2f", color: "white", fontWeight: "bold", fontSize: "16px", cursor: "pointer", marginTop: "10px" }}>
-                Đăng nhập
+              <button 
+                type="submit" 
+                disabled={loading}
+                style={{ 
+                  padding: "15px", 
+                  borderRadius: "8px", 
+                  border: "none", 
+                  background: loading ? "#a5a5a5" : "#558b2f", 
+                  color: "white", 
+                  fontWeight: "bold", 
+                  fontSize: "16px", 
+                  cursor: loading ? "not-allowed" : "pointer", 
+                  marginTop: "10px",
+                  opacity: loading ? 0.7 : 1
+                }}
+              >
+                {loading ? "Đang đăng nhập..." : "Đăng nhập"}
               </button>
             </form>
 
             <div style={{ textAlign: "center", marginTop: "20px", fontSize: "14px", color: "#333" }}>
               Chưa có tài khoản? 
-              <span style={{ color: "#558b2f", fontWeight: "bold", cursor: "pointer" }}
+              <span style={{ color: "#558b2f", fontWeight: "bold", cursor: "pointer", marginLeft: "5px" }}
                 onClick={() => navigate("/register")}
               >Đăng kí</span>
             </div>
@@ -169,13 +190,11 @@ const handleLogin = async (e) => {
             <div style={{ display: "flex", gap: "15px", marginTop: "20px" }}>
               <button style={{ flex: 1, padding: "10px", borderRadius: "20px", border: "1px solid #ccc", background: "white", cursor: "pointer", display: "flex", justifyContent: "center", alignItems: "center" }}>
                 <span style={{ color: "#db4437", fontWeight: "bold", fontSize: "18px" }}>G</span>
-                <span>.</span>
-                <span>Google</span>
+                <span style={{ marginLeft: "5px" }}>Google</span>
               </button>
               <button style={{ flex: 1, padding: "10px", borderRadius: "20px", border: "1px solid #ccc", background: "white", cursor: "pointer", display: "flex", justifyContent: "center", alignItems: "center" }}>
                 <span style={{ color: "#4267B2", fontWeight: "bold", fontSize: "18px" }}>f</span>
-                <span>.</span>
-                <span>FaceBook</span>
+                <span style={{ marginLeft: "5px" }}>FaceBook</span>
               </button>
             </div>
 

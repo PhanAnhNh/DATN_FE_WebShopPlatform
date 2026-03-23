@@ -1,4 +1,4 @@
-// src/pages/shop_manager/shop_manager.jsx
+// src/pages/shop_manager/shop_manager.jsx (hoặc ShopCustomers.jsx)
 import React, { useState, useEffect } from 'react';
 import { 
   FaSearch, 
@@ -20,7 +20,7 @@ import {
   FaAngleDoubleRight,
   FaSpinner
 } from 'react-icons/fa';
-import api from '../../api/api';
+import { shopApi } from '../../api/api'; // SỬA: import shopApi
 import '../../css/ShopCustomers.css';
 
 const ShopCustomers = () => {
@@ -39,6 +39,7 @@ const ShopCustomers = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editFormData, setEditFormData] = useState({});
   const [exportLoading, setExportLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   // Debounce search
   useEffect(() => {
@@ -52,112 +53,130 @@ const ShopCustomers = () => {
     fetchCustomers();
   }, [pagination.page, debouncedSearch]);
 
-const fetchCustomers = async () => {
-  try {
-    setLoading(true);
-    const token = localStorage.getItem('shop_token');
-    
-    const response = await api.get('/api/v1/shop/customers', {
-      params: {
-        page: pagination.page,
-        limit: pagination.limit,
-        search: debouncedSearch || undefined
-      },
-      headers: {
-        'Authorization': `Bearer ${token}` // Thêm token thủ công
+  const fetchCustomers = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('Fetching customers with shop token...');
+      
+      // DÙNG shopApi - không cần thêm token thủ công
+      const response = await shopApi.get('/api/v1/shop/customers', {
+        params: {
+          page: pagination.page,
+          limit: pagination.limit,
+          search: debouncedSearch || undefined
+        }
+      });
+      
+      console.log('Customers response:', response.data);
+      
+      setCustomers(response.data.data || []);
+      setPagination(response.data.pagination || {
+        page: 1,
+        limit: 10,
+        total: 0,
+        total_pages: 1
+      });
+    } catch (error) {
+      console.error('Error fetching customers:', error);
+      
+      if (error.response?.status === 401) {
+        console.log('Token expired, redirecting to login...');
+        localStorage.removeItem('shop_token');
+        localStorage.removeItem('shop_data');
+        localStorage.removeItem('shop_info');
+        window.location.href = '/shop/login';
+        return;
       }
-    });
-    
-    setCustomers(response.data.data || []);
-    setPagination(response.data.pagination || {
-      page: 1,
-      limit: 10,
-      total: 0,
-      total_pages: 1
-    });
-  } catch (error) {
-    console.error('Error fetching customers:', error);
-    setCustomers(mockCustomers);
-    setPagination({
-      page: 1,
-      limit: 10,
-      total: mockCustomers.length,
-      total_pages: Math.ceil(mockCustomers.length / 10)
-    });
-  } finally {
-    setLoading(false);
-  }
-};
+      
+      setError('Không thể tải danh sách khách hàng');
+      // Dữ liệu mẫu nếu API lỗi
+      setCustomers(mockCustomers);
+      setPagination({
+        page: 1,
+        limit: 10,
+        total: mockCustomers.length,
+        total_pages: Math.ceil(mockCustomers.length / 10)
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
-// Sửa các hàm khác tương tự
-const handleViewCustomer = async (customer) => {
-  try {
-    const token = localStorage.getItem('shop_token');
-    const response = await api.get(`/api/v1/customers/${customer.id}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    setSelectedCustomer(response.data);
-  } catch (error) {
-    console.error('Error fetching customer detail:', error);
-    setSelectedCustomer({
-      ...customer,
-      orders: [
-        { id: 'DH001', total_price: 500000, status: 'completed', created_at: '2024-03-15T10:30:00', items_count: 3 },
-        { id: 'DH002', total_price: 300000, status: 'completed', created_at: '2024-03-10T14:20:00', items_count: 2 },
-        { id: 'DH003', total_price: 700000, status: 'pending', created_at: '2024-03-18T16:45:00', items_count: 4 }
-      ]
-    });
-  }
-  setShowDetailModal(true);
-};
+  const handleViewCustomer = async (customer) => {
+    try {
+      // DÙNG shopApi
+      const response = await shopApi.get(`/api/v1/shop/customers/${customer.id}`);
+      setSelectedCustomer(response.data);
+    } catch (error) {
+      console.error('Error fetching customer detail:', error);
+      // Dữ liệu mẫu
+      setSelectedCustomer({
+        ...customer,
+        orders: [
+          { id: 'DH001', total_price: 500000, status: 'completed', created_at: '2024-03-15T10:30:00', items_count: 3 },
+          { id: 'DH002', total_price: 300000, status: 'completed', created_at: '2024-03-10T14:20:00', items_count: 2 },
+          { id: 'DH003', total_price: 700000, status: 'pending', created_at: '2024-03-18T16:45:00', items_count: 4 }
+        ]
+      });
+    }
+    setShowDetailModal(true);
+  };
 
   // Dữ liệu mẫu
   const mockCustomers = [
     {
       id: '1',
       full_name: 'Nguyễn Văn A',
+      username: 'nguyenvana',
       email: 'nguyenvana@email.com',
       phone: '0123670934',
       address: '123 Đường Lê Lợi, Quận 1, TP.HCM',
       total_spent: 1500000,
       order_count: 5,
       last_order: '2024-03-15T10:30:00',
-      created_at: '2024-01-10T08:00:00'
+      created_at: '2024-01-10T08:00:00',
+      gender: 'male'
     },
     {
       id: '2',
       full_name: 'Nguyễn Văn B',
+      username: 'nguyenvanb',
       email: 'nguyenvanb@email.com',
       phone: '0123670834',
       address: '456 Đường Nguyễn Huệ, Quận 1, TP.HCM',
       total_spent: 850000,
       order_count: 3,
       last_order: '2024-03-10T14:20:00',
-      created_at: '2024-01-15T09:30:00'
+      created_at: '2024-01-15T09:30:00',
+      gender: 'male'
     },
     {
       id: '3',
       full_name: 'Trần Thị C',
+      username: 'tranthic',
       email: 'tranthic@email.com',
       phone: '0987654321',
       address: '789 Đường Võ Văn Tần, Quận 3, TP.HCM',
       total_spent: 2300000,
       order_count: 7,
       last_order: '2024-03-18T16:45:00',
-      created_at: '2024-01-05T10:15:00'
+      created_at: '2024-01-05T10:15:00',
+      gender: 'female'
     },
     {
       id: '4',
       full_name: 'Lê Văn D',
+      username: 'levand',
       email: 'levand@email.com',
       phone: '0912345678',
       address: '321 Đường Cách Mạng Tháng 8, Quận 10, TP.HCM',
       total_spent: 450000,
       order_count: 2,
       last_order: '2024-03-05T09:10:00',
-      created_at: '2024-02-01T11:20:00'
+      created_at: '2024-02-01T11:20:00',
+      gender: 'male'
     }
   ];
 
@@ -176,7 +195,8 @@ const handleViewCustomer = async (customer) => {
   // Lưu thông tin khách hàng
   const handleSaveCustomer = async () => {
     try {
-      await api.put(`/api/v1/customers/${editFormData.id}`, {
+      // DÙNG shopApi
+      await shopApi.put(`/api/v1/shop/customers/${editFormData.id}`, {
         full_name: editFormData.full_name,
         phone: editFormData.phone,
         address: editFormData.address,
@@ -194,6 +214,12 @@ const handleViewCustomer = async (customer) => {
       alert('Cập nhật thông tin khách hàng thành công!');
     } catch (error) {
       console.error('Error updating customer:', error);
+      
+      if (error.response?.status === 401) {
+        window.location.href = '/shop/login';
+        return;
+      }
+      
       alert('Có lỗi xảy ra khi cập nhật thông tin');
     }
   };
@@ -205,11 +231,18 @@ const handleViewCustomer = async (customer) => {
     }
 
     try {
-      await api.delete(`/api/v1/customers/${customerId}`);
+      // DÙNG shopApi
+      await shopApi.delete(`/api/v1/shop/customers/${customerId}`);
       setCustomers(prev => prev.filter(c => c.id !== customerId));
       alert('Xóa khách hàng thành công!');
     } catch (error) {
       console.error('Error deleting customer:', error);
+      
+      if (error.response?.status === 401) {
+        window.location.href = '/shop/login';
+        return;
+      }
+      
       alert('Có lỗi xảy ra khi xóa khách hàng');
     }
   };
@@ -218,7 +251,8 @@ const handleViewCustomer = async (customer) => {
   const handleExportExcel = async () => {
     try {
       setExportLoading(true);
-      const response = await api.get('/api/v1/customers/export/excel');
+      // DÙNG shopApi
+      const response = await shopApi.get('/api/v1/shop/customers/export/excel');
       
       // Tạo file Excel từ dữ liệu
       const data = response.data.data;
@@ -228,6 +262,11 @@ const handleViewCustomer = async (customer) => {
       alert('Xuất file thành công!');
     } catch (error) {
       console.error('Error exporting customers:', error);
+      
+      if (error.response?.status === 401) {
+        window.location.href = '/shop/login';
+        return;
+      }
       
       // Fallback: xuất dữ liệu mẫu
       const mockData = mockCustomers.map((c, index) => ({
@@ -349,6 +388,11 @@ const handleViewCustomer = async (customer) => {
             <FaSpinner className="spinning" />
             <p>Đang tải dữ liệu...</p>
           </div>
+        ) : error ? (
+          <div className="error-state">
+            <p>{error}</p>
+            <button onClick={fetchCustomers}>Thử lại</button>
+          </div>
         ) : (
           <table className="customers-table">
             <thead>
@@ -421,7 +465,7 @@ const handleViewCustomer = async (customer) => {
       </div>
 
       {/* Pagination */}
-      {pagination.total_pages > 1 && (
+      {pagination.total_pages > 1 && !loading && (
         <div className="pagination">
           <div className="pagination-info">
             Trang hiển thị {pagination.page}/{pagination.total_pages}
@@ -488,7 +532,7 @@ const handleViewCustomer = async (customer) => {
         </div>
       )}
 
-      {/* Customer Detail Modal */}
+      {/* Customer Detail Modal - giữ nguyên */}
       {showDetailModal && selectedCustomer && (
         <div className="modal-overlay" onClick={() => setShowDetailModal(false)}>
           <div className="modal-content customer-detail-modal" onClick={e => e.stopPropagation()}>
@@ -599,7 +643,7 @@ const handleViewCustomer = async (customer) => {
         </div>
       )}
 
-      {/* Edit Customer Modal */}
+      {/* Edit Customer Modal - giữ nguyên */}
       {showEditModal && (
         <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
           <div className="modal-content edit-modal" onClick={e => e.stopPropagation()}>
@@ -678,6 +722,30 @@ const handleViewCustomer = async (customer) => {
           </div>
         </div>
       )}
+
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        .spinning {
+          animation: spin 1s linear infinite;
+        }
+        .error-state {
+          text-align: center;
+          padding: 40px;
+          color: #dc3545;
+        }
+        .error-state button {
+          margin-top: 10px;
+          padding: 8px 16px;
+          background: #2e7d32;
+          color: white;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+        }
+      `}</style>
     </div>
   );
 };

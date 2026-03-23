@@ -26,64 +26,63 @@ function ShopLogin() {
     setToast({ show: true, message, type });
   };
 
-  // src/pages/shop/auth/ShopLogin.jsx - Sửa hàm handleLogin
-const handleLogin = async (e) => {
-  e.preventDefault();
-  setError("");
-  setLoading(true);
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
 
-  try {
-    // Tạo FormData thay vì JSON
-    const formData = new URLSearchParams();
-    formData.append('username', loginIdentifier); // OAuth2 form yêu cầu field 'username'
-    formData.append('password', password);
+    try {
+      // Tạo FormData cho OAuth2 form
+      const formData = new URLSearchParams();
+      formData.append('username', loginIdentifier);
+      formData.append('password', password);
 
-    const response = await fetch("http://localhost:8000/api/v1/shop/auth/login", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      body: formData.toString() // Chuyển thành string
-    });
+      const response = await fetch("http://localhost:8000/api/v1/shop/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: formData.toString()
+      });
 
-    const data = await response.json();
-    console.log("Shop login response:", data);
+      const data = await response.json();
+      console.log("Shop login response:", data);
 
-    if (!response.ok) {
-      throw new Error(data.detail || "Đăng nhập thất bại");
+      if (!response.ok) {
+        throw new Error(data.detail || "Đăng nhập thất bại");
+      }
+
+      // Kiểm tra role có phải shop_owner không
+      if (data.user && data.user.role !== "shop_owner") {
+        throw new Error("Tài khoản không phải là chủ shop");
+      }
+
+      // Lưu token và user data với key RIÊNG cho shop
+      localStorage.setItem("shop_token", data.access_token);
+      localStorage.setItem("shop_data", JSON.stringify(data.user));
+      
+      // Lưu thông tin shop nếu có
+      if (data.shop) {
+        localStorage.setItem("shop_info", JSON.stringify(data.shop));
+      }
+
+      showToast("Đăng nhập vào trang quản lý shop thành công!", "success");
+      
+      setTimeout(() => {
+        navigate("/shop/dashboard");
+      }, 1500);
+
+    } catch (err) {
+      setError(err.message);
+      showToast(err.message, "error");
+    } finally {
+      setLoading(false);
     }
+  };
 
-    // Kiểm tra role có phải shop_owner không
-    if (data.user && data.user.role !== "shop_owner") {
-      throw new Error("Tài khoản không phải là chủ shop");
-    }
-
-    // Lưu token và user data
-    localStorage.setItem("shop_token", data.access_token);
-    localStorage.setItem("shop_data", JSON.stringify(data.user));
-    
-    // Lưu thêm thông tin shop riêng
-    if (data.shop) { // Sửa từ data.user.shop thành data.shop
-      localStorage.setItem("shop_info", JSON.stringify(data.shop));
-    }
-
-    showToast("Đăng nhập vào trang quản lý shop thành công!", "success");
-    
-    setTimeout(() => {
-      navigate("/shop/dashboard");
-    }, 1500);
-
-  } catch (err) {
-    setError(err.message);
-    showToast(err.message, "error");
-  } finally {
-    setLoading(false);
-  }
-};
-
-  // Hàm đăng nhập demo (để test nhanh)
+  // Hàm đăng nhập demo
   const handleDemoLogin = () => {
-    setLoginIdentifier("shopowner");
+    setLoginIdentifier("shop1");
     setPassword("123456");
   };
 
@@ -333,10 +332,7 @@ const handleLogin = async (e) => {
                   Tài khoản demo:
                 </p>
                 <p style={{ fontSize: "13px", margin: "5px 0", color: "#555" }}>
-                  <span style={{ fontWeight: "600" }}>Email:</span> shop@example.com
-                </p>
-                <p style={{ fontSize: "13px", margin: "5px 0", color: "#555" }}>
-                  <span style={{ fontWeight: "600" }}>Username:</span> shopowner
+                  <span style={{ fontWeight: "600" }}>Username:</span> shop1
                 </p>
                 <p style={{ fontSize: "13px", margin: "5px 0", color: "#555" }}>
                   <span style={{ fontWeight: "600" }}>Mật khẩu:</span> 123456
