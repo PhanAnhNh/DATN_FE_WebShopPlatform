@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api/api';
 import '../../css/AdminLayout.css';
+import NotificationBell from '../../pages/user/NotificationBell';
 
 const AdminHeader = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -66,10 +67,29 @@ const AdminHeader = () => {
       </div>
       
       <div className="user-info">
-        <button className="notification-btn">
-          🔔
-          <span className="notification-dot"></span>
-        </button>
+        <span style={{ 
+                    marginLeft: "20px",
+                    cursor: "pointer", 
+                    display: "flex", 
+                    border: "1px solid #ddd", 
+                    padding: "2px", 
+                    borderRadius: "50%", 
+                    backgroundColor: "#f0f2f5",
+                    transition: "all 0.3s"
+                }}
+                onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "#e8f5e9";
+                    e.currentTarget.style.borderColor = "#2e7d32";
+                }}
+                onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "#e8f5e9";
+                    e.currentTarget.style.borderColor = "#ddd";
+                }}>
+                <div className="notification-wrapper">
+                  <NotificationBell userType="admin" />
+                </div>
+          </span>
+        
         
         <div className="avatar-container" ref={dropdownRef}>
           <div 

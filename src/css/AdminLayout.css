@@ -382,13 +382,11 @@ body {
   font-size: 14px;
 }
 
-/* Thêm vào cuối file AdminLayout.css */
-
-/* Avatar Container */
 .avatar-container {
   position: relative;
   display: inline-block;
   height: 50px;
+  margin-top: 9px;
 }
 
 .user-avatar {

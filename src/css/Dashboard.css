@@ -418,6 +418,40 @@
   color: #7f8c8d;
 }
 
+/* Đảm bảo các container chart có kích thước đúng */
+.chart-card__body {
+  height: 280px;
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* Đảm bảo canvas luôn fill container */
+.chart-card__body canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Thêm transition mượt mà khi resize */
+.dashboard,
+.chart-card,
+.chart-card__body {
+  transition: all 0.2s ease;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .chart-card__body {
+    height: 240px;
+  }
+}
+
+@media (max-width: 480px) {
+  .chart-card__body {
+    height: 200px;
+  }
+}
+
 /* Responsive */
 @media (max-width: 1400px) {
   .dashboard {

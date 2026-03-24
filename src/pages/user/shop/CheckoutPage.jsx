@@ -1,4 +1,3 @@
-// pages/user/checkout/CheckoutPage.jsx
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../../../components/layout/Layout";
@@ -46,6 +45,9 @@ const CheckoutPage = () => {
     const [paymentMethod, setPaymentMethod] = useState("cod");
     const [toast, setToast] = useState({ show: false, message: '', type: 'success', id: null });
     const [showAddressForm, setShowAddressForm] = useState(false);
+    const [paymentProcessing, setPaymentProcessing] = useState(false);
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [orderSuccess, setOrderSuccess] = useState(null);
     const [editAddress, setEditAddress] = useState({
         name: "",
         phone: "",
@@ -138,6 +140,32 @@ const CheckoutPage = () => {
                 city: "",
                 country: "Việt Nam"
             });
+        }
+    };
+
+    const handlePayment = async (orderId, amount, method) => {
+        try {
+            setPaymentProcessing(true);
+            
+            // Tạo payment request
+            const paymentResponse = await api.post('/api/v1/payments/create', {
+                order_id: orderId,
+                method: method,
+                amount: amount
+            });
+            
+            console.log('Payment response:', paymentResponse.data);
+            
+            // Chuyển hướng đến trang thanh toán
+            if (paymentResponse.data.payment_url) {
+                window.location.href = paymentResponse.data.payment_url;
+            } else {
+                throw new Error('Không nhận được URL thanh toán');
+            }
+        } catch (error) {
+            console.error('Payment error:', error);
+            showToast(error.response?.data?.detail || 'Có lỗi xảy ra khi tạo thanh toán', 'error');
+            setPaymentProcessing(false);
         }
     };
 
@@ -396,14 +424,14 @@ const CheckoutPage = () => {
         
         setSubmitting(true);
         try {
-            const orderData = {
+            const response = await api.post('/api/v1/orders', {
                 items: selectedItems.map(item => ({
                     product_id: item.product_id,
                     product_name: item.product_name,
                     quantity: item.quantity,
                     price: item.price,
-                    variant_id: item.variant_id,
-                    variant_name: item.variant_name,
+                    variant_id: item.variant_id || null,
+                    variant_name: item.variant_name || null,
                     subtotal: item.subtotal || item.price * item.quantity,
                     shop_id: item.shop_id
                 })),
@@ -421,17 +449,19 @@ const CheckoutPage = () => {
                     country: shippingAddress.country,
                     full_address: formatFullAddress(shippingAddress)
                 },
-                note: note,
+                note: note || "",
                 payment_method: paymentMethod,
                 voucher: selectedVoucher ? {
                     id: selectedVoucher._id,
                     code: selectedVoucher.code,
                     discount: calculateDiscount()
                 } : null
-            };
+            });
             
-            const response = await api.post('/api/v1/orders', orderData);
+            console.log("Order response:", response.data);
+            const order = response.data;
             
+            // Xử lý voucher nếu có
             if (selectedVoucher && selectedVoucher._id) {
                 try {
                     await api.post(`/api/v1/vouchers/${selectedVoucher._id}/use`);
@@ -440,6 +470,7 @@ const CheckoutPage = () => {
                 }
             }
             
+            // Xóa sản phẩm khỏi giỏ hàng
             for (const item of selectedItems) {
                 try {
                     await api.delete('/api/v1/cart/remove', {
@@ -453,27 +484,74 @@ const CheckoutPage = () => {
                 }
             }
             
+            // Xóa localStorage
             localStorage.removeItem('selectedCartItems');
             localStorage.removeItem('selectedTotal');
             localStorage.removeItem('selectedVoucher');
             localStorage.removeItem('finalTotal');
             
-            showToast("Đặt hàng thành công!", "success");
-            setTimeout(() => {
-                navigate('/orders');
-            }, 1500);
+            // Lưu thông tin đơn hàng để hiển thị trong modal
+            setOrderSuccess({
+                orderId: order.id || order._id,
+                totalAmount: finalTotal,
+                paymentMethod: paymentMethod
+            });
+            
+            // Xử lý theo phương thức thanh toán
+            if (paymentMethod === 'cod') {
+                setShowSuccessModal(true);
+                setSubmitting(false);
+            } else if (paymentMethod === 'bank') {
+                setShowSuccessModal(true);
+                setSubmitting(false);
+            } else if (paymentMethod === 'momo' || paymentMethod === 'vnpay' || paymentMethod === 'zalopay') {
+                await handlePayment(order.id || order._id, finalTotal, paymentMethod);
+            } else if (paymentMethod === 'paypal') {
+                await handlePayment(order.id || order._id, finalTotal, 'paypal');
+            } else if (paymentMethod === 'card') {
+                await handlePayment(order.id || order._id, finalTotal, 'vnpay');
+            }
+            
         } catch (error) {
             console.error("Error placing order:", error);
-            if (error.response && error.response.data && error.response.data.detail) {
-                showToast(error.response.data.detail, "error");
-            } else {
-                showToast("Có lỗi xảy ra, vui lòng thử lại!", "error");
+            
+            let errorMessage = "Có lỗi xảy ra, vui lòng thử lại!";
+            
+            if (error.response) {
+                if (error.response.status === 422) {
+                    const errorData = error.response.data;
+                    if (Array.isArray(errorData.detail)) {
+                        const validationErrors = errorData.detail.map(err => 
+                            `${err.loc?.join('.')}: ${err.msg}`
+                        ).join(', ');
+                        errorMessage = validationErrors;
+                    } else if (errorData.detail) {
+                        errorMessage = errorData.detail;
+                    } else {
+                        errorMessage = "Dữ liệu không hợp lệ. Vui lòng kiểm tra lại thông tin.";
+                    }
+                } else if (error.response.data && error.response.data.detail) {
+                    errorMessage = error.response.data.detail;
+                }
             }
-        } finally {
+            
+            showToast(errorMessage, "error");
             setSubmitting(false);
         }
     };
 
+    const handleCloseSuccessModal = (navigateTo) => {
+        setShowSuccessModal(false);
+        if (navigateTo === 'orders') {
+            // Chuyển đến trang danh sách đơn hàng
+            navigate('/orders');
+        } else if (navigateTo === 'order-detail') {
+            // Chuyển đến trang chi tiết đơn hàng vừa đặt
+            navigate(`/orders/${orderSuccess.orderId}`);
+        } else if (navigateTo === 'shop') {
+            navigate('/');
+        }
+    };
     // Sửa onClick handler cho voucher list
     const handleVoucherClick = async (v) => {
         try {
@@ -1169,24 +1247,24 @@ const CheckoutPage = () => {
                                 {/* Nút đặt hàng */}
                                 <button 
                                     onClick={handleSubmitOrder}
-                                    disabled={submitting}
+                                    disabled={submitting || paymentProcessing}
                                     style={{
                                         width: "100%",
                                         padding: "16px",
-                                        background: "#2e7d32",
+                                        background: (submitting || paymentProcessing) ? "#ccc" : "#2e7d32",
                                         color: "white",
                                         border: "none",
                                         borderRadius: "40px",
                                         fontWeight: "600",
                                         fontSize: "16px",
-                                        cursor: submitting ? "not-allowed" : "pointer",
+                                        cursor: (submitting || paymentProcessing) ? "not-allowed" : "pointer",
                                         transition: "all 0.3s",
-                                        opacity: submitting ? 0.7 : 1
+                                        opacity: (submitting || paymentProcessing) ? 0.7 : 1
                                     }}
-                                    onMouseEnter={(e) => { if (!submitting) e.currentTarget.style.background = "#1b5e20"; }}
-                                    onMouseLeave={(e) => { if (!submitting) e.currentTarget.style.background = "#2e7d32"; }}
-                                >
-                                    {submitting ? <FaSpinner className="spinning" /> : "Đặt hàng"}
+                                    onMouseEnter={(e) => { if (!submitting && !paymentProcessing) e.currentTarget.style.background = "#1b5e20"; }}
+                    onMouseLeave={(e) => { if (!submitting && !paymentProcessing) e.currentTarget.style.background = "#2e7d32"; }}
+                >
+                    {(submitting || paymentProcessing) ? <FaSpinner className="spinning" /> : "Đặt hàng"}
                                 </button>
 
                                 {/* Nút quay lại */}
@@ -1287,33 +1365,237 @@ const CheckoutPage = () => {
                 </div>
             </div>
 
+           
+            {/* Success Modal */}
+{showSuccessModal && (
+    <div className="modal-overlay" onClick={() => handleCloseSuccessModal('stay')}>
+        <div className="modal-content success-modal" onClick={e => e.stopPropagation()}>
+            <div className="success-icon">
+                <FaCheckCircle />
+            </div>
+            <h2>Đặt hàng thành công!</h2>
+            <div className="success-message">
+                <p>Cảm ơn bạn đã đặt hàng tại <strong>Organic Food</strong>!</p>
+                {orderSuccess && (
+                    <>
+                        <p className="order-info">
+                            Mã đơn hàng: <strong>#{orderSuccess.orderId?.slice(-8)}</strong>
+                        </p>
+                        <p className="order-info">
+                            Tổng tiền: <strong className="total-amount">{formatCurrency(orderSuccess.totalAmount)}</strong>
+                        </p>
+                        <p className="order-info">
+                            Phương thức thanh toán: <strong>
+                                {orderSuccess.paymentMethod === 'cod' ? 'COD (Thanh toán khi nhận hàng)' : 
+                                 orderSuccess.paymentMethod === 'bank' ? 'Chuyển khoản ngân hàng' : 
+                                 orderSuccess.paymentMethod}
+                            </strong>
+                        </p>
+                    </>
+                )}
+                <p className="note">
+                    {orderSuccess?.paymentMethod === 'cod' ? 
+                        'Đơn hàng sẽ được xử lý và giao đến bạn trong thời gian sớm nhất.' : 
+                        'Vui lòng kiểm tra hướng dẫn thanh toán trong email hoặc tin nhắn.'}
+                </p>
+            </div>
+            <div className="modal-buttons">
+                <button 
+                    className="btn-primary"
+                    onClick={() => handleCloseSuccessModal('order-detail')}
+                >
+                    Xem chi tiết đơn hàng
+                </button>
+                <button 
+                    className="btn-secondary"
+                    onClick={() => handleCloseSuccessModal('shop')}
+                >
+                    Tiếp tục mua sắm
+                </button>
+            </div>
+        </div>
+    </div>
+)}
+
             <style>{`
-                @keyframes spin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
-                }
-                .spinning {
-                    animation: spin 1s linear infinite;
-                }
-                @keyframes toastFadeInOut {
-                    0% {
-                        opacity: 0;
-                        transform: translate(-50%, -50%) scale(0.9);
-                    }
-                    15% {
-                        opacity: 1;
-                        transform: translate(-50%, -50%) scale(1);
-                    }
-                    85% {
-                        opacity: 1;
-                        transform: translate(-50%, -50%) scale(1);
-                    }
-                    100% {
-                        opacity: 0;
-                        transform: translate(-50%, -50%) scale(0.9);
-                        visibility: hidden;
-                    }
-                }
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    .spinning {
+        animation: spin 1s linear infinite;
+    }
+    @keyframes toastFadeInOut {
+        0% {
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(0.9);
+        }
+        15% {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+        85% {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+        100% {
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(0.9);
+            visibility: hidden;
+        }
+    }
+    
+    /* Success Modal Styles */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(4px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10001;
+        animation: fadeIn 0.3s ease;
+    }
+    
+    .success-modal {
+        background: white;
+        border-radius: 24px;
+        max-width: 480px;
+        width: 90%;
+        padding: 32px;
+        text-align: center;
+        animation: slideUp 0.3s ease;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+    
+    .success-icon {
+        width: 80px;
+        height: 80px;
+        background: linear-gradient(135deg, #2e7d32 0%, #4caf50 100%);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 20px;
+        animation: scaleIn 0.5s ease;
+    }
+    
+    .success-icon svg {
+        font-size: 48px;
+        color: white;
+    }
+    
+    .success-modal h2 {
+        color: #2e7d32;
+        font-size: 28px;
+        margin-bottom: 16px;
+        font-weight: 600;
+    }
+    
+    .success-message {
+        margin-bottom: 32px;
+    }
+    
+    .success-message p {
+        color: #666;
+        line-height: 1.6;
+        margin: 8px 0;
+    }
+    
+    .order-info {
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 8px;
+        margin: 10px 0;
+    }
+    
+    .order-info strong {
+        color: #2e7d32;
+    }
+    
+    .total-amount {
+        font-size: 20px;
+        color: #d32f2f;
+    }
+    
+    .note {
+        font-size: 13px;
+        color: #999;
+        margin-top: 16px;
+    }
+    
+    .modal-buttons {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+    }
+    
+    .btn-primary, .btn-secondary {
+        padding: 12px 24px;
+        border-radius: 40px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.3s;
+        border: none;
+        font-size: 14px;
+    }
+    
+    .btn-primary {
+        background: #2e7d32;
+        color: white;
+    }
+    
+    .btn-primary:hover {
+        background: #1b5e20;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(46, 125, 50, 0.3);
+    }
+    
+    .btn-secondary {
+        background: white;
+        color: #2e7d32;
+        border: 2px solid #2e7d32;
+    }
+    
+    .btn-secondary:hover {
+        background: #f5f5f5;
+        transform: translateY(-2px);
+    }
+    
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+    
+    @keyframes slideUp {
+        from {
+            opacity: 0;
+            transform: translateY(50px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    @keyframes scaleIn {
+        from {
+            transform: scale(0);
+            opacity: 0;
+        }
+        to {
+            transform: scale(1);
+            opacity: 1;
+        }
+    }
             `}</style>
         </ShopDetailLayout>
     );

@@ -28,6 +28,9 @@ import ShopDetailPage from "./pages/user/shop/shop_detail.jsx";
 import ProductDetailPage from "./pages/user/shop/detail_products.jsx";
 import CartPage from "./pages/user/cart.jsx";
 import CheckoutPage from "./pages/user/shop/CheckoutPage.jsx";
+import PaymentInstructions from "./pages/user/shop/PaymentInstructions.jsx";
+import OrderDetail from "./pages/user/shop/orderDetail.jsx";
+import Orders from "./pages/user/orderHistory.jsx";
 
 function App() {
   return (
@@ -43,6 +46,9 @@ function App() {
       <Route path="/product/:product_id" element={<ProductDetailPage />} />
       <Route path="/checkout" element={<CheckoutPage />} />
       <Route path="/cart" element={<CartPage />} />
+      <Route path="/payment/instructions/:orderId" element={<PaymentInstructions />} />
+      <Route path="/orders/:orderId" element={<OrderDetail />} />
+      <Route path="/history/orders" element={<Orders />} />
       <Route 
         path="/admin/dashboard" 
         element={

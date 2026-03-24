@@ -3,6 +3,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaShoppingCart, FaBell, FaUser, FaBook, FaCog, FaSignOutAlt } from 'react-icons/fa';
 import api from "../../api/api";
+import NotificationBell from "../../pages/user/NotificationBell";
+
 
 function Header() {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -183,7 +185,7 @@ function Header() {
                     cursor: "pointer", 
                     display: "flex", 
                     border: "1px solid #ddd", 
-                    padding: "10px", 
+                    padding: "2px", 
                     borderRadius: "50%", 
                     backgroundColor: "#f0f2f5",
                     transition: "all 0.3s"
@@ -196,7 +198,10 @@ function Header() {
                     e.currentTarget.style.backgroundColor = "#f0f2f5";
                     e.currentTarget.style.borderColor = "#ddd";
                 }}>
-                    <FaBell size={18} color="#2e7d32" />
+                    <div className="notification-wrapper">
+                        <NotificationBell userType="user" />
+                    </div>
+                    
                 </span>
 
                 {/* Avatar và Dropdown Menu */}
@@ -270,7 +275,7 @@ function Header() {
                                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f0f2f5"}
                                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                                 onClick={() => {
-                                    navigate("/orders");
+                                    navigate("/history/orders");
                                     setIsMenuOpen(false);
                                 }}
                             >

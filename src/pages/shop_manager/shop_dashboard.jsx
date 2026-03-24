@@ -1,5 +1,5 @@
 // src/pages/shop/ShopDashboard.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   FaShoppingBag, 
   FaBox, 
@@ -22,7 +22,7 @@ import {
   ArcElement,
   Filler
 } from 'chart.js';
-import { shopApi } from '../../api/api'; // SỬA: import shopApi thay vì api mặc định
+import { shopApi } from '../../api/api';
 import '../../css/Dashboard.css';
 
 // Đăng ký các components cần thiết cho Chart.js
@@ -39,6 +39,16 @@ ChartJS.register(
 );
 
 const ShopDashboard = () => {
+  // Thêm refs cho các container chart
+  const chartContainerRef = useRef(null);
+  const barChartContainerRef = useRef(null);
+  const doughnutContainerRef = useRef(null);
+  
+  // Thêm refs cho các chart components
+  const lineChartRef = useRef(null);
+  const barChartRef = useRef(null);
+  const doughnutChartRef = useRef(null);
+  
   const [stats, setStats] = useState({
     products: {
       total: 0,
@@ -71,6 +81,19 @@ const ShopDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Hàm resize charts
+  const resizeCharts = () => {
+    if (lineChartRef.current) {
+      lineChartRef.current.chartInstance?.resize();
+    }
+    if (barChartRef.current) {
+      barChartRef.current.chartInstance?.resize();
+    }
+    if (doughnutChartRef.current) {
+      doughnutChartRef.current.chartInstance?.resize();
+    }
+  };
+
   useEffect(() => {
     // Kiểm tra token trước khi fetch
     const shopToken = localStorage.getItem('shop_token');
@@ -83,12 +106,49 @@ const ShopDashboard = () => {
     fetchDashboardData();
     fetchChartData();
     
+    // Sử dụng ResizeObserver để theo dõi sự thay đổi kích thước
+    const resizeObserver = new ResizeObserver(() => {
+      resizeCharts();
+    });
+    
+    // Theo dõi container chính hoặc window
+    if (chartContainerRef.current) {
+      resizeObserver.observe(chartContainerRef.current);
+    }
+    if (barChartContainerRef.current) {
+      resizeObserver.observe(barChartContainerRef.current);
+    }
+    if (doughnutContainerRef.current) {
+      resizeObserver.observe(doughnutContainerRef.current);
+    }
+    
+    // Lắng nghe sự kiện resize của window
+    window.addEventListener('resize', resizeCharts);
+    
+    // Lắng nghe sự kiện zoom (cho mobile)
+    window.addEventListener('touchmove', resizeCharts);
+    window.addEventListener('gesturechange', resizeCharts);
+    
     return () => {
       setStats({});
       setRecentActivities([]);
       setNewProducts([]);
+      
+      // Cleanup
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', resizeCharts);
+      window.removeEventListener('touchmove', resizeCharts);
+      window.removeEventListener('gesturechange', resizeCharts);
     };
   }, []);
+
+  // Thêm useEffect để resize charts khi chartData thay đổi
+  useEffect(() => {
+    if (!loading && chartData) {
+      // Delay nhỏ để đảm bảo DOM đã được render
+      setTimeout(resizeCharts, 100);
+    }
+  }, [chartData, loading]);
 
   const fetchDashboardData = async () => {
     try {
@@ -97,16 +157,13 @@ const ShopDashboard = () => {
       
       console.log('Fetching dashboard data with shop token...');
       
-      // Gọi API dashboard stats - DÙNG shopApi
       const statsRes = await shopApi.get('/api/v1/shop/dashboard/stats');
       console.log('Dashboard stats:', statsRes.data);
       setStats(statsRes.data);
       
-      // Gọi API recent activities
       const activitiesRes = await shopApi.get('/api/v1/shop/dashboard/recent-activities');
       setRecentActivities(activitiesRes.data);
       
-      // Gọi API sản phẩm mới
       const productsRes = await shopApi.get('/api/v1/shop/products?limit=5&sort=newest');
       setNewProducts(productsRes.data.data || []);
       
@@ -114,7 +171,6 @@ const ShopDashboard = () => {
       console.error('Error fetching dashboard data:', error);
       
       if (error.response?.status === 401) {
-        // Token hết hạn hoặc không hợp lệ
         console.log('Token expired or invalid, redirecting to login...');
         localStorage.removeItem('shop_token');
         localStorage.removeItem('shop_data');
@@ -125,7 +181,6 @@ const ShopDashboard = () => {
       
       setError('Không thể tải dữ liệu. Vui lòng thử lại sau.');
       
-      // Dữ liệu mẫu nếu API lỗi
       setStats({
         products: {
           total: 1000,
@@ -174,7 +229,6 @@ const ShopDashboard = () => {
       setChartData(response.data);
     } catch (error) {
       console.error('Error fetching chart data:', error);
-      // Dữ liệu mẫu
       setChartData({
         labels: ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'],
         orders: [45, 52, 48, 70, 85, 92, 78],
@@ -281,7 +335,13 @@ const ShopDashboard = () => {
       line: {
         tension: 0.4
       }
-    }
+    },
+    // Thêm option để cập nhật khi resize
+    animation: {
+      duration: 0
+    },
+    // Đảm bảo chart resize chính xác
+    resizeDelay: 0
   };
 
   const barOptions = {
@@ -312,7 +372,11 @@ const ShopDashboard = () => {
           display: false
         }
       }
-    }
+    },
+    animation: {
+      duration: 0
+    },
+    resizeDelay: 0
   };
 
   const doughnutOptions = {
@@ -336,7 +400,11 @@ const ShopDashboard = () => {
         top: 10,
         bottom: 10
       }
-    }
+    },
+    animation: {
+      duration: 0
+    },
+    resizeDelay: 0
   };
 
   const formatCurrency = (amount) => {
@@ -407,7 +475,7 @@ const ShopDashboard = () => {
   }
 
   return (
-    <div className="dashboard">
+    <div className="dashboard" ref={chartContainerRef}>
       <div className="dashboard__header">
         <h1 className="dashboard__title">Bảng Điều Khiển</h1>
         <div className="dashboard__date">
@@ -472,8 +540,14 @@ const ShopDashboard = () => {
               <FaDownload /> Tải báo cáo
             </button>
           </div>
-          <div className="chart-card__body">
-            <Line data={revenueData} options={lineOptions} />
+          <div className="chart-card__body" ref={chartContainerRef}>
+            <Line 
+              ref={lineChartRef}
+              data={revenueData} 
+              options={lineOptions}
+              // Thêm redraw để force update khi cần
+              redraw={false}
+            />
           </div>
         </div>
 
@@ -481,8 +555,13 @@ const ShopDashboard = () => {
           <div className="chart-card__header">
             <h3>Số Lượng Đơn Hàng</h3>
           </div>
-          <div className="chart-card__body">
-            <Bar data={ordersData} options={barOptions} />
+          <div className="chart-card__body" ref={barChartContainerRef}>
+            <Bar 
+              ref={barChartRef}
+              data={ordersData} 
+              options={barOptions}
+              redraw={false}
+            />
           </div>
         </div>
       </div>

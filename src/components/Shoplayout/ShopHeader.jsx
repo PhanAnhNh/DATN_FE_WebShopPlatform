@@ -12,6 +12,7 @@ import {
 } from 'react-icons/fa';
 import { useNavigate, useLocation } from 'react-router-dom';
 import '../../css/ShopHeader.css';
+import NotificationBell from '../../pages/user/NotificationBell';
 
 const ShopHeader = ({ toggleSidebar }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -182,39 +183,33 @@ const ShopHeader = ({ toggleSidebar }) => {
             <span className="shop-header__badge">3</span>
           </button>
           
-          <div className="shop-header__notification">
-            <button 
-              className="shop-header__action-btn"
-              onClick={() => setShowNotifications(!showNotifications)}
-            >
-              <FaBell />
-              <span className="shop-header__badge">5</span>
-            </button>
+          
+              
             
-            {showNotifications && (
-              <div className="shop-header__notification-dropdown">
-                <div className="shop-header__notification-header">
-                  <h4>Thông báo</h4>
-                  <span>Đánh dấu tất cả đã đọc</span>
-                </div>
-                <div className="shop-header__notification-list">
-                  <div className="shop-header__notification-item unread">
-                    <p className="shop-header__notification-title">Đơn hàng mới</p>
-                    <p className="shop-header__notification-desc">Bạn có đơn hàng #DH001 cần xử lý</p>
-                    <span className="shop-header__notification-time">5 phút trước</span>
-                  </div>
-                  <div className="shop-header__notification-item">
-                    <p className="shop-header__notification-title">Sản phẩm hết hàng</p>
-                    <p className="shop-header__notification-desc">Sản phẩm "Cà phê đặc sản" sắp hết hàng</p>
-                    <span className="shop-header__notification-time">1 giờ trước</span>
-                  </div>
-                </div>
-                <div className="shop-header__notification-footer">
-                  <button>Xem tất cả</button>
-                </div>
+              <span style={{ 
+                    marginLeft: "20px",
+                    cursor: "pointer", 
+                    display: "flex", 
+                    border: "1px solid #ddd", 
+                    padding: "2px", 
+                    borderRadius: "50%", 
+                    backgroundColor: "#f0f2f5",
+                    transition: "all 0.3s"
+                }}
+                onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "#e8f5e9";
+                    e.currentTarget.style.borderColor = "#2e7d32";
+                }}
+                onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "#e8f5e9";
+                    e.currentTarget.style.borderColor = "#ddd";
+                }}>
+              <div className="shop-header__notification">
+                <NotificationBell userType="shop" />
               </div>
-            )}
-          </div>
+              </span>
+            
+          
         </div>
 
         <div className="shop-header__user">

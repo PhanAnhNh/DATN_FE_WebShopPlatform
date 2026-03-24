@@ -24,9 +24,13 @@ import {
   FaAngleDoubleLeft,
   FaAngleDoubleRight,
   FaDownload,
-  FaEnvelope
+  FaEnvelope,
+  FaCreditCard,
+  FaShippingFast,
+  FaTag,
+  FaSave
 } from 'react-icons/fa';
-import { shopApi } from '../../api/api'; // SỬA: import shopApi dạng named export
+import { shopApi } from '../../api/api';
 import '../../css/ShopOrders.css';
 
 const ShopOrders = () => {
@@ -58,17 +62,27 @@ const ShopOrders = () => {
   
   // Modal states
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [showStatusFormModal, setShowStatusFormModal] = useState(false);
+  const [showPaymentFormModal, setShowPaymentFormModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [selectedNewStatus, setSelectedNewStatus] = useState('');
+  const [selectedNewPaymentStatus, setSelectedNewPaymentStatus] = useState('');
   const [updating, setUpdating] = useState(false);
+  const [formError, setFormError] = useState('');
 
   // Status options
   const statusOptions = [
-    { value: 'pending', label: 'Chờ xử lý', color: '#ffc107', icon: FaClock },
-    { value: 'paid', label: 'Đã thanh toán', color: '#17a2b8', icon: FaCheck },
-    { value: 'shipped', label: 'Đang giao', color: '#007bff', icon: FaTruck },
-    { value: 'completed', label: 'Đã giao', color: '#28a745', icon: FaCheckCircle },
-    { value: 'cancelled', label: 'Đã hủy', color: '#dc3545', icon: FaBan }
+    { value: 'pending', label: 'Chờ xử lý', color: '#ffc107', icon: FaClock, description: 'Đơn hàng mới, chưa xử lý' },
+    { value: 'paid', label: 'Đã thanh toán', color: '#17a2b8', icon: FaCheck, description: 'Khách hàng đã thanh toán' },
+    { value: 'shipped', label: 'Đang giao', color: '#007bff', icon: FaTruck, description: 'Đơn hàng đang được giao' },
+    { value: 'completed', label: 'Đã giao', color: '#28a745', icon: FaCheckCircle, description: 'Đơn hàng đã giao thành công' },
+    { value: 'cancelled', label: 'Đã hủy', color: '#dc3545', icon: FaBan, description: 'Đơn hàng đã bị hủy' }
+  ];
+
+  // Payment status options
+  const paymentStatusOptions = [
+    { value: 'unpaid', label: 'Chưa thanh toán', color: '#dc3545', icon: FaBan },
+    { value: 'paid', label: 'Đã thanh toán', color: '#28a745', icon: FaCheck }
   ];
 
   // Debounce search
@@ -123,7 +137,6 @@ const ShopOrders = () => {
         return;
       }
       
-      // Dữ liệu mẫu nếu API lỗi
       setOrders(mockOrders);
       setPagination({
         page: 1,
@@ -151,7 +164,6 @@ const ShopOrders = () => {
         return;
       }
       
-      // Dữ liệu mẫu
       setStats({
         pending: 5,
         paid: 3,
@@ -174,29 +186,23 @@ const ShopOrders = () => {
       customer_phone: '0912345678',
       customer_email: 'nguyenvana@email.com',
       shipping_address: '123 Đường Lê Lợi, Quận 1, TP.HCM',
+      shipping_address_details: {
+        name: 'Nguyễn Văn A',
+        phone: '0912345678',
+        street: '123 Đường Lê Lợi',
+        ward: 'Phường Bến Nghé',
+        district: 'Quận 1',
+        city: 'TP.HCM',
+        country: 'Việt Nam'
+      },
       total_price: 250000,
       status: 'pending',
       payment_status: 'unpaid',
+      payment_method: 'cod',
       created_at: new Date().toISOString(),
       items: [
         { product_name: 'Dừa xiêm', price: 11000, quantity: 2, variant_name: 'Trái' },
         { product_name: 'Táo đỏ', price: 20000, quantity: 1, variant_name: 'Kẹp' }
-      ]
-    },
-    {
-      _id: '2',
-      order_id: 'ORD002',
-      customer_name: 'Trần Thị B',
-      customer_username: 'tranthib',
-      customer_phone: '0987654321',
-      customer_email: 'tranthib@email.com',
-      shipping_address: '456 Đường Nguyễn Huệ, Quận 1, TP.HCM',
-      total_price: 180000,
-      status: 'paid',
-      payment_status: 'paid',
-      created_at: new Date().toISOString(),
-      items: [
-        { product_name: 'Bơ tươi', price: 10000, quantity: 3, variant_name: '1kg' }
       ]
     }
   ];
@@ -219,48 +225,96 @@ const ShopOrders = () => {
         return;
       }
       
-      // Dùng dữ liệu mẫu
       setSelectedOrder(order);
       setShowDetailModal(true);
     }
   };
 
-  // Update order status
-  const handleUpdateStatus = (order) => {
+  // Mở form cập nhật trạng thái giao hàng
+  const openStatusForm = (order) => {
     setSelectedOrder(order);
-    setShowStatusModal(true);
+    setSelectedNewStatus(order.status);
+    setFormError('');
+    setShowStatusFormModal(true);
   };
 
-  const confirmUpdateStatus = async (newStatus) => {
-    if (!selectedOrder) return;
+  // Mở form cập nhật trạng thái thanh toán
+  const openPaymentForm = (order) => {
+    setSelectedOrder(order);
+    setSelectedNewPaymentStatus(order.payment_status);
+    setFormError('');
+    setShowPaymentFormModal(true);
+  };
 
+  // Xử lý cập nhật trạng thái giao hàng
+  const handleUpdateStatus = async () => {
+    if (!selectedOrder) return;
+    
+    if (selectedNewStatus === selectedOrder.status) {
+      setFormError('Vui lòng chọn trạng thái khác với trạng thái hiện tại');
+      return;
+    }
+    
     try {
       setUpdating(true);
       const orderId = selectedOrder.order_id || selectedOrder._id;
       
       await shopApi.put(`/api/v1/shop/orders/${orderId}/status`, {
-        status: newStatus
+        status: selectedNewStatus
       });
-
-      // Refresh data
-      fetchOrders();
-      fetchStats();
       
-      setShowStatusModal(false);
+      await fetchOrders();
+      await fetchStats();
+      
+      setShowStatusFormModal(false);
       setSelectedOrder(null);
-      alert('Cập nhật trạng thái thành công!');
+      setSelectedNewStatus('');
+      
+      // Đóng modal chi tiết nếu đang mở
+      if (showDetailModal) {
+        setShowDetailModal(false);
+      }
     } catch (error) {
       console.error('Error updating status:', error);
+      const errorMessage = error.response?.data?.detail || 'Có lỗi xảy ra khi cập nhật trạng thái';
+      setFormError(errorMessage);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  // Xử lý cập nhật trạng thái thanh toán
+  const handleUpdatePaymentStatus = async () => {
+    if (!selectedOrder) return;
+    
+    if (selectedNewPaymentStatus === selectedOrder.payment_status) {
+      setFormError('Vui lòng chọn trạng thái khác với trạng thái hiện tại');
+      return;
+    }
+    
+    try {
+      setUpdating(true);
+      const orderId = selectedOrder.order_id || selectedOrder._id;
       
-      if (error.response?.status === 401) {
-        localStorage.removeItem('shop_token');
-        localStorage.removeItem('shop_data');
-        localStorage.removeItem('shop_info');
-        window.location.href = '/shop/login';
-        return;
+      await shopApi.put(`/api/v1/shop/orders/${orderId}/payment-status`, {
+        payment_status: selectedNewPaymentStatus
+      });
+      
+      await fetchOrders();
+      await fetchStats();
+      
+      setShowPaymentFormModal(false);
+      setSelectedOrder(null);
+      setSelectedNewPaymentStatus('');
+      
+      // Đóng modal chi tiết nếu đang mở
+      if (showDetailModal) {
+        setShowDetailModal(false);
       }
-      
-      alert('Có lỗi xảy ra khi cập nhật trạng thái');
+    } catch (error) {
+      console.error('Error updating payment status:', error);
+      const errorMessage = error.response?.data?.detail || 'Có lỗi xảy ra khi cập nhật trạng thái thanh toán';
+      setFormError(errorMessage);
     } finally {
       setUpdating(false);
     }
@@ -280,14 +334,23 @@ const ShopOrders = () => {
     return date.toLocaleDateString('vi-VN') + ' ' + date.toLocaleTimeString('vi-VN');
   };
 
-  const formatDateShort = (dateString) => {
-    if (!dateString) return 'Chưa có';
-    return new Date(dateString).toLocaleDateString('vi-VN');
-  };
-
   const getStatusBadge = (status) => {
     const option = statusOptions.find(opt => opt.value === status);
     return option || { label: status, color: '#6c757d', icon: FaClock };
+  };
+
+  const getPaymentStatusBadge = (status) => {
+    const option = paymentStatusOptions.find(opt => opt.value === status);
+    return option || { label: status === 'paid' ? 'Đã thanh toán' : 'Chưa thanh toán', color: status === 'paid' ? '#28a745' : '#dc3545' };
+  };
+
+  const getFullAddress = (order) => {
+    if (order.shipping_address_details) {
+      const addr = order.shipping_address_details;
+      const parts = [addr.street, addr.ward, addr.district, addr.city, addr.country].filter(p => p && p.trim());
+      return parts.join(', ') || order.shipping_address;
+    }
+    return order.shipping_address || 'Chưa có';
   };
 
   const handlePageChange = (newPage) => {
@@ -304,6 +367,14 @@ const ShopOrders = () => {
     setPagination(prev => ({ ...prev, page: 1 }));
   };
 
+  // Lấy danh sách trạng thái có thể chuyển đến (không bao gồm trạng thái hiện tại)
+  const getAvailableStatuses = (currentStatus) => {
+    if (currentStatus === 'cancelled' || currentStatus === 'completed') {
+      return [];
+    }
+    return statusOptions.filter(opt => opt.value !== currentStatus);
+  };
+
   return (
     <div className="shop-orders">
       {/* Header */}
@@ -313,46 +384,17 @@ const ShopOrders = () => {
 
       {/* Stats Cards */}
       <div className="orders-stats">
-        <div className="stat-card pending" onClick={() => setSelectedStatus('pending')}>
-          <div className="stat-icon">
-            <FaClock />
+        {statusOptions.map(opt => (
+          <div key={opt.value} className={`stat-card ${opt.value}`} onClick={() => setSelectedStatus(opt.value)}>
+            <div className="stat-icon">
+              <opt.icon />
+            </div>
+            <div className="stat-content">
+              <span className="stat-label">{opt.label}</span>
+              <span className="stat-value">{stats[opt.value] || 0}</span>
+            </div>
           </div>
-          <div className="stat-content">
-            <span className="stat-label">Chờ xử lý</span>
-            <span className="stat-value">{stats.pending}</span>
-          </div>
-        </div>
-
-        <div className="stat-card paid" onClick={() => setSelectedStatus('paid')}>
-          <div className="stat-icon">
-            <FaCheck />
-          </div>
-          <div className="stat-content">
-            <span className="stat-label">Đã thanh toán</span>
-            <span className="stat-value">{stats.paid}</span>
-          </div>
-        </div>
-
-        <div className="stat-card shipped" onClick={() => setSelectedStatus('shipped')}>
-          <div className="stat-icon">
-            <FaTruck />
-          </div>
-          <div className="stat-content">
-            <span className="stat-label">Đang giao</span>
-            <span className="stat-value">{stats.shipped}</span>
-          </div>
-        </div>
-
-        <div className="stat-card completed" onClick={() => setSelectedStatus('completed')}>
-          <div className="stat-icon">
-            <FaCheckCircle />
-          </div>
-          <div className="stat-content">
-            <span className="stat-label">Đã giao</span>
-            <span className="stat-value">{stats.completed}</span>
-          </div>
-        </div>
-
+        ))}
         <div className="stat-card revenue">
           <div className="stat-icon">
             <FaMoneyBillWave />
@@ -394,7 +436,7 @@ const ShopOrders = () => {
       {showFilters && (
         <div className="filter-panel">
           <div className="filter-group">
-            <label>Trạng thái</label>
+            <label>Trạng thái đơn hàng</label>
             <select 
               value={selectedStatus} 
               onChange={(e) => setSelectedStatus(e.target.value)}
@@ -437,13 +479,15 @@ const ShopOrders = () => {
           <table className="orders-table">
             <thead>
               <tr>
-                <th>Thứ tự</th>
-                <th>Tên Khách Hàng</th>
-                <th>Số Điện Thoại</th>
+                <th>STT</th>
+                <th>Mã đơn</th>
+                <th>Khách hàng</th>
+                <th>Số điện thoại</th>
                 <th>Địa chỉ</th>
-                <th>Thanh Toán</th>
-                <th>Trạng thái</th>
-                <th>Thao Tác</th>
+                <th>Tổng tiền</th>
+                <th>Thanh toán</th>
+                <th>Trạng thái giao</th>
+                <th>Thao tác</th>
               </tr>
             </thead>
             <tbody>
@@ -451,10 +495,12 @@ const ShopOrders = () => {
                 orders.map((order, index) => {
                   const statusInfo = getStatusBadge(order.status);
                   const StatusIcon = statusInfo.icon;
+                  const paymentInfo = getPaymentStatusBadge(order.payment_status);
                   
                   return (
                     <tr key={order._id || order.order_id}>
                       <td>{(pagination.page - 1) * pagination.limit + index + 1}</td>
+                      <td className="order-id">#{order.order_id?.slice(-6) || order._id?.slice(-6)}</td>
                       <td>
                         <div className="customer-name">
                           <FaUser className="customer-icon" />
@@ -467,13 +513,20 @@ const ShopOrders = () => {
                           {order.customer_phone || 'Chưa có'}
                         </div>
                       </td>
-                      <td className="address-cell" title={order.shipping_address}>
+                      <td className="address-cell" title={getFullAddress(order)}>
                         <FaMapMarkerAlt className="address-icon" />
-                        {order.shipping_address || 'Chưa có'}
+                        {getFullAddress(order).substring(0, 50)}...
                       </td>
+                      <td className="total-price">{formatCurrency(order.total_price)}</td>
                       <td>
-                        <span className={`payment-badge ${order.payment_status || 'unpaid'}`}>
-                          {order.payment_status === 'paid' ? 'Đã thanh toán' : 'Chưa thanh toán'}
+                        <span 
+                          className={`payment-badge ${order.payment_status || 'unpaid'}`}
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => openPaymentForm(order)}
+                          title="Click để cập nhật trạng thái thanh toán"
+                        >
+                          <FaEdit size={10} style={{ marginRight: '5px' }} />
+                          {paymentInfo.label}
                         </span>
                       </td>
                       <td>
@@ -482,11 +535,15 @@ const ShopOrders = () => {
                           style={{ 
                             backgroundColor: statusInfo.color + '20',
                             color: statusInfo.color,
-                            borderColor: statusInfo.color
+                            borderColor: statusInfo.color,
+                            cursor: order.status !== 'cancelled' && order.status !== 'completed' ? 'pointer' : 'default'
                           }}
+                          onClick={() => order.status !== 'cancelled' && order.status !== 'completed' && openStatusForm(order)}
+                          title={order.status !== 'cancelled' && order.status !== 'completed' ? 'Click để cập nhật trạng thái giao hàng' : 'Không thể cập nhật'}
                         >
                           <StatusIcon size={12} />
                           {statusInfo.label}
+                          {order.status !== 'cancelled' && order.status !== 'completed' && <FaEdit size={10} style={{ marginLeft: '5px' }} />}
                         </span>
                       </td>
                       <td>
@@ -498,14 +555,6 @@ const ShopOrders = () => {
                           >
                             <FaEye />
                           </button>
-                          <button 
-                            className="action-btn edit"
-                            onClick={() => handleUpdateStatus(order)}
-                            title="Cập nhật trạng thái"
-                            disabled={order.status === 'cancelled' || order.status === 'completed'}
-                          >
-                            <FaEdit />
-                          </button>
                         </div>
                       </td>
                     </tr>
@@ -513,7 +562,7 @@ const ShopOrders = () => {
                 })
               ) : (
                 <tr>
-                  <td colSpan="7" className="empty-state">
+                  <td colSpan="9" className="empty-state">
                     Không tìm thấy đơn hàng nào
                   </td>
                 </tr>
@@ -527,19 +576,13 @@ const ShopOrders = () => {
       {pagination.total_pages > 1 && !loading && (
         <div className="pagination">
           <div className="pagination-info">
-            Trang hiển thị {pagination.page}/{pagination.total_pages}
+            Trang {pagination.page}/{pagination.total_pages}
           </div>
           <div className="pagination-controls">
-            <button 
-              onClick={() => handlePageChange(1)}
-              disabled={pagination.page === 1}
-            >
+            <button onClick={() => handlePageChange(1)} disabled={pagination.page === 1}>
               <FaAngleDoubleLeft />
             </button>
-            <button 
-              onClick={() => handlePageChange(pagination.page - 1)}
-              disabled={pagination.page === 1}
-            >
+            <button onClick={() => handlePageChange(pagination.page - 1)} disabled={pagination.page === 1}>
               <FaChevronLeft />
             </button>
             
@@ -566,28 +609,22 @@ const ShopOrders = () => {
               );
             })}
             
-            <button 
-              onClick={() => handlePageChange(pagination.page + 1)}
-              disabled={pagination.page === pagination.total_pages}
-            >
+            <button onClick={() => handlePageChange(pagination.page + 1)} disabled={pagination.page === pagination.total_pages}>
               <FaChevronRight />
             </button>
-            <button 
-              onClick={() => handlePageChange(pagination.total_pages)}
-              disabled={pagination.page === pagination.total_pages}
-            >
+            <button onClick={() => handlePageChange(pagination.total_pages)} disabled={pagination.page === pagination.total_pages}>
               <FaAngleDoubleRight />
             </button>
           </div>
         </div>
       )}
 
-      {/* Order Detail Modal */}
+      {/* Order Detail Modal - Giữ nguyên như cũ */}
       {showDetailModal && selectedOrder && (
         <div className="modal-overlay" onClick={() => setShowDetailModal(false)}>
           <div className="modal-content order-detail-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Chi tiết đơn hàng</h2>
+              <h2>Chi tiết đơn hàng #{selectedOrder.order_id?.slice(-8) || selectedOrder._id?.slice(-8)}</h2>
               <button className="close-btn" onClick={() => {
                 setShowDetailModal(false);
                 setSelectedOrder(null);
@@ -597,7 +634,7 @@ const ShopOrders = () => {
             </div>
 
             <div className="modal-body">
-              {/* Customer Info */}
+              {/* Thông tin khách hàng */}
               <div className="detail-section">
                 <h3>Thông tin khách hàng</h3>
                 <div className="info-grid">
@@ -625,16 +662,16 @@ const ShopOrders = () => {
                 </div>
               </div>
 
-              {/* Shipping Info */}
+              {/* Địa chỉ giao hàng */}
               <div className="detail-section">
                 <h3>Địa chỉ giao hàng</h3>
                 <div className="shipping-address">
                   <FaMapMarkerAlt className="address-icon" />
-                  <p>{selectedOrder.shipping_address}</p>
+                  <p>{getFullAddress(selectedOrder)}</p>
                 </div>
               </div>
 
-              {/* Order Info */}
+              {/* Thông tin đơn hàng */}
               <div className="detail-section">
                 <h3>Thông tin đơn hàng</h3>
                 <div className="info-grid">
@@ -653,8 +690,29 @@ const ShopOrders = () => {
                     </div>
                   </div>
                   <div className="info-item">
+                    <FaShippingFast className="info-icon" />
                     <div>
-                      <label>Trạng thái</label>
+                      <label>Phí vận chuyển</label>
+                      <p>{formatCurrency(selectedOrder.shipping_fee || 0)}</p>
+                    </div>
+                  </div>
+                  <div className="info-item">
+                    <FaTag className="info-icon" />
+                    <div>
+                      <label>Giảm giá</label>
+                      <p className="discount-price">-{formatCurrency(selectedOrder.discount || 0)}</p>
+                    </div>
+                  </div>
+                  <div className="info-item">
+                    <FaCreditCard className="info-icon" />
+                    <div>
+                      <label>Phương thức thanh toán</label>
+                      <p>{selectedOrder.payment_method === 'cod' ? 'COD (Thanh toán khi nhận hàng)' : 'Chuyển khoản'}</p>
+                    </div>
+                  </div>
+                  <div className="info-item">
+                    <div>
+                      <label>Trạng thái giao hàng</label>
                       <p>
                         {(() => {
                           const status = getStatusBadge(selectedOrder.status);
@@ -665,11 +723,17 @@ const ShopOrders = () => {
                               style={{ 
                                 backgroundColor: status.color + '20',
                                 color: status.color,
-                                borderColor: status.color
+                                borderColor: status.color,
+                                cursor: 'pointer'
+                              }}
+                              onClick={() => {
+                                setShowDetailModal(false);
+                                openStatusForm(selectedOrder);
                               }}
                             >
                               <StatusIcon size={12} />
                               {status.label}
+                              <FaEdit size={10} style={{ marginLeft: '5px' }} />
                             </span>
                           );
                         })()}
@@ -680,8 +744,16 @@ const ShopOrders = () => {
                     <div>
                       <label>Thanh toán</label>
                       <p>
-                        <span className={`payment-badge ${selectedOrder.payment_status || 'unpaid'}`}>
+                        <span 
+                          className={`payment-badge ${selectedOrder.payment_status || 'unpaid'}`}
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => {
+                            setShowDetailModal(false);
+                            openPaymentForm(selectedOrder);
+                          }}
+                        >
                           {selectedOrder.payment_status === 'paid' ? 'Đã thanh toán' : 'Chưa thanh toán'}
+                          <FaEdit size={10} style={{ marginLeft: '5px' }} />
                         </span>
                       </p>
                     </div>
@@ -689,7 +761,21 @@ const ShopOrders = () => {
                 </div>
               </div>
 
-              {/* Order Items */}
+              {/* Voucher áp dụng */}
+              {selectedOrder.voucher && (
+                <div className="detail-section">
+                  <h3>Voucher áp dụng</h3>
+                  <div className="voucher-info">
+                    <FaTag className="voucher-icon" />
+                    <div>
+                      <p><strong>Mã: {selectedOrder.voucher.code}</strong></p>
+                      <p className="voucher-discount">Giảm: {formatCurrency(selectedOrder.voucher.discount)}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Sản phẩm đã đặt */}
               <div className="detail-section">
                 <h3>Sản phẩm đã đặt</h3>
                 <div className="order-items">
@@ -731,6 +817,16 @@ const ShopOrders = () => {
                   </table>
                 </div>
               </div>
+
+              {/* Ghi chú */}
+              {selectedOrder.note && (
+                <div className="detail-section">
+                  <h3>Ghi chú</h3>
+                  <div className="order-note">
+                    <p>{selectedOrder.note}</p>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="modal-footer">
@@ -740,75 +836,169 @@ const ShopOrders = () => {
               }}>
                 Đóng
               </button>
-              {selectedOrder.status !== 'cancelled' && selectedOrder.status !== 'completed' && (
-                <button 
-                  className="edit-btn"
-                  onClick={() => {
-                    setShowDetailModal(false);
-                    handleUpdateStatus(selectedOrder);
-                  }}
-                >
-                  <FaEdit /> Cập nhật trạng thái
-                </button>
-              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* Update Status Modal */}
-      {showStatusModal && selectedOrder && (
-        <div className="modal-overlay" onClick={() => setShowStatusModal(false)}>
-          <div className="modal-content status-modal" onClick={e => e.stopPropagation()}>
+      {/* Form cập nhật trạng thái giao hàng */}
+      {showStatusFormModal && selectedOrder && (
+        <div className="modal-overlay" onClick={() => setShowStatusFormModal(false)}>
+          <div className="modal-content status-form-modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Cập nhật trạng thái đơn hàng</h2>
+              <h2>Cập nhật trạng thái giao hàng</h2>
               <button className="close-btn" onClick={() => {
-                setShowStatusModal(false);
+                setShowStatusFormModal(false);
                 setSelectedOrder(null);
+                setFormError('');
               }}>
                 <FaTimes />
               </button>
             </div>
 
             <div className="modal-body">
-              <p className="order-info">
-                Đơn hàng của <strong>{selectedOrder.customer_name || selectedOrder.customer_username}</strong>
-              </p>
-              
-              <div className="status-options">
-                {statusOptions
-                  .filter(opt => opt.value !== 'cancelled')
-                  .map(option => {
-                    const StatusIcon = option.icon;
-                    const isCurrent = selectedOrder.status === option.value;
-                    
+              <div className="order-info-summary">
+                <p><strong>Đơn hàng:</strong> #{selectedOrder.order_id?.slice(-8) || selectedOrder._id?.slice(-8)}</p>
+                <p><strong>Khách hàng:</strong> {selectedOrder.customer_name || selectedOrder.customer_username}</p>
+                <p><strong>Trạng thái hiện tại:</strong> 
+                  <span className="status-badge" style={{ 
+                    backgroundColor: getStatusBadge(selectedOrder.status).color + '20',
+                    color: getStatusBadge(selectedOrder.status).color,
+                    marginLeft: '8px'
+                  }}>
+                    {getStatusBadge(selectedOrder.status).label}
+                  </span>
+                </p>
+              </div>
+
+              <div className="form-group">
+                <label>Chọn trạng thái mới <span className="required">*</span></label>
+                <div className="status-radio-group">
+                  {getAvailableStatuses(selectedOrder.status).map(opt => {
+                    const StatusIcon = opt.icon;
+                    const isSelected = selectedNewStatus === opt.value;
                     return (
-                      <button
-                        key={option.value}
-                        className={`status-option ${isCurrent ? 'current' : ''}`}
-                        onClick={() => confirmUpdateStatus(option.value)}
-                        disabled={updating || isCurrent}
-                        style={{
-                          backgroundColor: isCurrent ? option.color + '20' : 'transparent',
-                          borderColor: option.color,
-                          color: option.color
-                        }}
+                      <label 
+                        key={opt.value} 
+                        className={`status-radio-label ${isSelected ? 'selected' : ''}`}
+                        style={{ borderColor: opt.color }}
                       >
-                        <StatusIcon />
-                        <span>{option.label}</span>
-                        {isCurrent && <FaCheck className="check-icon" />}
-                      </button>
+                        <input
+                          type="radio"
+                          name="status"
+                          value={opt.value}
+                          checked={isSelected}
+                          onChange={(e) => setSelectedNewStatus(e.target.value)}
+                        />
+                        <div className="status-radio-content">
+                          <StatusIcon style={{ color: opt.color }} />
+                          <div>
+                            <strong>{opt.label}</strong>
+                            <small>{opt.description}</small>
+                          </div>
+                        </div>
+                      </label>
                     );
                   })}
+                </div>
+                {formError && <div className="form-error">{formError}</div>}
               </div>
             </div>
 
             <div className="modal-footer">
               <button className="cancel-btn" onClick={() => {
-                setShowStatusModal(false);
+                setShowStatusFormModal(false);
                 setSelectedOrder(null);
+                setFormError('');
               }}>
                 Hủy
+              </button>
+              <button 
+                className="submit-btn"
+                onClick={handleUpdateStatus}
+                disabled={updating || !selectedNewStatus || selectedNewStatus === selectedOrder.status}
+              >
+                {updating ? <FaSpinner className="spinning" /> : <FaSave />}
+                {updating ? ' Đang cập nhật...' : ' Cập nhật trạng thái'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Form cập nhật trạng thái thanh toán */}
+      {showPaymentFormModal && selectedOrder && (
+        <div className="modal-overlay" onClick={() => setShowPaymentFormModal(false)}>
+          <div className="modal-content payment-form-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Cập nhật trạng thái thanh toán</h2>
+              <button className="close-btn" onClick={() => {
+                setShowPaymentFormModal(false);
+                setSelectedOrder(null);
+                setFormError('');
+              }}>
+                <FaTimes />
+              </button>
+            </div>
+
+            <div className="modal-body">
+              <div className="order-info-summary">
+                <p><strong>Đơn hàng:</strong> #{selectedOrder.order_id?.slice(-8) || selectedOrder._id?.slice(-8)}</p>
+                <p><strong>Khách hàng:</strong> {selectedOrder.customer_name || selectedOrder.customer_username}</p>
+                <p><strong>Tổng tiền:</strong> {formatCurrency(selectedOrder.total_price)}</p>
+                <p><strong>Trạng thái hiện tại:</strong> 
+                  <span className={`payment-badge ${selectedOrder.payment_status}`} style={{ marginLeft: '8px' }}>
+                    {selectedOrder.payment_status === 'paid' ? 'Đã thanh toán' : 'Chưa thanh toán'}
+                  </span>
+                </p>
+              </div>
+
+              <div className="form-group">
+                <label>Chọn trạng thái thanh toán mới <span className="required">*</span></label>
+                <div className="payment-radio-group">
+                  {paymentStatusOptions.map(opt => {
+                    const PaymentIcon = opt.icon;
+                    const isSelected = selectedNewPaymentStatus === opt.value;
+                    return (
+                      <label 
+                        key={opt.value} 
+                        className={`payment-radio-label ${isSelected ? 'selected' : ''}`}
+                        style={{ borderColor: opt.color }}
+                      >
+                        <input
+                          type="radio"
+                          name="payment_status"
+                          value={opt.value}
+                          checked={isSelected}
+                          onChange={(e) => setSelectedNewPaymentStatus(e.target.value)}
+                        />
+                        <div className="payment-radio-content">
+                          <PaymentIcon style={{ color: opt.color }} />
+                          <strong>{opt.label}</strong>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+                {formError && <div className="form-error">{formError}</div>}
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button className="cancel-btn" onClick={() => {
+                setShowPaymentFormModal(false);
+                setSelectedOrder(null);
+                setFormError('');
+              }}>
+                Hủy
+              </button>
+              <button 
+                className="submit-btn"
+                onClick={handleUpdatePaymentStatus}
+                disabled={updating || !selectedNewPaymentStatus || selectedNewPaymentStatus === selectedOrder.payment_status}
+              >
+                {updating ? <FaSpinner className="spinning" /> : <FaSave />}
+                {updating ? ' Đang cập nhật...' : ' Cập nhật trạng thái'}
               </button>
             </div>
           </div>
@@ -822,6 +1012,151 @@ const ShopOrders = () => {
         }
         .spinning {
           animation: spin 1s linear infinite;
+        }
+        .order-id {
+          font-weight: 500;
+          color: #2e7d32;
+          font-family: monospace;
+        }
+        .discount-price {
+          color: #dc3545;
+        }
+        .voucher-info {
+          display: flex;
+          gap: 12px;
+          align-items: flex-start;
+          background: #e8f5e9;
+          padding: 12px;
+          border-radius: 8px;
+        }
+        .voucher-icon {
+          color: #2e7d32;
+          font-size: 20px;
+        }
+        .voucher-discount {
+          color: #dc3545;
+          font-weight: 500;
+        }
+        .order-note {
+          background: #f8f9fa;
+          padding: 12px;
+          border-radius: 8px;
+          border-left: 3px solid #2e7d32;
+        }
+        
+        /* Form Modal Styles */
+        .status-form-modal, .payment-form-modal {
+          max-width: 500px;
+        }
+        
+        .order-info-summary {
+          background: #f8f9fa;
+          padding: 15px;
+          border-radius: 8px;
+          margin-bottom: 20px;
+        }
+        
+        .order-info-summary p {
+          margin: 8px 0;
+        }
+        
+        .form-group {
+          margin-bottom: 20px;
+        }
+        
+        .form-group label {
+          display: block;
+          font-weight: 500;
+          margin-bottom: 10px;
+          color: #333;
+        }
+        
+        .required {
+          color: #dc3545;
+        }
+        
+        .status-radio-group, .payment-radio-group {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+        
+        .status-radio-label, .payment-radio-label {
+          display: block;
+          cursor: pointer;
+          border: 2px solid #e0e0e0;
+          border-radius: 10px;
+          transition: all 0.2s;
+        }
+        
+        .status-radio-label.selected, .payment-radio-label.selected {
+          border-width: 2px;
+          background: #f5f5f5;
+        }
+        
+        .status-radio-label input, .payment-radio-label input {
+          display: none;
+        }
+        
+        .status-radio-content, .payment-radio-content {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          padding: 12px 15px;
+        }
+        
+        .status-radio-content svg, .payment-radio-content svg {
+          font-size: 20px;
+        }
+        
+        .status-radio-content div {
+          display: flex;
+          flex-direction: column;
+        }
+        
+        .status-radio-content small {
+          font-size: 12px;
+          color: #666;
+          margin-top: 2px;
+        }
+        
+        .form-error {
+          color: #dc3545;
+          font-size: 13px;
+          margin-top: 8px;
+          padding: 8px;
+          background: #ffe6e6;
+          border-radius: 6px;
+        }
+        
+        .submit-btn {
+          background: #2e7d32;
+          color: white;
+          border: none;
+          padding: 10px 20px;
+          border-radius: 8px;
+          cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          font-weight: 500;
+        }
+        
+        .submit-btn:hover:not(:disabled) {
+          background: #1b5e20;
+        }
+        
+        .submit-btn:disabled {
+          background: #ccc;
+          cursor: not-allowed;
+        }
+        
+        .modal-footer {
+          display: flex;
+          justify-content: flex-end;
+          gap: 12px;
+          padding: 16px 24px;
+          border-top: 1px solid #eee;
         }
       `}</style>
     </div>
