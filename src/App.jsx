@@ -31,6 +31,7 @@ import CheckoutPage from "./pages/user/shop/CheckoutPage.jsx";
 import PaymentInstructions from "./pages/user/shop/PaymentInstructions.jsx";
 import OrderDetail from "./pages/user/shop/orderDetail.jsx";
 import Orders from "./pages/user/orderHistory.jsx";
+import UserProfile from "./pages/user/UserProfile.jsx";
 
 function App() {
   return (
@@ -49,6 +50,7 @@ function App() {
       <Route path="/payment/instructions/:orderId" element={<PaymentInstructions />} />
       <Route path="/orders/:orderId" element={<OrderDetail />} />
       <Route path="/history/orders" element={<Orders />} />
+      <Route path="/profile/:userId" element={<UserProfile />} />
       <Route 
         path="/admin/dashboard" 
         element={

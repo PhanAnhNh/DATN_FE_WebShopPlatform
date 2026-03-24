@@ -208,8 +208,6 @@ const ShopHeader = ({ toggleSidebar }) => {
                 <NotificationBell userType="shop" />
               </div>
               </span>
-            
-          
         </div>
 
         <div className="shop-header__user">

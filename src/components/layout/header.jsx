@@ -43,7 +43,7 @@ function Header() {
     // Effect thứ hai: lắng nghe custom event
     useEffect(() => {
         const handleCartUpdate = () => {
-            fetchCartCount(); // Bây giờ fetchCartCount đã được định nghĩa
+            fetchCartCount(); 
         };
         
         window.addEventListener('cartUpdated', handleCartUpdate);

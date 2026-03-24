@@ -21,6 +21,22 @@ function Home() {
     const [activeCommentMenu, setActiveCommentMenu] = useState(null); 
     const [editingCommentId, setEditingCommentId] = useState(null); 
     const [editCommentContent, setEditCommentContent] = useState("");
+
+    const [newPost, setNewPost] = useState({
+    content: "",
+    images: [],
+    videos: [],
+    tags: [],
+    location: "",
+    visibility: "public",
+    post_type: "text",
+    product_category: "general",
+    allow_comment: true,
+    allow_share: true
+});
+
+    const [imageUrls, setImageUrls] = useState([]);
+    const [uploadingImages, setUploadingImages] = useState(false);
     
     useEffect(() => {
         console.log("=== DEBUG AUTH ===");
@@ -150,6 +166,35 @@ function Home() {
         }
     };
 
+    const handleImageUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+    
+    setUploadingImages(true);
+    try {
+        const formData = new FormData();
+        files.forEach(file => {
+            formData.append('files', file);
+        });
+        
+        const response = await api.post('/api/v1/upload/images', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        
+        const urls = response.data.urls;
+        setImageUrls(prev => [...prev, ...urls]);
+        setNewPost(prev => ({
+            ...prev,
+            images: [...prev.images, ...urls]
+        }));
+    } catch (error) {
+        console.error('Lỗi upload ảnh:', error);
+        alert('Không thể upload ảnh. Vui lòng thử lại!');
+    } finally {
+        setUploadingImages(false);
+    }
+};
+
     const handleToggleLike = async (postId) => {
         const isCurrentlyLiked = likedPosts[postId];
         
@@ -233,36 +278,77 @@ function Home() {
     };
 
     const handleEditPost = (post) => {
-        setEditingPost(post); 
-        setNewPostContent(post.content || ""); 
-        setIsCreateModalOpen(true); 
-        setActivePostMenu(null); 
-    };
+    setEditingPost(post);
+    setNewPost({
+        content: post.content || "",
+        images: post.images || [],
+        videos: post.videos || [],
+        tags: post.tags || [],
+        location: post.location || "",
+        visibility: post.visibility || "public",
+        post_type: post.post_type || "text",
+        product_category: post.product_category || "general",
+        allow_comment: post.allow_comment !== false,
+        allow_share: post.allow_share !== false
+    });
+    setImageUrls(post.images || []);
+    setIsCreateModalOpen(true);
+    setActivePostMenu(null);
+};
 
     const handleSubmitPost = async () => {
-        if (!newPostContent.trim()) return;
+    if (!newPost.content.trim() && newPost.images.length === 0 && newPost.videos.length === 0) {
+        alert("Vui lòng nhập nội dung hoặc thêm ảnh/video");
+        return;
+    }
+    
+    setIsSubmitting(true);
+    try {
+        const postData = {
+            content: newPost.content,
+            images: newPost.images,
+            videos: newPost.videos,
+            tags: newPost.tags,
+            location: newPost.location,
+            visibility: newPost.visibility,
+            post_type: newPost.post_type,
+            product_category: newPost.product_category,
+            allow_comment: newPost.allow_comment,
+            allow_share: newPost.allow_share
+        };
         
-        setIsSubmitting(true);
-        try {
-            if (editingPost) {
-                await api.put(`/api/v1/posts/${editingPost._id}`, { content: newPostContent });
-                setPosts(posts.map(p => 
-                    p._id === editingPost._id ? { ...p, content: newPostContent } : p
-                ));
-            } else {
-                const res = await api.post("/api/v1/posts/", { content: newPostContent });
-                setPosts([res.data, ...posts]);
-            }
-            setIsCreateModalOpen(false);
-            setNewPostContent("");
-            setEditingPost(null);
-        } catch (error) {
-            console.error("Lỗi khi đăng/sửa bài:", error);
-            alert("Không thể lưu bài viết. Hãy kiểm tra lại!");
-        } finally {
-            setIsSubmitting(false);
+        if (editingPost) {
+            await api.put(`/api/v1/posts/${editingPost._id}`, postData);
+            setPosts(posts.map(p => 
+                p._id === editingPost._id ? { ...p, ...postData } : p
+            ));
+        } else {
+            const res = await api.post("/api/v1/posts/", postData);
+            setPosts([res.data, ...posts]);
         }
-    };
+        
+        setIsCreateModalOpen(false);
+        setNewPost({
+            content: "",
+            images: [],
+            videos: [],
+            tags: [],
+            location: "",
+            visibility: "public",
+            post_type: "text",
+            product_category: "general",
+            allow_comment: true,
+            allow_share: true
+        });
+        setImageUrls([]);
+        setEditingPost(null);
+    } catch (error) {
+        console.error("Lỗi khi đăng/sửa bài:", error);
+        alert("Không thể lưu bài viết. Hãy kiểm tra lại!");
+    } finally {
+        setIsSubmitting(false);
+    }
+};
 
     const handleDeletePost = async (postId) => {
         if (window.confirm("Bạn có chắc chắn muốn xóa bài viết này không?")) {
@@ -321,10 +407,29 @@ function Home() {
         }
     };
 
+    const removeImage = (indexToRemove) => {
+        setImageUrls(prev => prev.filter((_, idx) => idx !== indexToRemove));
+        setNewPost(prev => ({
+            ...prev,
+            images: prev.images.filter((_, idx) => idx !== indexToRemove)
+        }));
+    };
+
+    const handleTagsChange = (e) => {
+        const tagsString = e.target.value;
+        const tagsArray = tagsString.split(',').map(tag => tag.trim()).filter(tag => tag);
+        setNewPost(prev => ({ ...prev, tags: tagsArray }));
+    };
+
     const handleReportHideComment = (action) => {
         alert(`Đã thực hiện: ${action}. (Chức năng này cần API backend hỗ trợ thêm)`);
         setActiveCommentMenu(null);
     };
+
+            // Thêm hàm chuyển đến trang profile của người dùng
+        const goToUserProfile = (userId) => {
+            navigate(`/profile/${userId}`);
+        };
 
     const menuButtonStyle = {
         padding: "12px 15px",
@@ -409,12 +514,27 @@ function Home() {
                 <div key={post._id} style={{ background: "white", borderRadius: "12px", padding: "20px", marginBottom: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
                     {/* Phần nội dung bài viết giữ nguyên */}
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "15px", position: "relative" }}>
+                        {/* Phần hiển thị thông tin người đăng bài */}
                         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
                             <div style={{ width: "40px", height: "40px", background: "#ddd", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
                                 {post.author_avatar ? <img src={post.author_avatar} alt="avatar" style={{width:"100%", height:"100%", objectFit:"cover"}}/> : "👤"}
                             </div>
                             <div>
-                                <h4 style={{ margin: 0, fontSize: "16px" }}>{post.author_name}</h4>
+                                {/* Thêm cursor: pointer và onClick để click vào tên */}
+                                <h4 
+                                    style={{ 
+                                        margin: 0, 
+                                        fontSize: "16px", 
+                                        cursor: "pointer",
+                                        color: "#2e7d32",
+                                        transition: "color 0.2s"
+                                    }}
+                                    onClick={() => goToUserProfile(post.author_id)}
+                                    onMouseEnter={(e) => e.target.style.textDecoration = "underline"}
+                                    onMouseLeave={(e) => e.target.style.textDecoration = "none"}
+                                >
+                                    {post.author_name}
+                                </h4>
                                 <span style={{ fontSize: "12px", color: "#888" }}>{new Date(post.created_at).toLocaleDateString() || "Vừa xong"}</span>
                             </div>
                         </div>
@@ -716,16 +836,17 @@ function Home() {
             {isCreateModalOpen && (
                 <div style={{
                     position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
-                    backgroundColor: "rgba(244, 244, 244, 0.8)",
+                    backgroundColor: "rgba(0, 0, 0, 0.5)",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     zIndex: 1000
                 }}>
                     <div style={{
-                        background: "white", width: "500px", borderRadius: "10px",
-                        boxShadow: "0 12px 28px rgba(0,0,0,0.2)", display: "flex", flexDirection: "column"
+                        background: "white", width: "600px", maxWidth: "90%", maxHeight: "90vh",
+                        borderRadius: "12px", display: "flex", flexDirection: "column", overflow: "hidden"
                     }}>
+                        {/* Header Modal */}
                         <div style={{ position: "relative", padding: "15px", borderBottom: "1px solid #e4e6eb", textAlign: "center" }}>
-                            <h3 style={{ margin: 0, fontSize: "20px", fontWeight: "bold" }}>Tạo bài viết</h3>
+                            <h3 style={{ margin: 0, fontSize: "20px", fontWeight: "bold" }}>{editingPost ? "Sửa bài viết" : "Tạo bài viết mới"}</h3>
                             <button 
                                 onClick={() => setIsCreateModalOpen(false)}
                                 style={{ position: "absolute", top: "10px", right: "15px", width: "36px", height: "36px", borderRadius: "50%", border: "none", background: "#e4e6eb", cursor: "pointer", fontSize: "16px", fontWeight: "bold", color: "#606770" }}
@@ -734,6 +855,7 @@ function Home() {
                             </button>
                         </div>
 
+                        {/* Thông tin User */}
                         <div style={{ padding: "15px", display: "flex", alignItems: "center", gap: "10px" }}>
                             <div style={{ width: "40px", height: "40px", background: "#e4e6eb", borderRadius: "50%", overflow: "hidden" }}>
                                 {currentUser?.avatar_url ? <img src={currentUser.avatar_url} alt="avatar" style={{width: "100%", height:"100%", objectFit:"cover"}}/> : <div style={{width:"100%", height:"100%", display:"flex", alignItems:"center", justifyContent:"center"}}>👤</div>}
@@ -742,41 +864,118 @@ function Home() {
                                 <div style={{ fontWeight: "600", fontSize: "15px", color: "#050505" }}>
                                     {currentUser?.full_name || currentUser?.username}
                                 </div>
-                                <div style={{ background: "#e4e6eb", padding: "2px 8px", borderRadius: "6px", fontSize: "12px", display: "inline-block", marginTop: "2px", fontWeight: "500" }}>
-                                    👥 Bạn bè ▼
-                                </div>
+                                <select 
+                                    value={newPost.visibility}
+                                    onChange={(e) => setNewPost(prev => ({ ...prev, visibility: e.target.value }))}
+                                    style={{ background: "#e4e6eb", padding: "2px 8px", borderRadius: "6px", fontSize: "12px", border: "none", marginTop: "2px", fontWeight: "500" }}
+                                >
+                                    <option value="public">🌍 Công khai</option>
+                                    <option value="friends">👥 Bạn bè</option>
+                                    <option value="private">🔒 Riêng tư</option>
+                                </select>
                             </div>
                         </div>
 
-                        <div style={{ padding: "0 15px", flex: 1 }}>
+                        {/* Nội dung bài viết */}
+                        <div style={{ padding: "0 15px", flex: 1, overflowY: "auto" }}>
                             <textarea
                                 placeholder="Bạn đang nghĩ gì?"
-                                value={newPostContent}
-                                onChange={(e) => setNewPostContent(e.target.value)}
+                                value={newPost.content}
+                                onChange={(e) => setNewPost(prev => ({ ...prev, content: e.target.value }))}
                                 autoFocus
-                                style={{ width: "100%", minHeight: "150px", border: "none", outline: "none", resize: "none", fontSize: newPostContent.length < 80 ? "24px" : "16px", fontFamily: "inherit" }}
+                                rows="4"
+                                style={{ width: "100%", border: "none", outline: "none", resize: "none", fontSize: "16px", fontFamily: "inherit" }}
                             />
-                        </div>
-
-                        <div style={{ padding: "15px" }}>
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", border: "1px solid #ced0d4", borderRadius: "8px", padding: "10px 15px", boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}>
-                                <span style={{ fontWeight: "600", color: "#050505", cursor: "pointer" }}>Thêm vào bài viết của bạn</span>
-                                <div style={{ display: "flex", gap: "15px", fontSize: "20px", cursor: "pointer" }}>
-                                    <span>🖼️</span>
-                                    <span>👤</span>
-                                    <span>😊</span>
-                                    <span>📍</span>
+                            
+                            {/* Tags */}
+                            <input
+                                type="text"
+                                placeholder="Thêm tag (cách nhau bằng dấu phẩy, VD: cafe, bạn bè)"
+                                value={newPost.tags.join(', ')}
+                                onChange={handleTagsChange}
+                                style={{ width: "100%", padding: "8px 12px", border: "1px solid #ddd", borderRadius: "8px", marginBottom: "10px", fontSize: "14px" }}
+                            />
+                            
+                            {/* Location */}
+                            <input
+                                type="text"
+                                placeholder="Thêm địa điểm"
+                                value={newPost.location}
+                                onChange={(e) => setNewPost(prev => ({ ...prev, location: e.target.value }))}
+                                style={{ width: "100%", padding: "8px 12px", border: "1px solid #ddd", borderRadius: "8px", marginBottom: "10px", fontSize: "14px" }}
+                            />
+                            
+                            {/* Loại bài viết & Danh mục */}
+                            <div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
+                                <select 
+                                    value={newPost.post_type}
+                                    onChange={(e) => setNewPost(prev => ({ ...prev, post_type: e.target.value }))}
+                                    style={{ flex: 1, padding: "8px 12px", border: "1px solid #ddd", borderRadius: "8px", fontSize: "14px" }}
+                                >
+                                    <option value="text">📝 Bài viết thường</option>
+                                    <option value="product">🛍️ Giới thiệu sản phẩm</option>
+                                    <option value="review">⭐ Đánh giá</option>
+                                </select>
+                                
+                                <select 
+                                    value={newPost.product_category}
+                                    onChange={(e) => setNewPost(prev => ({ ...prev, product_category: e.target.value }))}
+                                    style={{ flex: 1, padding: "8px 12px", border: "1px solid #ddd", borderRadius: "8px", fontSize: "14px" }}
+                                >
+                                    <option value="general">🌾 Chung</option>
+                                    <option value="agriculture">🌽 Nông sản</option>
+                                    <option value="seafood">🦐 Hải sản</option>
+                                    <option value="specialty">🍜 Đặc sản</option>
+                                </select>
+                            </div>
+                            
+                            {/* Upload ảnh */}
+                            <div style={{ marginBottom: "10px" }}>
+                                <label style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "8px 16px", background: "#f0f2f5", borderRadius: "8px", cursor: "pointer" }}>
+                                    <span>📷</span> Thêm ảnh
+                                    <input type="file" multiple accept="image/*" onChange={handleImageUpload} style={{ display: "none" }} />
+                                </label>
+                                {uploadingImages && <span style={{ marginLeft: "10px", fontSize: "12px", color: "#666" }}>Đang upload...</span>}
+                            </div>
+                            
+                            {/* Hiển thị ảnh đã chọn */}
+                            {imageUrls.length > 0 && (
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px", marginBottom: "10px" }}>
+                                    {imageUrls.map((url, idx) => (
+                                        <div key={idx} style={{ position: "relative" }}>
+                                            <img src={url} alt={`preview_${idx}`} style={{ width: "100%", aspectRatio: "1/1", objectFit: "cover", borderRadius: "8px" }} />
+                                            <button 
+                                                onClick={() => removeImage(idx)}
+                                                style={{ position: "absolute", top: "4px", right: "4px", background: "rgba(0,0,0,0.5)", color: "white", border: "none", borderRadius: "50%", width: "24px", height: "24px", cursor: "pointer" }}
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+                                    ))}
                                 </div>
+                            )}
+                            
+                            {/* Tùy chọn */}
+                            <div style={{ display: "flex", gap: "20px", marginBottom: "15px" }}>
+                                <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", cursor: "pointer" }}>
+                                    <input type="checkbox" checked={newPost.allow_comment} onChange={(e) => setNewPost(prev => ({ ...prev, allow_comment: e.target.checked }))} />
+                                    Cho phép bình luận
+                                </label>
+                                <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", cursor: "pointer" }}>
+                                    <input type="checkbox" checked={newPost.allow_share} onChange={(e) => setNewPost(prev => ({ ...prev, allow_share: e.target.checked }))} />
+                                    Cho phép chia sẻ
+                                </label>
                             </div>
                         </div>
 
-                        <div style={{ padding: "0 15px 15px 15px" }}>
+                        {/* Nút Đăng */}
+                        <div style={{ padding: "15px", borderTop: "1px solid #eee" }}>
                             <button 
                                 onClick={handleSubmitPost}
-                                disabled={!newPostContent.trim() || isSubmitting}
-                                style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "none", background: newPostContent.trim() ? "#0866ff" : "#e4e6eb", color: newPostContent.trim() ? "white" : "#bcc0c4", fontSize: "15px", fontWeight: "600", cursor: newPostContent.trim() ? "pointer" : "not-allowed" }}
+                                disabled={(!newPost.content.trim() && imageUrls.length === 0) || isSubmitting}
+                                style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "none", background: (newPost.content.trim() || imageUrls.length > 0) ? "#0866ff" : "#e4e6eb", color: (newPost.content.trim() || imageUrls.length > 0) ? "white" : "#bcc0c4", fontSize: "15px", fontWeight: "600", cursor: (newPost.content.trim() || imageUrls.length > 0) ? "pointer" : "not-allowed" }}
                             >
-                                {isSubmitting ? "Đang đăng..." : "Đăng"}
+                                {isSubmitting ? "Đang đăng..." : editingPost ? "Cập nhật" : "Đăng"}
                             </button>
                         </div>
                     </div>

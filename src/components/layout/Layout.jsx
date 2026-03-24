@@ -1,13 +1,13 @@
-// Layout.jsx - Sửa lại phần margin
+// components/layout/Layout.jsx
 import Header from "./header";
 import SidebarLeft from "./SidebarLeft";
 
-function Layout({ children }) {
+function Layout({ children, userProfile = null }) { // Thêm prop userProfile
     return (
         <div style={{
             minHeight: "100vh",
             display: "flex",
-            flexDirection: "column", // QUAN TRỌNG: Thêm dấu ngoặc kép
+            flexDirection: "column",
             background: "#f3f4f6"
         }}>
             {/* Header dính chặt ở trên cùng */}
@@ -15,17 +15,17 @@ function Layout({ children }) {
                 <Header />
             </div>
 
-            {/* Chứa nội dung chính (Được căn giữa màn hình với maxWidth) */}
+            {/* Chứa nội dung chính */}
             <div style={{
                 display: "flex",
-                justifyContent: "center", // Thêm dòng này để căn giữa Cột trái + Cột giữa
+                justifyContent: "center",
                 width: "100%",
-                maxWidth: "100%", // Đổi từ 1200px xuống 1000px cho vừa khít (280+20+680)
+                maxWidth: "100%",
                 margin: "0 auto",
                 padding: "20px",
                 gap: "20px"
             }}>
-                {/* Cột trái (Sidebar cố định khi cuộn) */}
+                {/* Cột trái - Truyền userProfile */}
                 <div className="hide-scrollbar" style={{
                     position: "sticky",
                     top: "90px",
@@ -33,10 +33,10 @@ function Layout({ children }) {
                     height: "calc(100vh - 110px)",
                     overflowY: "auto"
                 }}>
-                    <SidebarLeft />
+                    <SidebarLeft userProfile={userProfile} />
                 </div>
 
-                {/* Cột giữa (Nội dung động: Feed bài viết) */}
+                {/* Cột giữa */}
                 <div style={{ flex: 1, maxWidth: "680px" }}>
                     {children}
                 </div>

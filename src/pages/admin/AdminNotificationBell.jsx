@@ -1,11 +1,11 @@
-// src/components/NotificationBell.jsx
+// src/components/AdminNotificationBell.jsx
 import React, { useState, useEffect, useRef } from 'react';
-import { FaBell, FaSpinner, FaCheck, FaTrash, FaCheckDouble, FaEye } from 'react-icons/fa';
-import api from '../../api/api';
+import { FaBell, FaSpinner, FaCheckDouble, FaTrash, FaUserPlus, FaStore, FaFileAlt, FaFlag, FaCog } from 'react-icons/fa';
+import {adminApi} from '../../api/api';
 import { useNavigate } from 'react-router-dom';
 import '../../css/Notification.css';
 
-const NotificationBell = ({ userType = 'user' }) => {
+const AdminNotificationBell = () => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -15,16 +15,9 @@ const NotificationBell = ({ userType = 'user' }) => {
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
 
-  // Lấy token dựa vào userType
+  // Lấy token admin
   const getToken = () => {
-    switch(userType) {
-      case 'shop':
-        return localStorage.getItem('shop_token');
-      case 'admin':
-        return localStorage.getItem('admin_token');
-      default:
-        return localStorage.getItem('user_token');
-    }
+    return localStorage.getItem('admin_token');
   };
 
   // Cấu hình API headers
@@ -45,10 +38,10 @@ const NotificationBell = ({ userType = 'user' }) => {
       if (!token) return;
 
       const config = getApiConfig();
-      const response = await api.get('/api/v1/notifications/unread-count', config);
+      const response = await adminApi.get('/api/v1/admin/notifications/unread-count', config);
       setUnreadCount(response.data.unread_count);
     } catch (error) {
-      console.error('Error fetching unread count:', error);
+      console.error('Error fetching admin unread count:', error);
     }
   };
 
@@ -60,7 +53,7 @@ const NotificationBell = ({ userType = 'user' }) => {
 
       setLoading(true);
       const config = getApiConfig();
-      const response = await api.get('/api/v1/notifications', {
+      const response = await adminApi.get('/api/v1/admin/notifications', {
         ...config,
         params: {
           page: pagination.page,
@@ -70,7 +63,7 @@ const NotificationBell = ({ userType = 'user' }) => {
       setNotifications(response.data.data);
       setPagination(response.data.pagination);
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+      console.error('Error fetching admin notifications:', error);
     } finally {
       setLoading(false);
     }
@@ -78,8 +71,6 @@ const NotificationBell = ({ userType = 'user' }) => {
 
   useEffect(() => {
     fetchUnreadCount();
-    
-    // Polling mỗi 30 giây
     const interval = setInterval(fetchUnreadCount, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -103,7 +94,7 @@ const NotificationBell = ({ userType = 'user' }) => {
   const markAsRead = async (notificationId) => {
     try {
       const config = getApiConfig();
-      await api.put(`/api/v1/notifications/${notificationId}/read`, {}, config);
+      await adminApi.put(`/api/v1/admin/notifications/${notificationId}/read`, {}, config);
       setNotifications(notifications.map(n => 
         n._id === notificationId ? { ...n, is_read: true } : n
       ));
@@ -117,7 +108,7 @@ const NotificationBell = ({ userType = 'user' }) => {
     try {
       setMarkingAll(true);
       const config = getApiConfig();
-      await api.put('/api/v1/notifications/read-all', {}, config);
+      await adminApi.put('/api/v1/admin/notifications/read-all', {}, config);
       setNotifications(notifications.map(n => ({ ...n, is_read: true })));
       setUnreadCount(0);
     } catch (error) {
@@ -130,7 +121,7 @@ const NotificationBell = ({ userType = 'user' }) => {
   const deleteNotification = async (notificationId) => {
     try {
       const config = getApiConfig();
-      await api.delete(`/api/v1/notifications/${notificationId}`, config);
+      await adminApi.delete(`/api/v1/admin/notifications/${notificationId}`, config);
       const deletedNotif = notifications.find(n => n._id === notificationId);
       setNotifications(notifications.filter(n => n._id !== notificationId));
       if (!deletedNotif?.is_read) {
@@ -141,82 +132,33 @@ const NotificationBell = ({ userType = 'user' }) => {
     }
   };
 
-  // Xử lý click vào thông báo
   const handleNotificationClick = (notification) => {
-    // Đánh dấu đã đọc
     if (!notification.is_read) {
       markAsRead(notification._id);
     }
     
-    // Chuyển hướng dựa vào loại thông báo và userType
+    // Chuyển hướng dựa vào loại thông báo admin
     if (notification.reference_id) {
       switch (notification.type) {
-        case 'order':
-          if (userType === 'shop') {
-            navigate(`/shop/orders/${notification.reference_id}`);
-          } else if (userType === 'admin') {
-            navigate(`/admin/orders/${notification.reference_id}`);
-          } else {
-            navigate(`/orders/${notification.reference_id}`);
-          }
+        case 'new_user':
+          navigate(`/admin/users/${notification.reference_id}`);
           break;
-          
-        case 'payment':
-          if (userType === 'admin') {
-            navigate(`/admin/orders/${notification.reference_id}`);
-          } else {
-            navigate(`/orders/${notification.reference_id}`);
-          }
+        case 'new_shop':
+          navigate(`/admin/stores/${notification.reference_id}`);
           break;
-          
-        case 'shipping':
-          if (userType === 'shop') {
-            navigate(`/shop/orders/${notification.reference_id}`);
-          } else if (userType === 'admin') {
-            navigate(`/admin/orders/${notification.reference_id}`);
-          } else {
-            navigate(`/orders/${notification.reference_id}`);
-          }
+        case 'new_post':
+          navigate(`/admin/posts/${notification.reference_id}`);
           break;
-          
-        case 'product':
-          if (userType === 'shop') {
-            navigate(`/shop/products/${notification.reference_id}`);
-          } else if (userType === 'admin') {
-            navigate(`/admin/products/${notification.reference_id}`);
-          } else {
-            navigate(`/product/${notification.reference_id}`);
-          }
+        case 'report_user':
+          navigate(`/admin/users/${notification.reference_id}/reports`);
           break;
-          
-        case 'review':
-          if (userType === 'shop') {
-            navigate(`/shop/reviews/${notification.reference_id}`);
-          } else if (userType === 'admin') {
-            navigate(`/admin/reviews/${notification.reference_id}`);
-          } else {
-            navigate(`/product/${notification.reference_id}`);
-          }
+        case 'report_shop':
+          navigate(`/admin/stores/${notification.reference_id}/reports`);
           break;
-          
-        case 'friend_request':
-        case 'friend_accepted':
-          // Chuyển đến trang profile của người gửi (reference_id là user_id)
-          navigate(`/profile/${notification.reference_id}`);
+        case 'report_post':
+          navigate(`/admin/posts/${notification.reference_id}/reports`);
           break;
-          
-        case 'follow':
-          // Chuyển đến trang profile của người theo dõi
-          navigate(`/profile/${notification.reference_id}`);
-          break;
-          
-        case 'system':
-          // Không chuyển hướng, chỉ đánh dấu đã đọc
-          break;
-          
         default:
-          // Mặc định: không chuyển hướng
-          console.log('Unknown notification type:', notification.type);
           break;
       }
     }
@@ -225,16 +167,14 @@ const NotificationBell = ({ userType = 'user' }) => {
 
   const getNotificationIcon = (type) => {
     switch (type) {
-      case 'order': return '📦';
-      case 'payment': return '💰';
-      case 'shipping': return '🚚';
-      case 'promotion': return '🎉';
-      case 'review': return '⭐';
-      case 'follow': return '👤';
-      case 'friend_request': return '🤝';
-      case 'friend_accepted': return '✅';
-      case 'system': return '🔔';
-      default: return '📢';
+      case 'new_user': return <FaUserPlus />;
+      case 'new_shop': return <FaStore />;
+      case 'new_post': return <FaFileAlt />;
+      case 'report_user': return <FaFlag />;
+      case 'report_shop': return <FaFlag />;
+      case 'report_post': return <FaFlag />;
+      case 'system': return <FaCog />;
+      default: return <FaBell />;
     }
   };
 
@@ -263,9 +203,9 @@ const NotificationBell = ({ userType = 'user' }) => {
       </button>
 
       {showDropdown && (
-        <div className="notification-dropdown">
+        <div className="notification-dropdown admin-dropdown">
           <div className="notification-dropdown-header">
-            <h3>Thông báo</h3>
+            <h3>Thông báo quản trị</h3>
             {notifications.some(n => !n.is_read) && (
               <button 
                 className="mark-all-btn" 
@@ -296,7 +236,7 @@ const NotificationBell = ({ userType = 'user' }) => {
                     className={`notification-item ${!notif.is_read ? 'unread' : ''}`}
                     onClick={() => handleNotificationClick(notif)}
                   >
-                    <div className="notification-item-icon">
+                    <div className="notification-item-icon admin-icon">
                       {getNotificationIcon(notif.type)}
                     </div>
                     <div className="notification-item-content">
@@ -342,4 +282,4 @@ const NotificationBell = ({ userType = 'user' }) => {
   );
 };
 
-export default NotificationBell;
+export default AdminNotificationBell;

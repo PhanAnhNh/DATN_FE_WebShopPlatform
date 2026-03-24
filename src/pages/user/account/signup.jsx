@@ -15,9 +15,14 @@ function Register() {
     confirmPassword: "",
     full_name: "",
     phone: "",
-    gender: "Other", // Mặc định
+    gender: "Other",
     dob: "",
-    address: ""
+    // Địa chỉ chi tiết
+    street: "",
+    ward: "",
+    district: "",
+    city: "",
+    country: "Việt Nam"
   });
 
   const handleChange = (e) => {
@@ -29,16 +34,28 @@ function Register() {
     e.preventDefault();
     setError("");
 
-    // 2. Validation nâng cao
+    // Validation
     if (formData.password.length < 6) return setError("Mật khẩu ít nhất 6 ký tự");
     if (formData.password !== formData.confirmPassword) return setError("Mật khẩu không khớp");
     
+    // Validation địa chỉ
+    if (!formData.street.trim()) return setError("Vui lòng nhập số nhà và tên đường");
+    if (!formData.ward.trim()) return setError("Vui lòng nhập phường/xã");
+    if (!formData.district.trim()) return setError("Vui lòng nhập quận/huyện");
+    if (!formData.city.trim()) return setError("Vui lòng nhập tỉnh/thành phố");
+    
     setLoading(true);
     try {
-      // Loại bỏ confirmPassword trước khi gửi lên Backend
-      const { confirmPassword, ...payload } = formData;
+      // Ghép địa chỉ thành một chuỗi để gửi lên backend
+      const fullAddress = `${formData.street}, ${formData.ward}, ${formData.district}, ${formData.city}, ${formData.country}`;
+      
+      // Loại bỏ confirmPassword và các trường địa chỉ riêng lẻ
+      const { confirmPassword, street, ward, district, city, country, ...payload } = formData;
+      
+      // Thêm address đã ghép vào payload
+      payload.address = fullAddress;
 
-      const response = await fetch("http://localhost:8000/users/", {
+      const response = await fetch("http://localhost:8000/api/v1/users/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -63,7 +80,16 @@ function Register() {
     border: "1px solid #ccc",
     backgroundColor: "#e9ecef",
     outline: "none",
-    fontSize: "14px"
+    fontSize: "14px",
+    width: "100%",
+    boxSizing: "border-box"
+  };
+
+  const labelStyle = {
+    fontSize: "12px",
+    color: "#666",
+    marginBottom: "4px",
+    display: "block"
   };
 
   return (
@@ -75,67 +101,151 @@ function Register() {
       </div>
 
       <div style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center", padding: "20px" }}>
-        <div style={{ display: "flex", width: "100%", maxWidth: "1000px", backgroundColor: "white", borderRadius: "15px", boxShadow: "0 10px 25px rgba(0,0,0,0.1)", overflow: "hidden" }}>
+        <div style={{ display: "flex", width: "100%", maxWidth: "1100px", backgroundColor: "white", borderRadius: "15px", boxShadow: "0 10px 25px rgba(0,0,0,0.1)", overflow: "hidden" }}>
           
-          {/* Cột trái: Form (Chiếm 60% chiều rộng để đủ chỗ cho nhiều input) */}
-          <div style={{ flex: 1.5, padding: "40px" }}>
+          {/* Cột trái: Form */}
+          <div style={{ flex: 1.5, padding: "40px", overflowY: "auto", maxHeight: "80vh" }}>
             <h1 style={{ margin: "0 0 20px 0", fontSize: "24px", color: "#333" }}>Tạo tài khoản mới</h1>
             
             <form onSubmit={handleRegister} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               
               {/* Hàng 1: Username & Email */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                <input name="username" placeholder="Tên đăng nhập *" required style={inputStyle} onChange={handleChange} />
-                <input name="email" type="email" placeholder="Email *" required style={inputStyle} onChange={handleChange} />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <div>
+                  <label style={labelStyle}>Tên đăng nhập *</label>
+                  <input name="username" required style={inputStyle} onChange={handleChange} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Email *</label>
+                  <input name="email" type="email" required style={inputStyle} onChange={handleChange} />
+                </div>
               </div>
 
               {/* Hàng 2: Họ tên & Số điện thoại */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                <input name="full_name" placeholder="Họ và tên" style={inputStyle} onChange={handleChange} />
-                <input name="phone" placeholder="Số điện thoại" style={inputStyle} onChange={handleChange} />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <div>
+                  <label style={labelStyle}>Họ và tên</label>
+                  <input name="full_name" style={inputStyle} onChange={handleChange} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Số điện thoại</label>
+                  <input name="phone" placeholder="VD: 0912345678" style={inputStyle} onChange={handleChange} />
+                </div>
               </div>
 
               {/* Hàng 3: Giới tính & Ngày sinh */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                <select name="gender" style={inputStyle} onChange={handleChange}>
-                  <option value="Other">Giới tính: Khác</option>
-                  <option value="Male">Nam</option>
-                  <option value="Female">Nữ</option>
-                </select>
-                <input name="dob" type="date" style={inputStyle} onChange={handleChange} title="Ngày sinh" />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <div>
+                  <label style={labelStyle}>Giới tính</label>
+                  <select name="gender" style={inputStyle} onChange={handleChange}>
+                    <option value="Other">Khác</option>
+                    <option value="Male">Nam</option>
+                    <option value="Female">Nữ</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={labelStyle}>Ngày sinh</label>
+                  <input name="dob" type="date" style={inputStyle} onChange={handleChange} />
+                </div>
               </div>
 
-              {/* Địa chỉ */}
-              <input name="address" placeholder="Địa chỉ thường trú" style={inputStyle} onChange={handleChange} />
+              {/* Địa chỉ chi tiết */}
+              <div style={{ marginTop: "8px" }}>
+                <label style={{ ...labelStyle, fontWeight: "bold", color: "#333" }}>Địa chỉ thường trú *</label>
+              </div>
+              
+              {/* Số nhà, tên đường */}
+              <div>
+                <label style={labelStyle}>Số nhà, tên đường *</label>
+                <input 
+                  name="street" 
+                  placeholder="VD: 123 Nguyễn Văn A" 
+                  required 
+                  style={inputStyle} 
+                  onChange={handleChange} 
+                />
+              </div>
+
+              {/* Phường/Xã */}
+              <div>
+                <label style={labelStyle}>Phường/Xã *</label>
+                <input 
+                  name="ward" 
+                  placeholder="VD: Phường Hòa Hải" 
+                  required 
+                  style={inputStyle} 
+                  onChange={handleChange} 
+                />
+              </div>
+
+              {/* Quận/Huyện */}
+              <div>
+                <label style={labelStyle}>Quận/Huyện *</label>
+                <input 
+                  name="district" 
+                  placeholder="VD: Quận Ngũ Hành Sơn" 
+                  required 
+                  style={inputStyle} 
+                  onChange={handleChange} 
+                />
+              </div>
+
+              {/* Tỉnh/Thành phố */}
+              <div>
+                <label style={labelStyle}>Tỉnh/Thành phố *</label>
+                <input 
+                  name="city" 
+                  placeholder="VD: Đà Nẵng" 
+                  required 
+                  style={inputStyle} 
+                  onChange={handleChange} 
+                />
+              </div>
+
+              {/* Quốc gia */}
+              <div>
+                <label style={labelStyle}>Quốc gia</label>
+                <input 
+                  name="country" 
+                  value={formData.country}
+                  style={inputStyle} 
+                  onChange={handleChange} 
+                />
+              </div>
 
               {/* Mật khẩu */}
               <div style={{ position: "relative" }}>
+                <label style={labelStyle}>Mật khẩu *</label>
                 <input 
                   name="password" 
                   type={showPassword ? "text" : "password"} 
-                  placeholder="Mật khẩu *" 
+                  placeholder="Ít nhất 6 ký tự" 
                   required 
-                  style={{ ...inputStyle, width: "100%", boxSizing: "border-box" }} 
+                  style={inputStyle} 
                   onChange={handleChange} 
                 />
                 <span 
                   onClick={() => setShowPassword(!showPassword)}
-                  style={{ position: "absolute", right: "15px", top: "50%", transform: "translateY(-50%)", cursor: "pointer" }}
+                  style={{ position: "absolute", right: "15px", top: "28px", cursor: "pointer" }}
                 >
                   {showPassword ? "👁️" : "🙈"}
                 </span>
               </div>
 
-              <input 
-                name="confirmPassword" 
-                type="password" 
-                placeholder="Xác nhận mật khẩu *" 
-                required 
-                style={inputStyle} 
-                onChange={handleChange} 
-              />
+              {/* Xác nhận mật khẩu */}
+              <div>
+                <label style={labelStyle}>Xác nhận mật khẩu *</label>
+                <input 
+                  name="confirmPassword" 
+                  type="password" 
+                  placeholder="Nhập lại mật khẩu" 
+                  required 
+                  style={inputStyle} 
+                  onChange={handleChange} 
+                />
+              </div>
 
-              {error && <div style={{ color: "#d32f2f", fontSize: "13px", fontWeight: "bold" }}>{error}</div>}
+              {error && <div style={{ color: "#d32f2f", fontSize: "13px", fontWeight: "bold", padding: "8px", backgroundColor: "#ffebee", borderRadius: "6px" }}>{error}</div>}
 
               <button 
                 type="submit" 
@@ -143,14 +253,14 @@ function Register() {
                 style={{ 
                   padding: "12px", borderRadius: "8px", border: "none", 
                   backgroundColor: loading ? "#ccc" : "#558b2f", color: "white", 
-                  fontWeight: "bold", fontSize: "16px", cursor: "pointer", marginTop: "5px" 
+                  fontWeight: "bold", fontSize: "16px", cursor: "pointer", marginTop: "10px" 
                 }}
               >
                 {loading ? "Đang xử lý..." : "Đăng kí ngay"}
               </button>
             </form>
 
-            <div style={{ textAlign: "center", marginTop: "15px", fontSize: "14px" }}>
+            <div style={{ textAlign: "center", marginTop: "20px", fontSize: "14px" }}>
               Đã có thành viên? <span onClick={() => navigate("/login")} style={{ color: "#558b2f", fontWeight: "bold", cursor: "pointer" }}>Đăng nhập tại đây</span>
             </div>
           </div>

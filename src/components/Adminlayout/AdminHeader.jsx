@@ -2,7 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api/api';
 import '../../css/AdminLayout.css';
-import NotificationBell from '../../pages/user/NotificationBell';
+import AdminNotificationBell from '../../pages/admin/AdminNotificationBell';
+
 
 const AdminHeader = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -86,7 +87,7 @@ const AdminHeader = () => {
                     e.currentTarget.style.borderColor = "#ddd";
                 }}>
                 <div className="notification-wrapper">
-                  <NotificationBell userType="admin" />
+                  <AdminNotificationBell userType="admin" />
                 </div>
           </span>
         
