@@ -443,7 +443,9 @@
   font-weight: 500;
   text-decoration: none;
   transition: all 0.3s;
-  white-space: nowrap; /* Không xuống dòng */
+  white-space: nowrap; 
+  min-width: 120px; /* Thêm min-width để nút có chiều rộng tối thiểu */
+  justify-content: center;
   width: 100px;
 }
 
@@ -666,7 +668,163 @@
   cursor: not-allowed;
 }
 
+/* src/css/Return.css */
+.return-modal {
+    max-width: 600px;
+    width: 90%;
+}
 
+.return-items-selection {
+    margin-bottom: 20px;
+}
+
+.return-item-select {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 12px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+.return-item-select input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+}
+
+.return-item-select .item-info {
+    flex: 1;
+}
+
+.return-item-select .item-name {
+    font-weight: 500;
+    margin-bottom: 4px;
+}
+
+.return-item-select .item-variant {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 4px;
+}
+
+.return-item-select .item-price {
+    font-size: 14px;
+    color: #2e7d32;
+    font-weight: 500;
+}
+
+.return-reason-section,
+.return-note-section,
+.return-images-section,
+.bank-info-section {
+    margin-bottom: 20px;
+}
+
+.return-reason-section label,
+.return-note-section label,
+.return-images-section label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 8px;
+    color: #333;
+}
+
+.return-reason-section select,
+.return-note-section textarea,
+.bank-info-section input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.return-note-section textarea {
+    resize: vertical;
+}
+
+.image-upload-area {
+    border: 2px dashed #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.image-upload-area:hover {
+    border-color: #2e7d32;
+    background: #f9f9f9;
+}
+
+.image-upload-area input {
+    display: none;
+}
+
+.image-preview {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.preview-item {
+    position: relative;
+    width: 80px;
+    height: 80px;
+}
+
+.preview-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 4px;
+}
+
+.preview-item button {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #ff4444;
+    color: white;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+}
+
+.bank-info-section input {
+    margin-bottom: 10px;
+}
+
+.bank-info-section input:last-child {
+    margin-bottom: 0;
+}
+
+.action-btn.return {
+    background: #ff9800;
+    color: white;
+}
+
+.action-btn.return:hover {
+    background: #f57c00;
+}
+
+.action-btn.view-return {
+    background: #9c27b0;
+    color: white;
+}
+
+.action-btn.view-return:hover {
+    background: #7b1fa2;
+}
 
 @keyframes fadeIn {
   from {

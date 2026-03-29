@@ -1,58 +1,92 @@
 .shop-layout {
   min-height: 100vh;
-  background: #f5f7fa;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
   position: relative;
-  overflow: hidden;
 }
 
 .shop-layout__container {
   display: flex;
-  height: calc(100vh - 70px);
+  min-height: calc(100vh - 70px);
   margin-top: 70px;
   position: relative;
-  overflow: hidden;
+  width: 100%;
 }
 
 .shop-layout__content {
   flex: 1;
-  margin-left: 280px;
-  transition: margin-left 0.3s ease;
-  height: 100%;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  height: calc(100vh - 70px);
   overflow-y: auto;
   overflow-x: hidden;
   position: relative;
+  padding: 24px;
+  width: calc(100% - 280px);
+  margin-left: 280px;
 }
 
 .shop-layout__content.expanded {
+  width: calc(100% - 80px);
   margin-left: 80px;
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar đẹp */
 .shop-layout__content::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
 }
 
 .shop-layout__content::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: rgba(34, 197, 94, 0.05);
+  border-radius: 4px;
 }
 
 .shop-layout__content::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 3px;
+  background: linear-gradient(180deg, #22c55e 0%, #15803d 100%);
+  border-radius: 4px;
 }
 
 .shop-layout__content::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
+  background: linear-gradient(180deg, #15803d 0%, #166534 100%);
 }
 
+/* Animation cho content */
+.shop-layout__content {
+  animation: fadeIn 0.5s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive */
 @media (max-width: 768px) {
   .shop-layout__container {
     margin-top: 60px;
-    height: calc(100vh - 60px);
+    min-height: calc(100vh - 60px);
   }
   
   .shop-layout__content {
-    margin-left: 0;
+    width: 100% !important;
+    margin-left: 0 !important;
     padding: 16px;
+    height: calc(100vh - 60px);
+  }
+  
+  .shop-header__search {
+    display: none;
+  }
+  
+  .shop-header__user-name {
+    display: none;
+  }
+  
+  .shop-header__logo h2 {
+    font-size: 1rem;
   }
 }

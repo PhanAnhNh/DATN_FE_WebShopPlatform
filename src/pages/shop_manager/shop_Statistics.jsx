@@ -1,4 +1,3 @@
-// src/pages/shop/ShopStatistics.jsx
 import React, { useState, useEffect } from 'react';
 import { 
   FaUsers, 
@@ -29,10 +28,9 @@ import {
   ArcElement
 } from 'chart.js';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
-import {shopApi} from '../../api/api';
+import { shopApi } from '../../api/api';
 import '../../css/ShopStatistics.css';
 
-// Đăng ký ChartJS
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -48,90 +46,58 @@ ChartJS.register(
 
 const ShopStatistics = () => {
   const [loading, setLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState('month'); // week, month, year
+  const [timeRange, setTimeRange] = useState('month');
   const [stats, setStats] = useState({
-    totalCustomers: 15000,
-    totalOrders: 1000,
-    totalRevenue: 10000000,
-    totalReturns: 10,
-    averageRating: 4.9,
-    totalReviews: 100,
-    reviewStats: {
-      good: 75,
-      normal: 15,
-      bad: 10
-    }
+    totalCustomers: 0,
+    totalOrders: 0,
+    totalRevenue: 0,
+    totalReturns: 0,
+    averageRating: 0,
+    totalReviews: 0,
+    reviewStats: { good: 0, normal: 0, bad: 0 }
   });
 
   const [revenueData, setRevenueData] = useState({
-    labels: ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'],
-    datasets: [
-      {
-        label: 'Doanh thu 2024',
-        data: [25000000, 20000000, 18000000, 22000000, 28000000, 30000000, 32000000, 29000000, 31000000, 35000000, 38000000, 42000000],
-        borderColor: '#4bc0c0',
-        backgroundColor: 'rgba(75, 192, 192, 0.1)',
-        borderWidth: 2,
-        pointBackgroundColor: '#4bc0c0',
-        pointBorderColor: '#fff',
-        pointBorderWidth: 2,
-        pointRadius: 4,
-        pointHoverRadius: 6,
-        tension: 0.4,
-        fill: true
-      },
-      {
-        label: 'Doanh thu 2023',
-        data: [20000000, 18000000, 15000000, 19000000, 22000000, 25000000, 27000000, 24000000, 26000000, 30000000, 32000000, 35000000],
-        borderColor: '#ff9f40',
-        backgroundColor: 'rgba(255, 159, 64, 0.1)',
-        borderWidth: 2,
-        pointBackgroundColor: '#ff9f40',
-        pointBorderColor: '#fff',
-        pointBorderWidth: 2,
-        pointRadius: 4,
-        pointHoverRadius: 6,
-        tension: 0.4,
-        fill: true,
-        hidden: true
-      }
-    ]
+    labels: [],
+    datasets: [{
+      label: 'Doanh thu',
+      data: [],
+      borderColor: '#4bc0c0',
+      backgroundColor: 'rgba(75, 192, 192, 0.1)',
+      borderWidth: 2,
+      pointBackgroundColor: '#4bc0c0',
+      pointBorderColor: '#fff',
+      pointBorderWidth: 2,
+      pointRadius: 4,
+      pointHoverRadius: 6,
+      tension: 0.4,
+      fill: true
+    }]
   });
 
   const [orderData, setOrderData] = useState({
-    labels: ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'],
-    datasets: [
-      {
-        label: 'Số lượng đơn hàng',
-        data: [45, 52, 48, 70, 85, 92, 78],
-        backgroundColor: 'rgba(54, 162, 235, 0.8)',
-        borderRadius: 6
-      }
-    ]
+    labels: [],
+    datasets: [{
+      label: 'Số lượng đơn hàng',
+      data: [],
+      backgroundColor: 'rgba(54, 162, 235, 0.8)',
+      borderRadius: 6
+    }]
   });
 
   const [feedbackData, setFeedbackData] = useState({
-    labels: ['Tốt', 'Bình thường', 'Xấu'],
-    datasets: [
-      {
-        data: [stats.reviewStats.good, stats.reviewStats.normal, stats.reviewStats.bad],
-        backgroundColor: [
-          'rgba(40, 167, 69, 0.9)',
-          'rgba(255, 193, 7, 0.9)',
-          'rgba(220, 53, 69, 0.9)'
-        ],
-        borderColor: [
-          'rgba(40, 167, 69, 1)',
-          'rgba(255, 193, 7, 1)',
-          'rgba(220, 53, 69, 1)'
-        ],
-        borderWidth: 2,
-        hoverOffset: 8
-      }
-    ]
+    labels: ['Tốt (4-5 sao)', 'Bình thường (3 sao)', 'Xấu (1-2 sao)'],
+    datasets: [{
+      data: [0, 0, 0],
+      backgroundColor: ['rgba(40, 167, 69, 0.9)', 'rgba(255, 193, 7, 0.9)', 'rgba(220, 53, 69, 0.9)'],
+      borderColor: ['rgba(40, 167, 69, 1)', 'rgba(255, 193, 7, 1)', 'rgba(220, 53, 69, 1)'],
+      borderWidth: 2,
+      hoverOffset: 8
+    }]
   });
 
-  // Fetch data từ API
+  const [recentReviews, setRecentReviews] = useState([]);
+
   useEffect(() => {
     fetchStatistics();
   }, [timeRange]);
@@ -140,34 +106,109 @@ const ShopStatistics = () => {
     try {
       setLoading(true);
       
-      // Gọi API thống kê tổng quan
-      const overviewResponse = await shopApi.get('/api/v1/shop/statistics/overview');
-      setStats(prev => ({ ...prev, ...overviewResponse.data }));
+      // 1. Thống kê tổng quan
+      const overviewRes = await shopApi.get('/api/v1/shop/statistics/overview');
+      setStats(prev => ({ ...prev, ...overviewRes.data }));
 
-      // Gọi API doanh thu theo thời gian
-      const revenueResponse = await shopApi.get('/api/v1/shop/statistics/revenue', {
+      // 2. Thống kê đánh giá
+      const reviewsRes = await shopApi.get('/api/v1/shop/statistics/reviews');
+      if (reviewsRes.data) {
+        setStats(prev => ({ 
+          ...prev, 
+          averageRating: reviewsRes.data.averageRating,
+          totalReviews: reviewsRes.data.totalReviews,
+          reviewStats: reviewsRes.data.reviewStats
+        }));
+        
+        const total = reviewsRes.data.totalReviews;
+        if (total > 0) {
+          setFeedbackData({
+            ...feedbackData,
+            datasets: [{
+              ...feedbackData.datasets[0],
+              data: [
+                reviewsRes.data.reviewStats.good,
+                reviewsRes.data.reviewStats.normal,
+                reviewsRes.data.reviewStats.bad
+              ]
+            }]
+          });
+        }
+      }
+
+      // 3. Doanh thu theo thời gian
+      const revenueRes = await shopApi.get('/api/v1/shop/statistics/revenue', {
         params: { range: timeRange }
       });
-      
-      // Cập nhật dữ liệu biểu đồ
-      updateChartData(revenueResponse.data);
-      
+      updateRevenueChart(revenueRes.data);
+
+      // 4. Đơn hàng theo ngày
+      const days = timeRange === 'week' ? 7 : timeRange === 'month' ? 30 : 365;
+      const ordersRes = await shopApi.get('/api/v1/shop/statistics/orders/daily', {
+        params: { days }
+      });
+      updateOrdersChart(ordersRes.data, timeRange);
+
+      // 5. Bình luận gần đây
+      const recentRes = await shopApi.get('/api/v1/shop/statistics/recent-reviews', {
+        params: { limit: 5 }
+      });
+      setRecentReviews(recentRes.data || []);
+
     } catch (error) {
       console.error('Error fetching statistics:', error);
-      // Sử dụng dữ liệu mẫu nếu API lỗi
     } finally {
       setLoading(false);
     }
   };
 
-  const updateChartData = (data) => {
-    // Cập nhật dữ liệu biểu đồ theo response từ API
-    if (data) {
-      // Xử lý cập nhật dữ liệu
+  const updateRevenueChart = (data) => {
+    if (!data || data.length === 0) {
+      setRevenueData({ ...revenueData, labels: [], datasets: [{ ...revenueData.datasets[0], data: [] }] });
+      return;
     }
+    
+    const labels = data.map(item => {
+      if (timeRange === 'week') {
+        const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+        return dayNames[item._id - 1] || `Ngày ${item._id}`;
+      } else if (timeRange === 'month') {
+        return `Ngày ${item._id}`;
+      } else {
+        return `Tháng ${item._id}`;
+      }
+    });
+    
+    setRevenueData({
+      labels,
+      datasets: [{ ...revenueData.datasets[0], data: data.map(item => item.revenue) }]
+    });
   };
 
-  // Format functions
+  const updateOrdersChart = (data, range) => {
+    if (!data || data.length === 0) {
+      setOrderData({ ...orderData, labels: [], datasets: [{ ...orderData.datasets[0], data: [] }] });
+      return;
+    }
+    
+    const labels = data.map(item => {
+      if (range === 'week') {
+        const dayNames = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+        const day = new Date(item._id.year, item._id.month - 1, item._id.day).getDay();
+        return dayNames[day];
+      } else if (range === 'month') {
+        return `${item._id.day}/${item._id.month}`;
+      } else {
+        return `Tháng ${item._id.month}`;
+      }
+    });
+    
+    setOrderData({
+      labels,
+      datasets: [{ ...orderData.datasets[0], data: data.map(item => item.count) }]
+    });
+  };
+
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('vi-VN', {
       style: 'currency',
@@ -182,127 +223,71 @@ const ShopStatistics = () => {
   };
 
   const formatCompactNumber = (num) => {
-    if (num >= 1000000) {
-      return (num / 1000000).toFixed(1) + 'tr';
-    }
-    if (num >= 1000) {
-      return (num / 1000).toFixed(1) + 'k';
-    }
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'tr';
+    if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
     return num.toString();
   };
 
-  // Chart options
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now - date);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    if (diffDays === 0) return 'Hôm nay';
+    if (diffDays === 1) return 'Hôm qua';
+    if (diffDays < 7) return `${diffDays} ngày trước`;
+    return date.toLocaleDateString('vi-VN');
+  };
+
   const lineOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: {
-        position: 'top',
-        labels: {
-          usePointStyle: true,
-          boxWidth: 6
-        }
-      },
+      legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 6 } },
       tooltip: {
         backgroundColor: 'rgba(0,0,0,0.8)',
-        titleColor: '#fff',
-        bodyColor: '#fff',
-        padding: 10,
-        cornerRadius: 8,
-        callbacks: {
-          label: function(context) {
-            let label = context.dataset.label || '';
-            if (label) {
-              label += ': ';
-            }
-            if (context.parsed.y !== null) {
-              label += formatCurrency(context.parsed.y);
-            }
-            return label;
-          }
-        }
+        callbacks: { label: (ctx) => `Doanh thu: ${formatCurrency(ctx.parsed.y)}` }
       }
     },
     scales: {
-      y: {
-        beginAtZero: true,
-        grid: {
-          color: 'rgba(0,0,0,0.05)'
-        },
-        ticks: {
-          callback: function(value) {
-            return formatCompactNumber(value);
-          }
-        }
-      },
-      x: {
-        grid: {
-          display: false
-        }
-      }
+      y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { callback: (v) => formatCompactNumber(v) } },
+      x: { grid: { display: false } }
     }
   };
 
   const barOptions = {
     responsive: true,
     maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        display: false
-      },
-      tooltip: {
-        backgroundColor: 'rgba(0,0,0,0.8)',
-        callbacks: {
-          label: function(context) {
-            return `Số đơn: ${context.raw}`;
-          }
-        }
-      }
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        grid: {
-          color: 'rgba(0,0,0,0.05)'
-        }
-      },
-      x: {
-        grid: {
-          display: false
-        }
-      }
-    }
+    plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `Số đơn: ${ctx.raw}` } } },
+    scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { stepSize: 1 } }, x: { grid: { display: false } } }
   };
 
   const doughnutOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: {
-        display: false
-      },
-      tooltip: {
-        callbacks: {
-          label: function(context) {
-            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-            const percentage = ((context.raw / total) * 100).toFixed(1);
-            return `${context.label}: ${percentage}% (${context.raw} lượt)`;
-          }
-        }
-      }
+      legend: { position: 'bottom', labels: { font: { size: 12 } } },
+      tooltip: { callbacks: { label: (ctx) => { const total = ctx.dataset.data.reduce((a,b)=>a+b,0); const pct = total>0 ? ((ctx.raw/total)*100).toFixed(1):0; return `${ctx.label}: ${pct}% (${ctx.raw} lượt)`; } } }
     },
-    cutout: '60%',
-    layout: {
-      padding: {
-        top: 10,
-        bottom: 10
-      }
-    }
+    cutout: '60%'
   };
 
-  const handleExportReport = () => {
-    // Xử lý xuất báo cáo
-    alert('Đang xuất báo cáo...');
+  const handleExportReport = async () => {
+    try {
+      const response = await shopApi.get('/api/v1/shop/statistics/export', { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `bao_cao_thong_ke_${new Date().toISOString().split('T')[0]}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error exporting report:', error);
+      alert('Có lỗi xảy ra khi xuất báo cáo');
+    }
   };
 
   if (loading) {
@@ -316,248 +301,62 @@ const ShopStatistics = () => {
 
   return (
     <div className="shop-statistics">
-      {/* Header */}
       <div className="statistics-header">
         <h1 className="statistics-title">Bảng Điều Khiển</h1>
         <div className="header-actions">
           <div className="time-range-selector">
-            <button 
-              className={`range-btn ${timeRange === 'week' ? 'active' : ''}`}
-              onClick={() => setTimeRange('week')}
-            >
-              Tuần
-            </button>
-            <button 
-              className={`range-btn ${timeRange === 'month' ? 'active' : ''}`}
-              onClick={() => setTimeRange('month')}
-            >
-              Tháng
-            </button>
-            <button 
-              className={`range-btn ${timeRange === 'year' ? 'active' : ''}`}
-              onClick={() => setTimeRange('year')}
-            >
-              Năm
-            </button>
+            <button className={`range-btn ${timeRange === 'week' ? 'active' : ''}`} onClick={() => setTimeRange('week')}>Tuần</button>
+            <button className={`range-btn ${timeRange === 'month' ? 'active' : ''}`} onClick={() => setTimeRange('month')}>Tháng</button>
+            <button className={`range-btn ${timeRange === 'year' ? 'active' : ''}`} onClick={() => setTimeRange('year')}>Năm</button>
           </div>
-          <button className="export-btn" onClick={handleExportReport}>
-            <FaDownload /> Tải báo cáo
-          </button>
+          <button className="export-btn" onClick={handleExportReport}><FaDownload /> Tải báo cáo</button>
         </div>
       </div>
 
-      {/* Stats Cards */}
       <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-icon blue">
-            <FaUsers />
-          </div>
-          <div className="stat-content">
-            <span className="stat-label">Số lượng khách</span>
-            <span className="stat-value">{formatNumber(stats.totalCustomers)}</span>
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-icon green">
-            <FaShoppingBag />
-          </div>
-          <div className="stat-content">
-            <span className="stat-label">Tổng đơn hàng</span>
-            <span className="stat-value">{formatNumber(stats.totalOrders)}</span>
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-icon purple">
-            <FaMoneyBillWave />
-          </div>
-          <div className="stat-content">
-            <span className="stat-label">Tổng doanh thu</span>
-            <span className="stat-value">{formatCurrency(stats.totalRevenue)}</span>
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="stat-icon orange">
-            <FaExchangeAlt />
-          </div>
-          <div className="stat-content">
-            <span className="stat-label">Đối Trả hàng</span>
-            <span className="stat-value">{formatNumber(stats.totalReturns)}</span>
-          </div>
-        </div>
+        <div className="stat-card"><div className="stat-icon blue"><FaUsers /></div><div className="stat-content"><span className="stat-label">Số lượng khách</span><span className="stat-value">{formatNumber(stats.totalCustomers)}</span></div></div>
+        <div className="stat-card"><div className="stat-icon green"><FaShoppingBag /></div><div className="stat-content"><span className="stat-label">Tổng đơn hàng</span><span className="stat-value">{formatNumber(stats.totalOrders)}</span></div></div>
+        <div className="stat-card"><div className="stat-icon purple"><FaMoneyBillWave /></div><div className="stat-content"><span className="stat-label">Tổng doanh thu</span><span className="stat-value">{formatCurrency(stats.totalRevenue)}</span></div></div>
+        <div className="stat-card"><div className="stat-icon orange"><FaExchangeAlt /></div><div className="stat-content"><span className="stat-label">Đối Trả hàng</span><span className="stat-value">{formatNumber(stats.totalReturns)}</span></div></div>
       </div>
 
-      {/* Charts Section */}
       <div className="charts-section">
-        {/* Line Chart - Revenue */}
-        <div className="chart-card">
-          <div className="chart-header">
-            <h3>Doanh thu theo tháng</h3>
-            <div className="chart-legend">
-              <span className="legend-item">
-                <span className="legend-color current"></span>
-                2024
-              </span>
-              <span className="legend-item">
-                <span className="legend-color previous"></span>
-                2023
-              </span>
-            </div>
-          </div>
-          <div className="chart-body">
-            <Line data={revenueData} options={lineOptions} />
-          </div>
-        </div>
-
-        {/* Bar Chart - Orders */}
-        <div className="chart-card">
-          <div className="chart-header">
-            <h3>Số lượng đơn hàng theo ngày</h3>
-            <FaCalendarAlt className="chart-icon" />
-          </div>
-          <div className="chart-body">
-            <Bar data={orderData} options={barOptions} />
-          </div>
-        </div>
+        <div className="chart-card"><div className="chart-header"><h3>Doanh thu theo {timeRange === 'week' ? 'ngày' : timeRange === 'month' ? 'ngày' : 'tháng'}</h3><FaChartLine className="chart-icon" /></div><div className="chart-body">{revenueData.labels.length > 0 ? <Line data={revenueData} options={lineOptions} /> : <div className="no-data">Chưa có dữ liệu</div>}</div></div>
+        <div className="chart-card"><div className="chart-header"><h3>Số lượng đơn hàng theo {timeRange === 'week' ? 'ngày' : timeRange === 'month' ? 'ngày' : 'tháng'}</h3><FaCalendarAlt className="chart-icon" /></div><div className="chart-body">{orderData.labels.length > 0 ? <Bar data={orderData} options={barOptions} /> : <div className="no-data">Chưa có dữ liệu</div>}</div></div>
       </div>
 
-      {/* Bottom Section */}
       <div className="bottom-section">
-        {/* Feedback Chart */}
         <div className="feedback-card">
           <div className="feedback-header">
             <h3>Phản hồi của khách hàng</h3>
             <div className="rating-summary">
-              <div className="average-rating">
-                <FaStar className="star-icon" />
-                <span className="rating-value">{stats.averageRating}</span>
-                <span className="rating-max">/5</span>
-              </div>
-              <div className="total-reviews">
-                <FaComment className="comment-icon" />
-                <span>{formatNumber(stats.totalReviews)} lượt</span>
-              </div>
+              <div className="average-rating"><FaStar className="star-icon" /><span className="rating-value">{stats.averageRating.toFixed(1)}</span><span className="rating-max">/5</span></div>
+              <div className="total-reviews"><FaComment className="comment-icon" /><span>{formatNumber(stats.totalReviews)} lượt</span></div>
             </div>
           </div>
-
           <div className="feedback-content">
-            <div className="chart-container">
-              <Doughnut data={feedbackData} options={doughnutOptions} />
-            </div>
-
+            <div className="chart-container"><Doughnut data={feedbackData} options={doughnutOptions} /></div>
             <div className="feedback-stats">
-              <div className="feedback-item good">
-                <div className="feedback-label">
-                  <FaThumbsUp className="feedback-icon" />
-                  <span>Tốt</span>
-                </div>
-                <div className="feedback-bar">
-                  <div 
-                    className="bar-fill" 
-                    style={{ width: `${stats.reviewStats.good}%` }}
-                  ></div>
-                </div>
-                <span className="feedback-percent">{stats.reviewStats.good}%</span>
-              </div>
-
-              <div className="feedback-item normal">
-                <div className="feedback-label">
-                  <FaMeh className="feedback-icon" />
-                  <span>Bình thường</span>
-                </div>
-                <div className="feedback-bar">
-                  <div 
-                    className="bar-fill" 
-                    style={{ width: `${stats.reviewStats.normal}%` }}
-                  ></div>
-                </div>
-                <span className="feedback-percent">{stats.reviewStats.normal}%</span>
-              </div>
-
-              <div className="feedback-item bad">
-                <div className="feedback-label">
-                  <FaFrown className="feedback-icon" />
-                  <span>Xấu</span>
-                </div>
-                <div className="feedback-bar">
-                  <div 
-                    className="bar-fill" 
-                    style={{ width: `${stats.reviewStats.bad}%` }}
-                  ></div>
-                </div>
-                <span className="feedback-percent">{stats.reviewStats.bad}%</span>
-              </div>
+              <div className="feedback-item good"><div className="feedback-label"><FaThumbsUp /><span>Tốt (4-5 sao)</span></div><div className="feedback-bar"><div className="bar-fill" style={{ width: stats.totalReviews > 0 ? `${(stats.reviewStats.good / stats.totalReviews) * 100}%` : '0%' }}></div></div><span className="feedback-percent">{stats.totalReviews > 0 ? ((stats.reviewStats.good / stats.totalReviews) * 100).toFixed(1) : 0}%</span></div>
+              <div className="feedback-item normal"><div className="feedback-label"><FaMeh /><span>Bình thường (3 sao)</span></div><div className="feedback-bar"><div className="bar-fill" style={{ width: stats.totalReviews > 0 ? `${(stats.reviewStats.normal / stats.totalReviews) * 100}%` : '0%' }}></div></div><span className="feedback-percent">{stats.totalReviews > 0 ? ((stats.reviewStats.normal / stats.totalReviews) * 100).toFixed(1) : 0}%</span></div>
+              <div className="feedback-item bad"><div className="feedback-label"><FaFrown /><span>Xấu (1-2 sao)</span></div><div className="feedback-bar"><div className="bar-fill" style={{ width: stats.totalReviews > 0 ? `${(stats.reviewStats.bad / stats.totalReviews) * 100}%` : '0%' }}></div></div><span className="feedback-percent">{stats.totalReviews > 0 ? ((stats.reviewStats.bad / stats.totalReviews) * 100).toFixed(1) : 0}%</span></div>
             </div>
           </div>
         </div>
 
-        {/* Recent Comments */}
         <div className="recent-comments-card">
-          <div className="comments-header">
-            <h3>Bình luận gần đây</h3>
-            <button className="view-all">Xem tất cả</button>
-          </div>
-
+          <div className="comments-header"><h3>Bình luận gần đây</h3><button className="view-all" onClick={() => window.location.href = '/shop/reviews'}>Xem tất cả</button></div>
           <div className="comments-list">
-            <div className="comment-item">
-              <div className="comment-avatar">
-                <img src="https://ui-avatars.com/api/?name=Nguyễn+Văn+A&background=2e7d32&color=fff&size=40" alt="Avatar" />
-              </div>
-              <div className="comment-content">
-                <div className="comment-user">
-                  <span className="user-name">Nguyễn Văn A</span>
-                  <div className="comment-rating">
-                    {[1,2,3,4,5].map(star => (
-                      <FaStar key={star} className="star-filled" />
-                    ))}
-                  </div>
+            {recentReviews.length > 0 ? recentReviews.map((review, idx) => (
+              <div key={idx} className="comment-item">
+                <div className="comment-avatar"><img src={review.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(review.user_name)}&background=2e7d32&color=fff&size=40`} alt={review.user_name} /></div>
+                <div className="comment-content">
+                  <div className="comment-user"><span className="user-name">{review.user_name}</span><div className="comment-rating">{[...Array(5)].map((_, i) => <FaStar key={i} className={i < review.rating ? 'star-filled' : 'star-empty'} />)}</div></div>
+                  <p className="comment-text">{review.comment || 'Không có nội dung'}</p>
+                  <span className="comment-time">{formatDate(review.created_at)}</span>
                 </div>
-                <p className="comment-text">Sản phẩm chất lượng tốt, đóng gói cẩn thận. Giao hàng nhanh.</p>
-                <span className="comment-time">2 giờ trước</span>
               </div>
-            </div>
-
-            <div className="comment-item">
-              <div className="comment-avatar">
-                <img src="https://ui-avatars.com/api/?name=Trần+Thị+B&background=2e7d32&color=fff&size=40" alt="Avatar" />
-              </div>
-              <div className="comment-content">
-                <div className="comment-user">
-                  <span className="user-name">Trần Thị B</span>
-                  <div className="comment-rating">
-                    {[1,2,3,4].map(star => (
-                      <FaStar key={star} className="star-filled" />
-                    ))}
-                    <FaStar className="star-empty" />
-                  </div>
-                </div>
-                <p className="comment-text">Hàng đẹp, sẽ ủng hộ shop lần sau.</p>
-                <span className="comment-time">5 giờ trước</span>
-              </div>
-            </div>
-
-            <div className="comment-item">
-              <div className="comment-avatar">
-                <img src="https://ui-avatars.com/api/?name=Lê+Văn+C&background=2e7d32&color=fff&size=40" alt="Avatar" />
-              </div>
-              <div className="comment-content">
-                <div className="comment-user">
-                  <span className="user-name">Lê Văn C</span>
-                  <div className="comment-rating">
-                    {[1,2,3].map(star => (
-                      <FaStar key={star} className="star-filled" />
-                    ))}
-                    {[1,2].map(star => (
-                      <FaStar key={star} className="star-empty" />
-                    ))}
-                  </div>
-                </div>
-                <p className="comment-text">Sản phẩm ổn, giá cả hợp lý.</p>
-                <span className="comment-time">1 ngày trước</span>
-              </div>
-            </div>
+            )) : <div className="no-comments"><FaComment className="no-comment-icon" /><p>Chưa có bình luận nào</p></div>}
           </div>
         </div>
       </div>

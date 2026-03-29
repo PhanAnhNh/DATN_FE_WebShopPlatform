@@ -1,3 +1,4 @@
+// src/pages/shop/ShopHeader.jsx
 import React, { useState, useEffect } from 'react';
 import { 
   FaBars, 
@@ -8,57 +9,101 @@ import {
   FaChevronDown,
   FaCog,
   FaSignOutAlt,
-  FaUser
+  FaUser,
+  FaLeaf,
+  FaSpinner
 } from 'react-icons/fa';
 import { useNavigate, useLocation } from 'react-router-dom';
 import '../../css/ShopHeader.css';
 import NotificationBell from '../../pages/user/NotificationBell';
+import { shopApi } from '../../api/api';
 
 const ShopHeader = ({ toggleSidebar }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [userData, setUserData] = useState(null);
   const [shopInfo, setShopInfo] = useState(null);
+  const [searchFocused, setSearchFocused] = useState(false);
   
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Hàm load dữ liệu từ localStorage
+  // Hàm lấy thông tin shop từ API
+  // src/pages/shop/ShopHeader.jsx - Phần fetchShopInfo
+const fetchShopInfo = async () => {
+  try {
+    setRefreshing(true);
+    const response = await shopApi.get('/api/v1/shops/info');
+    
+    const newShopInfo = response.data;
+    setShopInfo(newShopInfo);
+    
+    // Cập nhật localStorage
+    localStorage.setItem('shop_info', JSON.stringify(newShopInfo));
+    
+    // Dispatch event để các component khác cập nhật
+    window.dispatchEvent(new CustomEvent('shopInfoUpdate', { detail: newShopInfo }));
+    
+    return newShopInfo;
+  } catch (error) {
+    console.error('Error fetching shop info:', error);
+    
+    // Nếu API lỗi 404, thử lấy từ localStorage
+    if (error.response?.status === 404) {
+      console.log('API /shop/info not found, using localStorage data');
+    }
+    
+    // Fallback sang localStorage nếu API lỗi
+    try {
+      const cached = JSON.parse(localStorage.getItem('shop_info') || '{}');
+      if (cached.name) {
+        setShopInfo(cached);
+      } else {
+        // Tạo dữ liệu mặc định từ shop_data
+        const shopData = JSON.parse(localStorage.getItem('shop_data') || '{}');
+        const defaultInfo = {
+          name: shopData.shop_name || 'Cửa hàng của tôi',
+          email: shopData.email || '',
+          phone: shopData.phone || '',
+          address: ''
+        };
+        setShopInfo(defaultInfo);
+      }
+    } catch (e) {
+      console.error('Error parsing cached shop info:', e);
+    }
+  } finally {
+    setRefreshing(false);
+  }
+};
+
   const loadUserData = () => {
     try {
       const shopData = JSON.parse(localStorage.getItem('shop_data') || '{}');
-      const shop = JSON.parse(localStorage.getItem('shop_info') || '{}');
-      console.log('Loading user data:', shopData); // Debug log
       setUserData(shopData);
-      setShopInfo(shop);
     } catch (error) {
       console.error('Error loading user data:', error);
     }
   };
 
-  // Load dữ liệu khi component mount
   useEffect(() => {
     loadUserData();
+    fetchShopInfo();
   }, []);
 
-  // Lắng nghe custom events
+  // Lắng nghe sự kiện cập nhật từ trang settings
   useEffect(() => {
-    const handleShopDataUpdate = (event) => {
-      console.log('Shop data updated:', event.detail);
-      setUserData(event.detail);
+    const handleSettingsUpdate = (event) => {
+      // Khi settings được cập nhật, reload shop info
+      fetchShopInfo();
     };
 
     const handleShopInfoUpdate = (event) => {
-      console.log('Shop info updated:', event.detail);
       setShopInfo(event.detail);
     };
 
-    // Lắng nghe custom events
-    window.addEventListener('shopDataUpdate', handleShopDataUpdate);
-    window.addEventListener('shopInfoUpdate', handleShopInfoUpdate);
-
-    // Vẫn giữ storage event cho trường hợp nhiều tab
     const handleStorageChange = (e) => {
       if (e.key === 'shop_data') {
         try {
@@ -78,43 +123,46 @@ const ShopHeader = ({ toggleSidebar }) => {
       }
     };
 
+    window.addEventListener('shopSettingsUpdate', handleSettingsUpdate);
+    window.addEventListener('shopInfoUpdate', handleShopInfoUpdate);
     window.addEventListener('storage', handleStorageChange);
 
     return () => {
-      window.removeEventListener('shopDataUpdate', handleShopDataUpdate);
+      window.removeEventListener('shopSettingsUpdate', handleSettingsUpdate);
       window.removeEventListener('shopInfoUpdate', handleShopInfoUpdate);
       window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
 
-  // Reload dữ liệu khi component được focus
   useEffect(() => {
     const handleFocus = () => {
       loadUserData();
+      fetchShopInfo();
     };
 
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
-  // Reload dữ liệu khi route thay đổi
+  // Tự động refresh khi route thay đổi
   useEffect(() => {
-    loadUserData();
+    fetchShopInfo();
   }, [location.pathname]);
 
   const user = {
     name: userData?.full_name || userData?.username || 'Chủ shop',
     email: userData?.email || '',
     avatar: userData?.avatar_url || null,
-    shopName: shopInfo?.name || 'Cửa hàng của tôi'
+    shopName: shopInfo?.name || 'Cửa hàng của tôi',
+    shopEmail: shopInfo?.email || '',
+    shopPhone: shopInfo?.phone || '',
+    shopAddress: shopInfo?.address || ''
   };
 
-  // Hàm xử lý đăng xuất
   const handleLogout = async () => {
     try {
       setLoading(true);
       
-      // Gọi API logout
       try {
         await fetch('http://localhost:8000/api/v1/shop/auth/logout', {
           method: 'POST',
@@ -126,12 +174,10 @@ const ShopHeader = ({ toggleSidebar }) => {
         console.log('Logout API error:', error);
       }
 
-      // Xóa tất cả dữ liệu shop trong localStorage
       localStorage.removeItem('shop_token');
       localStorage.removeItem('shop_data');
       localStorage.removeItem('shop_info');
       
-      // Chuyển hướng về trang đăng nhập shop
       navigate('/shop/login');
       
     } catch (error) {
@@ -141,7 +187,6 @@ const ShopHeader = ({ toggleSidebar }) => {
     }
   };
 
-  // Đóng menu khi click ra ngoài
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (!event.target.closest('.shop-header__user')) {
@@ -163,16 +208,26 @@ const ShopHeader = ({ toggleSidebar }) => {
           <FaBars />
         </button>
         <div className="shop-header__logo">
+          <div className="shop-header__logo-icon">
+            {shopInfo?.logo_url ? (
+              <img src={shopInfo.logo_url} alt={user.shopName} style={{ width: 32, height: 32, borderRadius: 8 }} />
+            ) : (
+              <FaLeaf />
+            )}
+          </div>
           <h2>{user.shopName}</h2>
+          {refreshing && <FaSpinner className="spinning-small" />}
         </div>
       </div>
 
-      <div className="shop-header__search">
+      <div className={`shop-header__search ${searchFocused ? 'focused' : ''}`}>
         <FaSearch className="shop-header__search-icon" />
         <input 
           type="text" 
           placeholder="Tìm kiếm sản phẩm, đơn hàng..." 
           className="shop-header__search-input"
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => setSearchFocused(false)}
         />
       </div>
 
@@ -183,31 +238,11 @@ const ShopHeader = ({ toggleSidebar }) => {
             <span className="shop-header__badge">3</span>
           </button>
           
-          
-              
-            
-              <span style={{ 
-                    marginLeft: "20px",
-                    cursor: "pointer", 
-                    display: "flex", 
-                    border: "1px solid #ddd", 
-                    padding: "2px", 
-                    borderRadius: "50%", 
-                    backgroundColor: "#f0f2f5",
-                    transition: "all 0.3s"
-                }}
-                onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = "#e8f5e9";
-                    e.currentTarget.style.borderColor = "#2e7d32";
-                }}
-                onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = "#e8f5e9";
-                    e.currentTarget.style.borderColor = "#ddd";
-                }}>
-              <div className="shop-header__notification">
-                <NotificationBell userType="shop" />
-              </div>
-              </span>
+          <div className="shop-header__notification-wrapper">
+            <div className="shop-header__notification">
+              <NotificationBell userType="shop" />
+            </div>
+          </div>
         </div>
 
         <div className="shop-header__user">
@@ -228,9 +263,48 @@ const ShopHeader = ({ toggleSidebar }) => {
           {showUserMenu && (
             <div className="shop-header__user-dropdown">
               <div className="shop-header__dropdown-header">
-                <p className="shop-header__dropdown-name">{user.name}</p>
-                <p className="shop-header__dropdown-email">{user.email}</p>
+                <div className="shop-header__dropdown-avatar">
+                  {user.avatar ? (
+                    <img src={user.avatar} alt={user.name} />
+                  ) : (
+                    <FaUserCircle />
+                  )}
+                </div>
+                <div className="shop-header__dropdown-info">
+                  <p className="shop-header__dropdown-name">{user.name}</p>
+                  <p className="shop-header__dropdown-email">{user.email}</p>
+                </div>
               </div>
+              
+              {/* Hiển thị thông tin shop */}
+              <div className="shop-header__dropdown-shop-info">
+                <div className="shop-info-item">
+                  <FaLeaf className="shop-info-icon" />
+                  <div>
+                    <p className="shop-info-label">Cửa hàng</p>
+                    <p className="shop-info-value">{user.shopName}</p>
+                  </div>
+                </div>
+                {user.shopEmail && (
+                  <div className="shop-info-item">
+                    <FaEnvelope className="shop-info-icon" />
+                    <div>
+                      <p className="shop-info-label">Email</p>
+                      <p className="shop-info-value">{user.shopEmail}</p>
+                    </div>
+                  </div>
+                )}
+                {user.shopPhone && (
+                  <div className="shop-info-item">
+                    <FaEnvelope className="shop-info-icon" />
+                    <div>
+                      <p className="shop-info-label">Điện thoại</p>
+                      <p className="shop-info-value">{user.shopPhone}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
               <ul className="shop-header__dropdown-menu">
                 <li onClick={() => navigate('/shop/profile')}>
                   <FaUser />
@@ -238,7 +312,7 @@ const ShopHeader = ({ toggleSidebar }) => {
                 </li>
                 <li onClick={() => navigate('/shop/settings')}>
                   <FaCog />
-                  <span>Cài đặt tài khoản</span>
+                  <span>Cài đặt hệ thống</span>
                 </li>
                 <li className="divider"></li>
                 <li 
@@ -253,6 +327,49 @@ const ShopHeader = ({ toggleSidebar }) => {
           )}
         </div>
       </div>
+
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        .spinning-small {
+          animation: spin 1s linear infinite;
+          margin-left: 8px;
+          font-size: 12px;
+          color: #2e7d32;
+        }
+        .shop-header__dropdown-shop-info {
+          padding: 12px 16px;
+          background: #f8f9fa;
+          border-bottom: 1px solid #e9ecef;
+        }
+        .shop-info-item {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-bottom: 8px;
+        }
+        .shop-info-item:last-child {
+          margin-bottom: 0;
+        }
+        .shop-info-icon {
+          color: #2e7d32;
+          font-size: 14px;
+          width: 20px;
+        }
+        .shop-info-label {
+          font-size: 11px;
+          color: #6c757d;
+          margin: 0;
+        }
+        .shop-info-value {
+          font-size: 13px;
+          color: #212529;
+          margin: 0;
+          font-weight: 500;
+        }
+      `}</style>
     </header>
   );
 };

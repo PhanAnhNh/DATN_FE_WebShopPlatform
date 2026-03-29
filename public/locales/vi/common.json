@@ -1,0 +1,26 @@
+
+{
+  "save": "Lưu",
+  "cancel": "Hủy",
+  "save_changes": "Lưu thay đổi",
+  "save_success": "Cập nhật cài đặt thành công!",
+  "save_error": "Có lỗi xảy ra khi cập nhật",
+  "loading": "Đang tải cài đặt...",
+  "retry": "Thử lại",
+  "yes": "Có",
+  "no": "Không",
+  "confirm": "Xác nhận",
+  "close": "Đóng",
+
+  "sidebar": {
+    "dashboard": "Tổng Quan",
+    "customers": "Quản Lý Khách Hàng",
+    "products": "Quản Lý Sản phẩm",
+    "vouchers": "Quản Lý Voucher",
+    "orders": "Quản Lý Đơn Hàng",
+    "revenue": "Thống Kê Doanh Thu",
+    "returns": "Quản Lý Đổi Trả",
+    "shipping": "Đơn Vị Vận Chuyển",
+    "settings": "Cài Đặt Hệ Thống"
+  }
+}

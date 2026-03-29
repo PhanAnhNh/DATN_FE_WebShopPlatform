@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ShopHeader from './ShopHeader';
 import ShopSidebarLeft from './ShopSidebarLeft';
 import '../../css/ShopLayout.css';
@@ -10,13 +10,30 @@ const ShopLayout = ({ children }) => {
     setSidebarCollapsed(!sidebarCollapsed);
   };
 
+  // Lưu trạng thái sidebar vào localStorage nếu muốn
+  useEffect(() => {
+    const savedState = localStorage.getItem('sidebarCollapsed');
+    if (savedState !== null) {
+      setSidebarCollapsed(JSON.parse(savedState));
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('sidebarCollapsed', JSON.stringify(sidebarCollapsed));
+  }, [sidebarCollapsed]);
+
   return (
     <div className="shop-layout">
       <ShopHeader toggleSidebar={toggleSidebar} />
       <div className="shop-layout__container">
-        <ShopSidebarLeft collapsed={sidebarCollapsed} />
+        <ShopSidebarLeft 
+          collapsed={sidebarCollapsed} 
+          onToggle={toggleSidebar}
+        />
         <main className={`shop-layout__content ${sidebarCollapsed ? 'expanded' : ''}`}>
-          {children}
+          <div className="shop-layout__content-inner">
+            {children}
+          </div>
         </main>
       </div>
     </div>

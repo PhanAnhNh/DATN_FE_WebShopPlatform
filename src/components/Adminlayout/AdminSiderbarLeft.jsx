@@ -2,7 +2,9 @@ import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, Users, Store, FileText, 
-  BarChart3, Settings, LogOut 
+  BarChart3, Settings, Ticket, Truck,
+  Package, ShoppingCart, ChartNoAxesCombined, 
+  Repeat, Cog, ChevronRight, MessageCircle
 } from 'lucide-react';
 
 const Sidebar = () => {
@@ -14,7 +16,7 @@ const Sidebar = () => {
     { icon: <Users size={20}/>, label: 'Quản Lý Người Dùng', path: '/admin/users' },
     { icon: <Store size={20}/>, label: 'Quản Lý Cửa Hàng', path: '/admin/stores' },
     { icon: <FileText size={20}/>, label: 'Quản Lý Bài Viết', path: '/admin/posts' },
-    { icon: <BarChart3 size={20}/>, label: 'Thống Kê', path: '/admin/statistics' },
+    { icon: <Truck size={20}/>, label: 'Thống Kê Đơn Vị Vận Chuyển', path: '/admin/shipping-units' }, // Đổi thành Truck icon và đường dẫn riêng
     { icon: <Settings size={20}/>, label: 'Cài Đặt Hệ Thống', path: '/admin/settings' },
   ];
 
@@ -46,7 +48,6 @@ const Sidebar = () => {
           </div>
         ))}
       </nav>
-      
     </div>
   );
 };

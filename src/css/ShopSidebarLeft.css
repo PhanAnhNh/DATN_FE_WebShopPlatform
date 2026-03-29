@@ -1,41 +1,157 @@
+/* Base styles với gradient xanh lá */
 .shop-sidebar {
   position: fixed;
   left: 0;
   top: 70px;
   bottom: 0;
   width: 280px;
-  background: white;
-  box-shadow: 2px 0 10px rgba(0,0,0,0.1);
-  transition: width 0.3s ease;
-  z-index: 900;
+  background: linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%);
+  box-shadow: 4px 0 24px rgba(34, 197, 94, 0.08);
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 999;
   overflow-y: auto;
   overflow-x: hidden;
-}
-
-/* Custom scrollbar cho sidebar */
-.shop-sidebar::-webkit-scrollbar {
-  width: 4px;
-}
-
-.shop-sidebar::-webkit-scrollbar-track {
-  background: #f1f1f1;
-}
-
-.shop-sidebar::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 2px;
+  display: flex;
+  flex-direction: column;
+  border-right: 2px solid rgba(34, 197, 94, 0.15);
 }
 
 .shop-sidebar.collapsed {
   width: 80px;
 }
 
-.shop-sidebar__shop-info {
-  padding: 24px 16px;
-  border-bottom: 1px solid #e0e0e0;
+.shop-sidebar.expanding {
+  width: 280px;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Custom scrollbar màu xanh */
+.shop-sidebar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.shop-sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.shop-sidebar::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #4ade80 0%, #22c55e 100%);
+  border-radius: 4px;
+}
+
+.shop-sidebar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #22c55e 0%, #15803d 100%);
+}
+
+/* Header */
+.shop-sidebar__header {
+  padding: 20px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 2px solid rgba(34, 197, 94, 0.15);
+  position: relative;
+  margin-bottom: 8px;
+}
+
+.shop-sidebar.collapsed .shop-sidebar__header {
+  justify-content: center;
+  padding: 20px 0;
+}
+
+.shop-sidebar.expanding .shop-sidebar__header {
+  justify-content: space-between;
+  padding: 20px 20px;
+}
+
+.shop-sidebar__logo {
   display: flex;
   align-items: center;
   gap: 12px;
+  font-weight: 700;
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+.shop-sidebar.collapsed:not(.expanding) .shop-sidebar__logo {
+  display: none;
+}
+
+.shop-sidebar__logo-icon-wrapper {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #22c55e 0%, #15803d 100%);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+  animation: pulse-green 2s infinite;
+}
+
+@keyframes pulse-green {
+  0%, 100% {
+    box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+  }
+  50% {
+    box-shadow: 0 4px 20px rgba(34, 197, 94, 0.5);
+  }
+}
+
+.shop-sidebar__logo-icon {
+  color: white;
+  font-size: 1.2rem;
+}
+
+.shop-sidebar__logo-text {
+  font-size: 1.2rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #22c55e 0%, #15803d 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.5px;
+}
+
+.shop-sidebar__toggle-btn {
+  background: white;
+  border: 2px solid rgba(34, 197, 94, 0.3);
+  border-radius: 12px;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s;
+  color: #22c55e;
+  flex-shrink: 0;
+}
+
+.shop-sidebar__toggle-btn:hover {
+  background: linear-gradient(135deg, #22c55e 0%, #15803d 100%);
+  border-color: transparent;
+  color: white;
+  transform: scale(1.05) rotate(90deg);
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+}
+
+.shop-sidebar.collapsed .shop-sidebar__toggle-btn {
+  margin: 0 auto;
+}
+
+.shop-sidebar.expanding .shop-sidebar__toggle-btn {
+  margin: 0;
+}
+
+/* Shop Info */
+.shop-sidebar__shop-info {
+  padding: 24px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 2px solid rgba(34, 197, 94, 0.15);
+  position: relative;
 }
 
 .shop-sidebar.collapsed .shop-sidebar__shop-info {
@@ -43,40 +159,113 @@
   padding: 20px 0;
 }
 
-.shop-sidebar__shop-avatar {
+.shop-sidebar.expanding .shop-sidebar__shop-info {
+  justify-content: flex-start;
+  padding: 24px 20px;
+}
+
+.shop-sidebar__shop-avatar-wrapper {
+  position: relative;
   flex-shrink: 0;
 }
 
-.shop-sidebar__shop-avatar img {
-  width: 50px;
-  height: 50px;
-  border-radius: 12px;
+.shop-sidebar__shop-avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 20px;
   object-fit: cover;
+  border: 3px solid #22c55e;
+  box-shadow: 0 6px 14px rgba(34, 197, 94, 0.2);
+  transition: all 0.3s;
+}
+
+.shop-sidebar.collapsed .shop-sidebar__shop-avatar {
+  width: 48px;
+  height: 48px;
+}
+
+.shop-sidebar__shop-avatar:hover {
+  transform: scale(1.05) rotate(5deg);
+  box-shadow: 0 8px 20px rgba(34, 197, 94, 0.3);
+}
+
+.shop-sidebar__shop-status-badge {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  background: white;
+  border-radius: 50%;
+  padding: 2px;
+}
+
+.status-dot {
+  display: block;
+  width: 12px;
+  height: 12px;
+  background: #22c55e;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 6px rgba(34, 197, 94, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+  }
 }
 
 .shop-sidebar__shop-details {
+  flex: 1;
   overflow: hidden;
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+.shop-sidebar.collapsed:not(.expanding) .shop-sidebar__shop-details {
+  display: none;
 }
 
 .shop-sidebar__shop-details h3 {
-  margin: 0 0 4px;
+  margin: 0 0 8px;
   font-size: 1rem;
-  color: #2c3e50;
+  font-weight: 600;
+  color: #166534;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.shop-sidebar__shop-details p {
-  margin: 0;
-  font-size: 0.8rem;
-  color: #27ae60;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.shop-sidebar__shop-stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
+.shop-sidebar__shop-rating,
+.shop-sidebar__shop-orders {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  color: #15803d;
+}
+
+.shop-sidebar__shop-rating span,
+.shop-sidebar__shop-orders span {
+  font-weight: 600;
+}
+
+/* Navigation */
 .shop-sidebar__nav {
+  flex: 1;
   padding: 20px 0;
 }
 
@@ -87,109 +276,348 @@
 }
 
 .shop-sidebar__menu-item {
-  margin-bottom: 2px;
+  margin: 6px 12px;
+  position: relative;
 }
 
-.shop-sidebar__menu-item a {
+.shop-sidebar__menu-link {
   display: flex;
   align-items: center;
-  padding: 12px 20px;
-  color: #7f8c8d;
+  padding: 12px 16px;
+  color: #166534;
   text-decoration: none;
-  transition: all 0.3s;
+  border-radius: 16px;
+  transition: all 0.3s ease;
   position: relative;
   white-space: nowrap;
+  gap: 12px;
+  background: transparent;
+  border: 1px solid transparent;
 }
 
-.shop-sidebar.collapsed .shop-sidebar__menu-item a {
+.shop-sidebar.collapsed .shop-sidebar__menu-link {
   justify-content: center;
-  padding: 15px 0;
+  padding: 12px;
 }
 
-.shop-sidebar__menu-item a:hover {
-  background: #f0f7ff;
-  color: #3498db;
+.shop-sidebar.expanding .shop-sidebar__menu-link {
+  justify-content: flex-start;
+  padding: 12px 16px;
 }
 
-.shop-sidebar__menu-item a.active {
-  background: #3498db;
+.shop-sidebar__menu-link:hover {
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(21, 128, 61, 0.1) 100%);
+  color: #15803d;
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.shop-sidebar.collapsed .shop-sidebar__menu-link:hover {
+  transform: scale(1.05);
+}
+
+.shop-sidebar.expanding .shop-sidebar__menu-link:hover {
+  transform: translateX(4px);
+}
+
+.shop-sidebar__menu-link.active {
+  background: linear-gradient(135deg, #22c55e 0%, #15803d 100%);
   color: white;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+  border-color: transparent;
 }
 
-.shop-sidebar__menu-item a.active::before {
+.shop-sidebar__menu-link.active .shop-sidebar__menu-icon {
+  animation: bounce 0.5s ease;
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+.shop-sidebar__menu-link.active::before {
   content: '';
   position: absolute;
   left: 0;
-  top: 0;
-  bottom: 0;
+  top: 50%;
+  transform: translateY(-50%);
   width: 4px;
-  background: #2980b9;
+  height: 70%;
+  background: white;
+  border-radius: 0 4px 4px 0;
+  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.5);
 }
 
 .shop-sidebar__menu-icon {
   font-size: 1.2rem;
-  margin-right: 12px;
   flex-shrink: 0;
+  width: 24px;
+  text-align: center;
+  transition: transform 0.3s;
 }
 
-.shop-sidebar.collapsed .shop-sidebar__menu-icon {
-  margin-right: 0;
+.shop-sidebar__menu-link:hover .shop-sidebar__menu-icon {
+  transform: scale(1.1);
 }
 
 .shop-sidebar__menu-title {
   flex: 1;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
+  opacity: 1;
+  transition: opacity 0.2s ease;
 }
 
-.shop-sidebar__menu-arrow {
-  font-size: 0.8rem;
-  opacity: 0.5;
-  flex-shrink: 0;
-  margin-left: 8px;
-}
-
-.shop-sidebar.collapsed .shop-sidebar__menu-title,
-.shop-sidebar.collapsed .shop-sidebar__menu-arrow {
+.shop-sidebar.collapsed:not(.expanding) .shop-sidebar__menu-title {
   display: none;
 }
 
+.shop-sidebar__menu-arrow {
+  opacity: 0;
+  transition: all 0.3s;
+  flex-shrink: 0;
+  color: #15803d;
+}
+
+.shop-sidebar__menu-link:hover .shop-sidebar__menu-arrow {
+  opacity: 1;
+  transform: translateX(4px);
+}
+
+.shop-sidebar__menu-link.active .shop-sidebar__menu-arrow {
+  opacity: 1;
+  color: white;
+}
+
+/* Tooltip */
+.shop-sidebar__tooltip {
+  position: fixed;
+  left: 96px;
+  background: linear-gradient(135deg, #15803d 0%, #166534 100%);
+  color: white;
+  padding: 8px 14px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+  z-index: 1001;
+  pointer-events: none;
+  animation: slideIn 0.2s ease;
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.shop-sidebar__tooltip::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-width: 6px 8px 6px 0;
+  border-style: solid;
+  border-color: transparent #15803d transparent transparent;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-15px) translateY(-50%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) translateY(-50%);
+  }
+}
+
+/* Footer */
 .shop-sidebar__footer {
   padding: 20px;
-  border-top: 1px solid #e0e0e0;
+  border-top: 2px solid rgba(34, 197, 94, 0.15);
   margin-top: auto;
 }
 
-.shop-sidebar__upgrade {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 16px;
-  border-radius: 12px;
-  color: white;
-  text-align: center;
+.shop-sidebar.collapsed .shop-sidebar__footer {
+  padding: 20px 0;
+  display: flex;
+  justify-content: center;
 }
 
-.shop-sidebar__upgrade p {
-  margin: 0 0 12px;
-  font-size: 0.9rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.shop-sidebar.expanding .shop-sidebar__footer {
+  padding: 20px;
+  display: block;
 }
 
-.shop-sidebar__upgrade button {
-  background: white;
-  border: none;
-  padding: 6px 20px;
+.shop-sidebar__upgrade-card {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
   border-radius: 20px;
-  color: #764ba2;
+  padding: 12px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 2px solid rgba(34, 197, 94, 0.3);
+  transition: all 0.3s;
+  cursor: pointer;
+}
+
+.shop-sidebar.collapsed:not(.expanding) .shop-sidebar__upgrade-card {
+  display: none;
+}
+
+.shop-sidebar__upgrade-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(34, 197, 94, 0.2);
+  border-color: #22c55e;
+}
+
+.shop-sidebar__upgrade-icon {
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.1rem;
+  animation: rotate 3s linear infinite;
+}
+
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.shop-sidebar__upgrade-content {
+  flex: 1;
+}
+
+.shop-sidebar__upgrade-content p {
+  margin: 0 0 2px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #15803d;
+}
+
+.shop-sidebar__upgrade-content span {
+  font-size: 0.65rem;
+  color: #166534;
+  font-weight: 500;
+}
+
+.shop-sidebar__upgrade-btn {
+  background: linear-gradient(135deg, #22c55e 0%, #15803d 100%);
+  border: none;
+  padding: 6px 14px;
+  border-radius: 20px;
+  color: white;
+  font-size: 0.7rem;
   font-weight: 600;
   cursor: pointer;
-  transition: transform 0.3s;
-  width: 100%;
-  max-width: 100px;
+  transition: all 0.3s;
 }
 
-.shop-sidebar__upgrade button:hover {
+.shop-sidebar__upgrade-btn:hover {
   transform: scale(1.05);
+  box-shadow: 0 2px 10px rgba(34, 197, 94, 0.5);
+}
+
+.shop-sidebar__logout-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px;
+  background: transparent;
+  border: 2px solid rgba(239, 68, 68, 0.3);
+  border-radius: 16px;
+  color: #ef4444;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.shop-sidebar.collapsed .shop-sidebar__logout-btn {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 14px;
+}
+
+.shop-sidebar.expanding .shop-sidebar__logout-btn {
+  width: 100%;
+  padding: 12px;
+  border-radius: 16px;
+}
+
+.shop-sidebar__logout-btn:hover {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.1) 100%);
+  border-color: #ef4444;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+}
+
+.shop-sidebar__logout-icon {
+  font-size: 1.2rem;
+}
+
+/* Hiệu ứng hover tổng thể */
+.shop-sidebar__menu-item {
+  position: relative;
+  overflow: hidden;
+}
+
+.shop-sidebar__menu-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(34, 197, 94, 0.1), transparent);
+  transition: left 0.5s;
+  pointer-events: none;
+}
+
+.shop-sidebar__menu-item:hover::before {
+  left: 100%;
+}
+
+/* Container cho submenu */
+.shop-sidebar__submenu-list {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Thụt lề cho các nút voucher để phân biệt với menu cha */
+.shop-sidebar__submenu-item {
+  margin-left: 24px !important; /* Đẩy sang phải để tạo cấp bậc */
+  margin-right: 12px !important;
+}
+
+/* Tinh chỉnh kích thước icon cho submenu nếu muốn nhỏ hơn một chút */
+.shop-sidebar__submenu-item .shop-sidebar__menu-icon {
+  font-size: 1.1rem;
+}
+
+/* Hiệu ứng Hover và Active đã tự động kế thừa từ .shop-sidebar__menu-link */
+/* Nếu bạn muốn nút con khi active có màu nhẹ hơn menu chính (tùy chọn) */
+.shop-sidebar__submenu-item .shop-sidebar__menu-link.active {
+  background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%); /* Màu xanh sáng hơn một chút */
+  transform: translateX(4px);
 }

@@ -24,7 +24,7 @@ import {
   FaShoppingBag,
   FaStar,
   FaRegStar,
-  FaDownload
+  FaUndo  // Thêm FaUndo
 } from 'react-icons/fa';
 import api from '../../api/api';
 import '../../css/Orders.css';
@@ -63,6 +63,18 @@ const Orders = () => {
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
+
+  // Return modal states
+  const [showReturnModal, setShowReturnModal] = useState(false);
+  const [selectedOrderForReturn, setSelectedOrderForReturn] = useState(null); // Thay đổi: lưu order cụ thể
+  const [returnItems, setReturnItems] = useState([]);
+  const [returnReason, setReturnReason] = useState('');
+  const [returnNote, setReturnNote] = useState('');
+  const [returnImages, setReturnImages] = useState([]);
+  const [submittingReturn, setSubmittingReturn] = useState(false);
+  const [bankInfo, setBankInfo] = useState({ name: '', account: '', holder: '' });
+  const [hasReturnRequest, setHasReturnRequest] = useState({}); 
+   const [cancelling, setCancelling] = useState(false);
 
   // Status configurations
   const statusConfig = {
@@ -112,6 +124,43 @@ const Orders = () => {
     }
   };
 
+  // Kiểm tra có thể yêu cầu hoàn trả không
+  const canRequestReturn = (order) => {
+  if (!order) return false;
+  
+  if (order.status !== 'completed') return false;
+  
+  // Kiểm tra ngày hoàn thành
+  const completedDate = new Date(order.completed_at || order.created_at);
+  const daysDiff = Math.floor((new Date() - completedDate) / (1000 * 60 * 60 * 24));
+  if (daysDiff > 7) return false;
+  
+  // Kiểm tra đã có yêu cầu hoàn trả chưa
+  if (hasReturnRequest[order._id] === true) return false;
+  
+  return true;
+};
+
+  // Kiểm tra đã có yêu cầu hoàn trả chưa
+const checkReturnRequest = async (orderId) => {
+  try {
+    const response = await api.get(`/api/v1/returns/my?order_id=${orderId}`);
+    const returns = response.data.data || [];
+    
+    // Kiểm tra xem có yêu cầu nào đang pending, approved, hoặc completed không
+    const hasActiveReturn = returns.some(ret => 
+      ret.status === 'pending' || 
+      ret.status === 'approved' || 
+      ret.status === 'completed'
+    );
+    
+    setHasReturnRequest(prev => ({ ...prev, [orderId]: hasActiveReturn }));
+  } catch (error) {
+    console.error('Error checking return request:', error);
+    setHasReturnRequest(prev => ({ ...prev, [orderId]: false }));
+  }
+};
+
   // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -130,67 +179,79 @@ const Orders = () => {
     fetchStats();
   }, []);
 
-  // src/pages/Orders.jsx - Cập nhật phần fetchOrders
-const fetchOrders = async () => {
-  try {
-    setLoading(true);
-    const response = await api.get('/api/v1/orders/my', {
-      params: {
-        page: pagination.page,
-        limit: pagination.limit,
-        search: debouncedSearch || undefined,
-        status: selectedStatus || undefined,
-        from_date: fromDate || undefined,
-        to_date: toDate || undefined
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/api/v1/orders/my', {
+        params: {
+          page: pagination.page,
+          limit: pagination.limit,
+          search: debouncedSearch || undefined,
+          status: selectedStatus || undefined,
+          from_date: fromDate || undefined,
+          to_date: toDate || undefined
+        }
+      });
+      
+      console.log('Orders response:', response.data);
+      
+      let ordersData = [];
+      let paginationData = pagination;
+      
+      if (response.data.data) {
+        ordersData = response.data.data;
+        paginationData = response.data.pagination;
+      } else if (Array.isArray(response.data)) {
+        ordersData = response.data;
+        paginationData = {
+          page: 1,
+          limit: 10,
+          total: response.data.length,
+          total_pages: Math.ceil(response.data.length / 10)
+        };
+      } else {
+        ordersData = [];
       }
-    });
-    
-    console.log('Orders response:', response.data); // Debug để xem cấu trúc dữ liệu
-    
-    // Xử lý dữ liệu từ API
-    let ordersData = [];
-    let paginationData = pagination;
-    
-    if (response.data.data) {
-      ordersData = response.data.data;
-      paginationData = response.data.pagination;
-    } else if (Array.isArray(response.data)) {
-      ordersData = response.data;
-      paginationData = {
-        page: 1,
-        limit: 10,
-        total: response.data.length,
-        total_pages: Math.ceil(response.data.length / 10)
-      };
-    } else {
-      ordersData = [];
-    }
-    
-    // Đảm bảo mỗi order có đầy đủ các trường cần thiết
+      
+      // src/pages/Orders.jsx - Trong fetchOrders
     const processedOrders = ordersData.map(order => ({
-      ...order,
-      // Đảm bảo total_price có giá trị
-      total_price: order.total_amount || order.total_price || 0,
-      // Đảm bảo items là mảng
-      items: order.items || []
+        ...order,
+        total_price: order.total_amount || order.total_price || 0,
+        items: order.items.map(item => ({
+            ...item,
+            _id: item._id || `item_${Math.random()}`, // Đảm bảo có _id
+            product_id: item.product_id,
+            product_name: item.product_name,
+            price: item.price,
+            quantity: item.quantity
+        }))
     }));
-    
-    setOrders(processedOrders);
-    setPagination(paginationData);
-  } catch (error) {
-    console.error('Error fetching orders:', error);
-    
-    if (error.response?.status === 401) {
-      navigate('/login');
-      return;
+
+console.log('Processed orders with items:', processedOrders);
+      
+      setOrders(processedOrders);
+      setPagination(paginationData);
+      
+      // Kiểm tra trạng thái hoàn trả cho từng order đã hoàn thành
+      processedOrders.forEach(order => {
+        if (order.status === 'completed') {
+          checkReturnRequest(order._id);
+        }
+      });
+      
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      
+      if (error.response?.status === 401) {
+        navigate('/login');
+        return;
+      }
+      
+      setOrders(mockOrders);
+    } finally {
+      setLoading(false);
     }
-    
-    // Dữ liệu mẫu
-    setOrders(mockOrders);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const fetchStats = async () => {
     try {
@@ -198,7 +259,6 @@ const fetchOrders = async () => {
       setStats(response.data);
     } catch (error) {
       console.error('Error fetching stats:', error);
-      // Dữ liệu mẫu
       setStats({
         total: 15,
         pending: 3,
@@ -210,35 +270,158 @@ const fetchOrders = async () => {
     }
   };
 
-  // Dữ liệu mẫu
-  const mockOrders = [
-    {
-      _id: '1',
-      order_id: 'ORD001',
-      customer_name: 'Nguyễn Văn A',
-      total_price: 250000,
-      status: 'pending',
-      payment_status: 'unpaid',
-      payment_method: 'cod',
-      created_at: new Date().toISOString(),
-      items: [
-        { product_name: 'Dừa xiêm', price: 11000, quantity: 2, variant_name: 'Trái' }
-      ]
-    },
-    {
-      _id: '2',
-      order_id: 'ORD002',
-      customer_name: 'Nguyễn Văn A',
-      total_price: 180000,
-      status: 'completed',
-      payment_status: 'paid',
-      payment_method: 'bank',
-      created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-      items: [
-        { product_name: 'Bơ tươi', price: 10000, quantity: 3, variant_name: '1kg' }
-      ]
+// src/pages/Orders.jsx - Sửa handleReturnRequest
+const handleReturnRequest = async () => {
+    if (!selectedOrderForReturn) return;
+    
+    // Kiểm tra chọn ít nhất 1 sản phẩm
+    const selectedItems = returnItems.filter(item => item.selected);
+    if (selectedItems.length === 0) {
+        alert('Vui lòng chọn ít nhất 1 sản phẩm để yêu cầu hoàn trả');
+        return;
     }
-  ];
+    
+    if (!returnReason) {
+        alert('Vui lòng chọn lý do hoàn trả');
+        return;
+    }
+    
+    try {
+        setSubmittingReturn(true);
+        
+        // Debug: In ra dữ liệu trước khi gửi
+        console.log('=== SENDING RETURN REQUEST ===');
+        console.log('Selected Order:', selectedOrderForReturn);
+        console.log('Selected Order ID:', selectedOrderForReturn._id);
+        console.log('Selected Items:', selectedItems);
+        
+        // Đảm bảo các trường có giá trị đúng
+        const returnData = {
+            order_id: selectedOrderForReturn._id,
+            items: selectedItems.map(item => ({
+                order_item_id: String(item.order_item_id), // Đảm bảo là string
+                product_id: String(item.product_id), // Đảm bảo là string
+                product_name: String(item.product_name),
+                variant_id: item.variant_id ? String(item.variant_id) : null,
+                variant_name: item.variant_name || null,
+                quantity: Number(item.quantity), // Đảm bảo là number
+                price: Number(item.price), // Đảm bảo là number
+                reason: String(returnReason), // Đảm bảo là string
+                reason_note: returnNote || null,
+                images: Array.isArray(returnImages) ? returnImages : [] // Đảm bảo là array
+            })),
+            notes: returnNote || null,
+            bank_name: bankInfo.name || null,
+            bank_account: bankInfo.account || null,
+            bank_holder: bankInfo.holder || null
+        };
+        
+        console.log('Return Data:', JSON.stringify(returnData, null, 2));
+        
+        const response = await api.post('/api/v1/returns/request', returnData);
+        console.log('Response:', response.data);
+        
+        alert('Yêu cầu hoàn trả đã được gửi. Vui lòng chờ shop xử lý.');
+        setShowReturnModal(false);
+        setSelectedOrderForReturn(null);
+        setReturnItems([]);
+        setReturnReason('');
+        setReturnNote('');
+        setReturnImages([]);
+        setBankInfo({ name: '', account: '', holder: '' });
+        
+        // Cập nhật lại trạng thái
+        if (selectedOrderForReturn) {
+            await checkReturnRequest(selectedOrderForReturn._id);
+        }
+        
+    } catch (error) {
+        console.error('Error creating return request:', error);
+        if (error.response) {
+            console.error('Response data:', error.response.data);
+            console.error('Response status:', error.response.status);
+            
+            // Hiển thị chi tiết lỗi validation
+            if (error.response.data?.detail) {
+                const details = error.response.data.detail;
+                if (Array.isArray(details)) {
+                    const errorMessages = details.map(err => {
+                        if (err.loc) {
+                            const field = err.loc.slice(1).join('.');
+                            return `${field}: ${err.msg}`;
+                        }
+                        return err.msg;
+                    }).join('\n');
+                    alert(`Lỗi dữ liệu:\n${errorMessages}`);
+                } else {
+                    alert(details);
+                }
+            } else {
+                alert('Có lỗi xảy ra, vui lòng thử lại sau');
+            }
+        } else {
+            alert('Có lỗi xảy ra, vui lòng thử lại sau');
+        }
+    } finally {
+        setSubmittingReturn(false);
+    }
+};
+
+const handleCancelOrder = async (orderId) => {
+  if (!window.confirm('Bạn có chắc chắn muốn hủy đơn hàng này?')) return;
+  
+  try {
+    setCancelling(true);
+    await api.post(`/api/v1/orders/${orderId}/cancel`);
+    alert('Đơn hàng đã được hủy thành công!');
+    fetchOrders(); // Refresh danh sách
+    fetchStats(); // Refresh thống kê
+  } catch (error) {
+    console.error('Error cancelling order:', error);
+    alert(error.response?.data?.detail || 'Không thể hủy đơn hàng này');
+  } finally {
+    setCancelling(false);
+  }
+};
+
+
+// src/pages/Orders.jsx
+const openReturnModal = (order) => {
+    console.log('Opening return modal for order:', order);
+    console.log('Order items:', order.items);
+    
+    setSelectedOrderForReturn(order);
+    // Khởi tạo returnItems với các sản phẩm chưa được chọn
+    const initialItems = order.items.map((item, index) => {
+        // Đảm bảo có order_item_id
+        const orderItemId = item._id || item.id || `item_${index}`;
+        console.log(`Item ${index}:`, { 
+            original: item, 
+            orderItemId,
+            product_id: item.product_id,
+            product_name: item.product_name
+        });
+        
+        return {
+            order_item_id: String(orderItemId),
+            product_id: String(item.product_id),
+            product_name: String(item.product_name),
+            variant_id: item.variant_id ? String(item.variant_id) : null,
+            variant_name: item.variant_name || null,
+            quantity: Number(item.quantity),
+            price: Number(item.price),
+            selected: false
+        };
+    });
+    
+    setReturnItems(initialItems);
+    setReturnReason('');
+    setReturnNote('');
+    setReturnImages([]);
+    setBankInfo({ name: '', account: '', holder: '' });
+    setShowReturnModal(true);
+};
+
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -318,7 +501,6 @@ const fetchOrders = async () => {
     
     try {
       setSubmittingReview(true);
-      // Gọi API đánh giá
       await api.post('/api/v1/reviews', {
         order_id: selectedOrderForReview._id,
         rating: reviewRating,
@@ -538,6 +720,8 @@ const fetchOrders = async () => {
                         <Link to={`/orders/${order._id}`} className="action-btn view">
                           <FaEye /> Xem chi tiết
                         </Link>
+                        
+                        {/* Nút đánh giá - chỉ hiện khi đã giao */}
                         {order.status === 'completed' && (
                           <button 
                             className="action-btn review"
@@ -546,13 +730,43 @@ const fetchOrders = async () => {
                             <FaStar /> Đánh giá
                           </button>
                         )}
-                        {order.status !== 'cancelled' && order.status !== 'completed' && (
+                        
+                        {/* Nút đặt lại - không hiện khi đã hủy */}
+                        {order.status !== 'cancelled' && (
                           <button 
                             className="action-btn reorder"
                             onClick={() => handleReorder(order)}
                           >
                             <FaShoppingBag /> Đặt lại
                           </button>
+                        )}
+                        
+                        {/* Nút hủy đơn - chỉ hiện khi đơn hàng đang chờ xử lý hoặc đã thanh toán */}
+                        {(order.status === 'pending' || order.status === 'paid') && (
+                          <button 
+                            className="action-btn cancel"
+                            onClick={() => handleCancelOrder(order._id)}
+                            disabled={cancelling}
+                          >
+                            <FaBan /> Hủy đơn
+                          </button>
+                        )}
+                        
+                        {/* Nút yêu cầu hoàn trả - chỉ hiện khi đủ điều kiện */}
+                        {canRequestReturn(order) && (
+                          <button 
+                            className="action-btn return"
+                            onClick={() => openReturnModal(order)}
+                          >
+                            <FaUndo /> Yêu cầu hoàn trả
+                          </button>
+                        )}
+                        
+                        {/* Link xem yêu cầu hoàn trả - chỉ hiện khi đã có yêu cầu */}
+                        {hasReturnRequest[order._id] && (
+                          <Link to={`/returns/${order._id}`} className="action-btn view-return">
+                            <FaEye /> Xem hoàn trả
+                          </Link>
                         )}
                       </div>
                     </div>
@@ -674,6 +888,159 @@ const fetchOrders = async () => {
                 disabled={submittingReview}
               >
                 {submittingReview ? <FaSpinner className="spinning" /> : 'Gửi đánh giá'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Return Modal */}
+      {showReturnModal && selectedOrderForReturn && (
+        <div className="modal-overlay" onClick={() => setShowReturnModal(false)}>
+          <div className="modal-content return-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Yêu cầu hoàn trả</h2>
+              <button className="close-btn" onClick={() => setShowReturnModal(false)}>
+                <FaTimes />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="return-items-selection">
+                <h4>Chọn sản phẩm muốn trả</h4>
+                {selectedOrderForReturn.items.map((item, idx) => (
+                  <div key={idx} className="return-item-select">
+                    <input
+                      type="checkbox"
+                      checked={returnItems.find(i => i.order_item_id === (item._id || item.id))?.selected || false}
+                      onChange={(e) => {
+                        const newItems = [...returnItems];
+                        const existingIndex = newItems.findIndex(i => i.order_item_id === (item._id || item.id));
+                        if (existingIndex !== -1) {
+                          newItems[existingIndex].selected = e.target.checked;
+                        } else {
+                          newItems.push({
+                            order_item_id: item._id || item.id,
+                            product_id: item.product_id,
+                            product_name: item.product_name,
+                            variant_id: item.variant_id,
+                            variant_name: item.variant_name,
+                            quantity: item.quantity,
+                            price: item.price,
+                            selected: e.target.checked
+                          });
+                        }
+                        setReturnItems(newItems);
+                      }}
+                    />
+                    <div className="item-info">
+                      <div className="item-name">{item.product_name}</div>
+                      {item.variant_name && (
+                        <div className="item-variant">Đơn vị: {item.variant_name}</div>
+                      )}
+                      <div className="item-price">
+                        {formatCurrency(item.price)} x {item.quantity}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="return-reason-section">
+                <label>Lý do hoàn trả</label>
+                <select 
+                  value={returnReason} 
+                  onChange={(e) => setReturnReason(e.target.value)}
+                >
+                  <option value="">Chọn lý do</option>
+                  <option value="wrong_product">Sai sản phẩm</option>
+                  <option value="damaged">Sản phẩm hư hỏng</option>
+                  <option value="expired">Sản phẩm hết hạn</option>
+                  <option value="quality">Chất lượng kém</option>
+                  <option value="change_mind">Đổi ý</option>
+                  <option value="other">Lý do khác</option>
+                </select>
+              </div>
+
+              <div className="return-note-section">
+                <label>Ghi chú thêm</label>
+                <textarea
+                  rows="3"
+                  placeholder="Mô tả chi tiết vấn đề..."
+                  value={returnNote}
+                  onChange={(e) => setReturnNote(e.target.value)}
+                />
+              </div>
+
+              <div className="return-images-section">
+                <label>Hình ảnh chứng minh</label>
+                <div className="image-upload-area">
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={async (e) => {
+                      const files = Array.from(e.target.files);
+                      const uploadedUrls = [];
+                      for (const file of files) {
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        try {
+                          const response = await api.post('/api/v1/returns/upload-image', formData, {
+                            headers: { 'Content-Type': 'multipart/form-data' }
+                          });
+                          uploadedUrls.push(response.data.url);
+                        } catch (err) {
+                          console.error('Error uploading image:', err);
+                        }
+                      }
+                      setReturnImages([...returnImages, ...uploadedUrls]);
+                    }}
+                  />
+                  <div className="image-preview">
+                    {returnImages.map((url, idx) => (
+                      <div key={idx} className="preview-item">
+                        <img src={url} alt={`preview-${idx}`} />
+                        <button onClick={() => setReturnImages(returnImages.filter((_, i) => i !== idx))}>
+                          <FaTimes />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="bank-info-section">
+                <h4>Thông tin nhận hoàn tiền</h4>
+                <input
+                  type="text"
+                  placeholder="Tên ngân hàng"
+                  value={bankInfo.name}
+                  onChange={(e) => setBankInfo({ ...bankInfo, name: e.target.value })}
+                />
+                <input
+                  type="text"
+                  placeholder="Số tài khoản"
+                  value={bankInfo.account}
+                  onChange={(e) => setBankInfo({ ...bankInfo, account: e.target.value })}
+                />
+                <input
+                  type="text"
+                  placeholder="Tên chủ tài khoản"
+                  value={bankInfo.holder}
+                  onChange={(e) => setBankInfo({ ...bankInfo, holder: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="cancel-btn" onClick={() => setShowReturnModal(false)}>
+                Hủy
+              </button>
+              <button 
+                className="submit-btn" 
+                onClick={handleReturnRequest}
+                disabled={submittingReturn}
+              >
+                {submittingReturn ? <FaSpinner className="spinning" /> : 'Gửi yêu cầu'}
               </button>
             </div>
           </div>

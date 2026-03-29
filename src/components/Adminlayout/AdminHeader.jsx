@@ -51,7 +51,7 @@ const AdminHeader = () => {
   };
 
   const handleViewProfile = () => {
-    navigate('/api/v1/admin/profile');
+    navigate('/admin/profile');
     setIsDropdownOpen(false);
   };
 

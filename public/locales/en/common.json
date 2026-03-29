@@ -1,0 +1,25 @@
+{
+  "save": "Save",
+  "cancel": "Cancel",
+  "save_changes": "Save Changes",
+  "save_success": "Settings updated successfully!",
+  "save_error": "An error occurred while updating",
+  "loading": "Loading settings...",
+  "retry": "Retry",
+  "yes": "Yes",
+  "no": "No",
+  "confirm": "Confirm",
+  "close": "Close",
+
+  "sidebar": {
+    "dashboard": "Dashboard",
+    "customers": "Customers",
+    "products": "Products",
+    "vouchers": "Vouchers",
+    "orders": "Orders",
+    "revenue": "Revenue",
+    "returns": "Returns",
+    "shipping": "Shipping Units",
+    "settings": "Settings"
+  }
+}

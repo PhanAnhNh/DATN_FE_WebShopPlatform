@@ -1,4 +1,3 @@
-// src/pages/shop/ShopOrders.jsx
 import React, { useState, useEffect } from 'react';
 import { 
   FaSearch, 
@@ -36,6 +35,7 @@ import '../../css/ShopOrders.css';
 const ShopOrders = () => {
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState([]);
+  const [shippingUnits, setShippingUnits] = useState([]); // Thêm state cho shipping units
   const [stats, setStats] = useState({
     pending: 0,
     paid: 0,
@@ -47,12 +47,11 @@ const ShopOrders = () => {
   });
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 10,
+    limit: 5,
     total: 0,
     total_pages: 1
   });
   
-  // Filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('');
@@ -60,17 +59,18 @@ const ShopOrders = () => {
   const [toDate, setToDate] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   
-  // Modal states
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showStatusFormModal, setShowStatusFormModal] = useState(false);
   const [showPaymentFormModal, setShowPaymentFormModal] = useState(false);
+  const [showAssignShippingModal, setShowAssignShippingModal] = useState(false); // Thêm modal gán shipping
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [selectedNewStatus, setSelectedNewStatus] = useState('');
   const [selectedNewPaymentStatus, setSelectedNewPaymentStatus] = useState('');
+  const [selectedShippingUnitId, setSelectedShippingUnitId] = useState('');
   const [updating, setUpdating] = useState(false);
   const [formError, setFormError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
-  // Status options
   const statusOptions = [
     { value: 'pending', label: 'Chờ xử lý', color: '#ffc107', icon: FaClock, description: 'Đơn hàng mới, chưa xử lý' },
     { value: 'paid', label: 'Đã thanh toán', color: '#17a2b8', icon: FaCheck, description: 'Khách hàng đã thanh toán' },
@@ -85,6 +85,22 @@ const ShopOrders = () => {
     { value: 'paid', label: 'Đã thanh toán', color: '#28a745', icon: FaCheck }
   ];
 
+  // Fetch shipping units
+  const fetchShippingUnits = async () => {
+    try {
+      const response = await shopApi.get('/api/v1/shipping-units/shop');
+      let unitsData = [];
+      if (response.data && response.data.data) {
+        unitsData = response.data.data;
+      } else if (Array.isArray(response.data)) {
+        unitsData = response.data;
+      }
+      setShippingUnits(unitsData.filter(u => u.status === 'active'));
+    } catch (error) {
+      console.error('Error fetching shipping units:', error);
+    }
+  };
+
   // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -96,11 +112,12 @@ const ShopOrders = () => {
   // Fetch orders
   useEffect(() => {
     fetchOrders();
-  }, [pagination.page, debouncedSearch, selectedStatus, fromDate, toDate]);
+  }, [pagination.page, pagination.limit, debouncedSearch, selectedStatus, fromDate, toDate]);
 
   // Fetch stats
   useEffect(() => {
     fetchStats();
+    fetchShippingUnits(); // Lấy danh sách shipping units
   }, []);
 
   const fetchOrders = async () => {
@@ -118,36 +135,31 @@ const ShopOrders = () => {
       });
       
       console.log('Orders response:', response.data);
+      console.log('Pagination data:', response.data.pagination);
       
       setOrders(response.data.data || []);
       setPagination(response.data.pagination || {
         page: 1,
-        limit: 10,
+        limit: 5,
         total: 0,
         total_pages: 1
       });
     } catch (error) {
       console.error('Error fetching orders:', error);
-      
-      if (error.response?.status === 401) {
-        localStorage.removeItem('shop_token');
-        localStorage.removeItem('shop_data');
-        localStorage.removeItem('shop_info');
-        window.location.href = '/shop/login';
-        return;
+        
+        if (error.response?.status === 401) {
+          localStorage.removeItem('shop_token');
+          localStorage.removeItem('shop_data');
+          localStorage.removeItem('shop_info');
+          window.location.href = '/shop/login';
+          return;
+        }
+        
+        setOrders([]);
+      } finally {
+        setLoading(false);
       }
-      
-      setOrders(mockOrders);
-      setPagination({
-        page: 1,
-        limit: 10,
-        total: mockOrders.length,
-        total_pages: 1
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
   const fetchStats = async () => {
     try {
@@ -165,47 +177,16 @@ const ShopOrders = () => {
       }
       
       setStats({
-        pending: 5,
-        paid: 3,
-        shipped: 2,
-        completed: 10,
-        cancelled: 1,
-        total: 21,
-        today_revenue: 1500000
+        pending: 0,
+        paid: 0,
+        shipped: 0,
+        completed: 0,
+        cancelled: 0,
+        total: 0,
+        today_revenue: 0
       });
     }
   };
-
-  // Dữ liệu mẫu
-  const mockOrders = [
-    {
-      _id: '1',
-      order_id: 'ORD001',
-      customer_name: 'Nguyễn Văn A',
-      customer_username: 'nguyenvana',
-      customer_phone: '0912345678',
-      customer_email: 'nguyenvana@email.com',
-      shipping_address: '123 Đường Lê Lợi, Quận 1, TP.HCM',
-      shipping_address_details: {
-        name: 'Nguyễn Văn A',
-        phone: '0912345678',
-        street: '123 Đường Lê Lợi',
-        ward: 'Phường Bến Nghé',
-        district: 'Quận 1',
-        city: 'TP.HCM',
-        country: 'Việt Nam'
-      },
-      total_price: 250000,
-      status: 'pending',
-      payment_status: 'unpaid',
-      payment_method: 'cod',
-      created_at: new Date().toISOString(),
-      items: [
-        { product_name: 'Dừa xiêm', price: 11000, quantity: 2, variant_name: 'Trái' },
-        { product_name: 'Táo đỏ', price: 20000, quantity: 1, variant_name: 'Kẹp' }
-      ]
-    }
-  ];
 
   // View order detail
   const handleViewOrder = async (order) => {
@@ -216,15 +197,6 @@ const ShopOrders = () => {
       setShowDetailModal(true);
     } catch (error) {
       console.error('Error fetching order detail:', error);
-      
-      if (error.response?.status === 401) {
-        localStorage.removeItem('shop_token');
-        localStorage.removeItem('shop_data');
-        localStorage.removeItem('shop_info');
-        window.location.href = '/shop/login';
-        return;
-      }
-      
       setSelectedOrder(order);
       setShowDetailModal(true);
     }
@@ -244,6 +216,49 @@ const ShopOrders = () => {
     setSelectedNewPaymentStatus(order.payment_status);
     setFormError('');
     setShowPaymentFormModal(true);
+  };
+
+  // Mở form gán đơn vị vận chuyển
+  const openAssignShippingForm = (order) => {
+    setSelectedOrder(order);
+    setSelectedShippingUnitId(order.shipping_unit_id || '');
+    setFormError('');
+    setShowAssignShippingModal(true);
+  };
+
+  // Xử lý gán đơn vị vận chuyển
+  const handleAssignShipping = async () => {
+    if (!selectedOrder || !selectedShippingUnitId) {
+      setFormError('Vui lòng chọn đơn vị vận chuyển');
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      const orderId = selectedOrder.order_id || selectedOrder._id;
+      
+      await shopApi.put(`/api/v1/shop/orders/${orderId}/assign-shipping?shipping_unit_id=${selectedShippingUnitId}`);
+      
+      await fetchOrders();
+      await fetchStats();
+      
+      setShowAssignShippingModal(false);
+      setSelectedOrder(null);
+      setSelectedShippingUnitId('');
+      setSuccessMessage('Đã gán đơn vị vận chuyển thành công');
+      setTimeout(() => setSuccessMessage(''), 3000);
+      
+      // Đóng modal chi tiết nếu đang mở
+      if (showDetailModal) {
+        setShowDetailModal(false);
+      }
+    } catch (error) {
+      console.error('Error assigning shipping:', error);
+      const errorMessage = error.response?.data?.detail || 'Có lỗi xảy ra khi gán đơn vị vận chuyển';
+      setFormError(errorMessage);
+    } finally {
+      setUpdating(false);
+    }
   };
 
   // Xử lý cập nhật trạng thái giao hàng
@@ -367,7 +382,7 @@ const ShopOrders = () => {
     setPagination(prev => ({ ...prev, page: 1 }));
   };
 
-  // Lấy danh sách trạng thái có thể chuyển đến (không bao gồm trạng thái hiện tại)
+  // Lấy danh sách trạng thái có thể chuyển đến
   const getAvailableStatuses = (currentStatus) => {
     if (currentStatus === 'cancelled' || currentStatus === 'completed') {
       return [];
@@ -377,6 +392,13 @@ const ShopOrders = () => {
 
   return (
     <div className="shop-orders">
+      {/* Success message */}
+      {successMessage && (
+        <div className="success-message">
+          <FaCheckCircle /> {successMessage}
+        </div>
+      )}
+
       {/* Header */}
       <div className="orders-header">
         <h1 className="orders-title">Quản Lý Đơn Hàng</h1>
@@ -487,6 +509,7 @@ const ShopOrders = () => {
                 <th>Tổng tiền</th>
                 <th>Thanh toán</th>
                 <th>Trạng thái giao</th>
+                <th>Đơn vị VC</th>
                 <th>Thao tác</th>
               </tr>
             </thead>
@@ -546,6 +569,26 @@ const ShopOrders = () => {
                           {order.status !== 'cancelled' && order.status !== 'completed' && <FaEdit size={10} style={{ marginLeft: '5px' }} />}
                         </span>
                       </td>
+                      <td className="shipping-cell">
+                        {order.shipping_unit ? (
+                          <div className="shipping-info">
+                            <span className="shipping-badge">
+                              <FaTruck size={12} /> {order.shipping_unit.name}
+                            </span>
+                            <span className="shipping-fee">
+                              Phí: {formatCurrency(order.shipping_unit.shipping_fee || 0)}
+                            </span>
+                          </div>
+                        ) : (
+                          <button 
+                            className="assign-shipping-btn"
+                            onClick={() => openAssignShippingForm(order)}
+                            title="Gán đơn vị vận chuyển"
+                          >
+                            <FaTruck /> Gán VC
+                          </button>
+                        )}
+                      </td>
                       <td>
                         <div className="action-buttons">
                           <button 
@@ -562,7 +605,7 @@ const ShopOrders = () => {
                 })
               ) : (
                 <tr>
-                  <td colSpan="9" className="empty-state">
+                  <td colSpan="10" className="empty-state">
                     Không tìm thấy đơn hàng nào
                   </td>
                 </tr>
@@ -573,48 +616,201 @@ const ShopOrders = () => {
       </div>
 
       {/* Pagination */}
-      {pagination.total_pages > 1 && !loading && (
+      { !loading && (
         <div className="pagination">
           <div className="pagination-info">
-            Trang {pagination.page}/{pagination.total_pages}
+            Hiển thị <strong>{(pagination.page - 1) * pagination.limit + 1}</strong> -{' '}
+            <strong>{Math.min(pagination.page * pagination.limit, pagination.total)}</strong> của{' '}
+            <strong>{pagination.total}</strong> đơn hàng
           </div>
           <div className="pagination-controls">
-            <button onClick={() => handlePageChange(1)} disabled={pagination.page === 1}>
+            {/* First page button */}
+            <button 
+              onClick={() => handlePageChange(1)} 
+              disabled={pagination.page === 1}
+              className="pagination-nav-btn"
+              title="Trang đầu"
+            >
               <FaAngleDoubleLeft />
             </button>
-            <button onClick={() => handlePageChange(pagination.page - 1)} disabled={pagination.page === 1}>
+            
+            {/* Previous page button */}
+            <button 
+              onClick={() => handlePageChange(pagination.page - 1)} 
+              disabled={pagination.page === 1}
+              className="pagination-nav-btn"
+              title="Trang trước"
+            >
               <FaChevronLeft />
             </button>
             
-            {Array.from({ length: Math.min(5, pagination.total_pages) }, (_, i) => {
-              let pageNum;
-              if (pagination.total_pages <= 5) {
-                pageNum = i + 1;
-              } else if (pagination.page <= 3) {
-                pageNum = i + 1;
-              } else if (pagination.page >= pagination.total_pages - 2) {
-                pageNum = pagination.total_pages - 4 + i;
-              } else {
-                pageNum = pagination.page - 2 + i;
-              }
-              
-              return (
-                <button
-                  key={`page-${pageNum}`}
-                  className={pagination.page === pageNum ? 'active' : ''}
-                  onClick={() => handlePageChange(pageNum)}
-                >
-                  {pageNum}
-                </button>
-              );
-            })}
+            {/* Page numbers - dynamically adjust based on screen size */}
+            <div className="pagination-numbers">
+              {(() => {
+                const pages = [];
+                const totalPages = pagination.total_pages;
+                const currentPage = pagination.page;
+                
+                // Responsive: show fewer pages on mobile
+                const isMobile = window.innerWidth <= 768;
+                const maxVisible = isMobile ? 3 : 5;
+                
+                let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+                let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+                
+                if (endPage - startPage + 1 < maxVisible) {
+                  startPage = Math.max(1, endPage - maxVisible + 1);
+                }
+                
+                // Show first page if not at start
+                if (startPage > 1) {
+                  pages.push(
+                    <button
+                      key={1}
+                      className={currentPage === 1 ? 'active' : ''}
+                      onClick={() => handlePageChange(1)}
+                    >
+                      1
+                    </button>
+                  );
+                  if (startPage > 2) {
+                    pages.push(
+                      <span key="start-ellipsis" className="ellipsis">...</span>
+                    );
+                  }
+                }
+                
+                // Show page numbers
+                for (let i = startPage; i <= endPage; i++) {
+                  pages.push(
+                    <button
+                      key={i}
+                      className={currentPage === i ? 'active' : ''}
+                      onClick={() => handlePageChange(i)}
+                    >
+                      {i}
+                    </button>
+                  );
+                }
+                
+                // Show last page if not at end
+                if (endPage < totalPages) {
+                  if (endPage < totalPages - 1) {
+                    pages.push(
+                      <span key="end-ellipsis" className="ellipsis">...</span>
+                    );
+                  }
+                  pages.push(
+                    <button
+                      key={totalPages}
+                      className={currentPage === totalPages ? 'active' : ''}
+                      onClick={() => handlePageChange(totalPages)}
+                    >
+                      {totalPages}
+                    </button>
+                  );
+                }
+                
+                return pages;
+              })()}
+            </div>
             
-            <button onClick={() => handlePageChange(pagination.page + 1)} disabled={pagination.page === pagination.total_pages}>
+            {/* Next page button */}
+            <button 
+              onClick={() => handlePageChange(pagination.page + 1)} 
+              disabled={pagination.page === pagination.total_pages}
+              className="pagination-nav-btn"
+              title="Trang sau"
+            >
               <FaChevronRight />
             </button>
-            <button onClick={() => handlePageChange(pagination.total_pages)} disabled={pagination.page === pagination.total_pages}>
+            
+            {/* Last page button */}
+            <button 
+              onClick={() => handlePageChange(pagination.total_pages)} 
+              disabled={pagination.page === pagination.total_pages}
+              className="pagination-nav-btn"
+              title="Trang cuối"
+            >
               <FaAngleDoubleRight />
             </button>
+          </div>
+          
+          {/* Page size selector - optional but helpful */}
+          <div className="page-size-selector">
+            <select 
+              value={pagination.limit} 
+              onChange={(e) => {
+                setPagination(prev => ({ ...prev, limit: parseInt(e.target.value), page: 1 }));
+              }}
+              className="page-size-select"
+            >
+              <option value={5}>5 / trang</option>
+              <option value={10}>10 / trang</option>
+              <option value={20}>20 / trang</option>
+              <option value={50}>50 / trang</option>
+            </select>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Shipping Modal */}
+      {showAssignShippingModal && selectedOrder && (
+        <div className="modal-overlay" onClick={() => setShowAssignShippingModal(false)}>
+          <div className="modal-content assign-shipping-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Gán đơn vị vận chuyển</h2>
+              <button className="close-btn" onClick={() => {
+                setShowAssignShippingModal(false);
+                setSelectedOrder(null);
+                setFormError('');
+              }}>
+                <FaTimes />
+              </button>
+            </div>
+
+            <div className="modal-body">
+              <div className="order-info-summary">
+                <p><strong>Đơn hàng:</strong> #{selectedOrder.order_id?.slice(-8) || selectedOrder._id?.slice(-8)}</p>
+                <p><strong>Khách hàng:</strong> {selectedOrder.customer_name || selectedOrder.customer_username}</p>
+                <p><strong>Địa chỉ:</strong> {getFullAddress(selectedOrder)}</p>
+              </div>
+
+              <div className="form-group">
+                <label>Chọn đơn vị vận chuyển <span className="required">*</span></label>
+                <select 
+                  value={selectedShippingUnitId} 
+                  onChange={(e) => setSelectedShippingUnitId(e.target.value)}
+                  className="shipping-select"
+                >
+                  <option value="">-- Chọn đơn vị vận chuyển --</option>
+                  {shippingUnits.map(unit => (
+                    <option key={unit.id} value={unit.id}>
+                      {unit.name} - Phí ship: {formatCurrency(unit.shipping_fee_base)} - Giao trong {unit.estimated_delivery_days} ngày
+                    </option>
+                  ))}
+                </select>
+                {formError && <div className="form-error">{formError}</div>}
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button className="cancel-btn" onClick={() => {
+                setShowAssignShippingModal(false);
+                setSelectedOrder(null);
+                setFormError('');
+              }}>
+                Hủy
+              </button>
+              <button 
+                className="submit-btn"
+                onClick={handleAssignShipping}
+                disabled={updating || !selectedShippingUnitId}
+              >
+                {updating ? <FaSpinner className="spinning" /> : <FaTruck />}
+                {updating ? ' Đang gán...' : ' Gán đơn vị vận chuyển'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -710,70 +906,17 @@ const ShopOrders = () => {
                       <p>{selectedOrder.payment_method === 'cod' ? 'COD (Thanh toán khi nhận hàng)' : 'Chuyển khoản'}</p>
                     </div>
                   </div>
-                  <div className="info-item">
-                    <div>
-                      <label>Trạng thái giao hàng</label>
-                      <p>
-                        {(() => {
-                          const status = getStatusBadge(selectedOrder.status);
-                          const StatusIcon = status.icon;
-                          return (
-                            <span 
-                              className="status-badge"
-                              style={{ 
-                                backgroundColor: status.color + '20',
-                                color: status.color,
-                                borderColor: status.color,
-                                cursor: 'pointer'
-                              }}
-                              onClick={() => {
-                                setShowDetailModal(false);
-                                openStatusForm(selectedOrder);
-                              }}
-                            >
-                              <StatusIcon size={12} />
-                              {status.label}
-                              <FaEdit size={10} style={{ marginLeft: '5px' }} />
-                            </span>
-                          );
-                        })()}
-                      </p>
+                  {selectedOrder.shipping_unit && (
+                    <div className="info-item">
+                      <FaTruck className="info-icon" />
+                      <div>
+                        <label>Đơn vị vận chuyển</label>
+                        <p>{selectedOrder.shipping_unit.name} - Giao trong {selectedOrder.shipping_unit.estimated_delivery_days} ngày</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="info-item">
-                    <div>
-                      <label>Thanh toán</label>
-                      <p>
-                        <span 
-                          className={`payment-badge ${selectedOrder.payment_status || 'unpaid'}`}
-                          style={{ cursor: 'pointer' }}
-                          onClick={() => {
-                            setShowDetailModal(false);
-                            openPaymentForm(selectedOrder);
-                          }}
-                        >
-                          {selectedOrder.payment_status === 'paid' ? 'Đã thanh toán' : 'Chưa thanh toán'}
-                          <FaEdit size={10} style={{ marginLeft: '5px' }} />
-                        </span>
-                      </p>
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
-
-              {/* Voucher áp dụng */}
-              {selectedOrder.voucher && (
-                <div className="detail-section">
-                  <h3>Voucher áp dụng</h3>
-                  <div className="voucher-info">
-                    <FaTag className="voucher-icon" />
-                    <div>
-                      <p><strong>Mã: {selectedOrder.voucher.code}</strong></p>
-                      <p className="voucher-discount">Giảm: {formatCurrency(selectedOrder.voucher.discount)}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* Sản phẩm đã đặt */}
               <div className="detail-section">
@@ -841,7 +984,7 @@ const ShopOrders = () => {
         </div>
       )}
 
-      {/* Form cập nhật trạng thái giao hàng */}
+      {/* Form cập nhật trạng thái giao hàng - Giữ nguyên */}
       {showStatusFormModal && selectedOrder && (
         <div className="modal-overlay" onClick={() => setShowStatusFormModal(false)}>
           <div className="modal-content status-form-modal" onClick={e => e.stopPropagation()}>
@@ -926,7 +1069,7 @@ const ShopOrders = () => {
         </div>
       )}
 
-      {/* Form cập nhật trạng thái thanh toán */}
+      {/* Form cập nhật trạng thái thanh toán - Giữ nguyên */}
       {showPaymentFormModal && selectedOrder && (
         <div className="modal-overlay" onClick={() => setShowPaymentFormModal(false)}>
           <div className="modal-content payment-form-modal" onClick={e => e.stopPropagation()}>
@@ -1021,142 +1164,67 @@ const ShopOrders = () => {
         .discount-price {
           color: #dc3545;
         }
-        .voucher-info {
-          display: flex;
-          gap: 12px;
-          align-items: flex-start;
-          background: #e8f5e9;
-          padding: 12px;
+        .success-message {
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          background: #d4edda;
+          color: #155724;
+          padding: 12px 20px;
           border-radius: 8px;
-        }
-        .voucher-icon {
-          color: #2e7d32;
-          font-size: 20px;
-        }
-        .voucher-discount {
-          color: #dc3545;
-          font-weight: 500;
-        }
-        .order-note {
-          background: #f8f9fa;
-          padding: 12px;
-          border-radius: 8px;
-          border-left: 3px solid #2e7d32;
-        }
-        
-        /* Form Modal Styles */
-        .status-form-modal, .payment-form-modal {
-          max-width: 500px;
-        }
-        
-        .order-info-summary {
-          background: #f8f9fa;
-          padding: 15px;
-          border-radius: 8px;
-          margin-bottom: 20px;
-        }
-        
-        .order-info-summary p {
-          margin: 8px 0;
-        }
-        
-        .form-group {
-          margin-bottom: 20px;
-        }
-        
-        .form-group label {
-          display: block;
-          font-weight: 500;
-          margin-bottom: 10px;
-          color: #333;
-        }
-        
-        .required {
-          color: #dc3545;
-        }
-        
-        .status-radio-group, .payment-radio-group {
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-        
-        .status-radio-label, .payment-radio-label {
-          display: block;
-          cursor: pointer;
-          border: 2px solid #e0e0e0;
-          border-radius: 10px;
-          transition: all 0.2s;
-        }
-        
-        .status-radio-label.selected, .payment-radio-label.selected {
-          border-width: 2px;
-          background: #f5f5f5;
-        }
-        
-        .status-radio-label input, .payment-radio-label input {
-          display: none;
-        }
-        
-        .status-radio-content, .payment-radio-content {
           display: flex;
           align-items: center;
-          gap: 12px;
-          padding: 12px 15px;
+          gap: 10px;
+          z-index: 1000;
+          animation: slideIn 0.3s ease;
         }
-        
-        .status-radio-content svg, .payment-radio-content svg {
-          font-size: 20px;
+        @keyframes slideIn {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
         }
-        
-        .status-radio-content div {
-          display: flex;
-          flex-direction: column;
-        }
-        
-        .status-radio-content small {
+        .shipping-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 4px 10px;
+          background: #e3f2fd;
+          color: #1976d2;
+          border-radius: 20px;
           font-size: 12px;
-          color: #666;
-          margin-top: 2px;
+          font-weight: 500;
         }
-        
-        .form-error {
-          color: #dc3545;
-          font-size: 13px;
-          margin-top: 8px;
-          padding: 8px;
-          background: #ffe6e6;
-          border-radius: 6px;
-        }
-        
-        .submit-btn {
-          background: #2e7d32;
-          color: white;
+        .assign-shipping-btn {
+          background: #ffc107;
+          color: #856404;
           border: none;
-          padding: 10px 20px;
-          border-radius: 8px;
+          padding: 6px 12px;
+          border-radius: 20px;
+          font-size: 12px;
           cursor: pointer;
           display: inline-flex;
           align-items: center;
-          gap: 8px;
-          font-weight: 500;
+          gap: 5px;
+          transition: all 0.2s;
         }
-        
-        .submit-btn:hover:not(:disabled) {
-          background: #1b5e20;
+        .assign-shipping-btn:hover {
+          background: #e0a800;
+          transform: translateY(-1px);
         }
-        
-        .submit-btn:disabled {
-          background: #ccc;
-          cursor: not-allowed;
+        .shipping-select {
+          width: 100%;
+          padding: 10px 12px;
+          border: 1px solid #ddd;
+          border-radius: 8px;
+          font-size: 14px;
         }
-        
-        .modal-footer {
-          display: flex;
-          justify-content: flex-end;
-          gap: 12px;
-          padding: 16px 24px;
-          border-top: 1px solid #eee;
+        .assign-shipping-modal {
+          max-width: 500px;
         }
       `}</style>
     </div>

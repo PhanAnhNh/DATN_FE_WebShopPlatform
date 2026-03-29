@@ -1,0 +1,27 @@
+
+{
+  "shop_settings": "Cài Đặt Hệ Thống",
+  "general": "Cài đặt chung",
+  "notifications": "Thông báo",
+  "payment": "Thanh toán",
+  "shipping": "Vận chuyển",
+  "invoice": "Hóa đơn",
+  "security": "Bảo mật",
+  "social_media": "Mạng xã hội",
+  "seo": "SEO",
+  "shop_name": "Tên cửa hàng",
+  "email": "Email",
+  "phone": "Số điện thoại",
+  "address": "Địa chỉ",
+  "tax_code": "Mã số thuế",
+  "website": "Website",
+  "working_hours": "Giờ làm việc",
+  "timezone": "Múi giờ",
+  "date_format": "Định dạng ngày",
+  "currency": "Tiền tệ",
+  "language": "Ngôn ngữ",
+  "vnd": "Việt Nam Đồng",
+  "usd": "Đô la Mỹ",
+  "vietnamese": "Tiếng Việt",
+  "english": "English"
+}

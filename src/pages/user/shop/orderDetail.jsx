@@ -1,4 +1,3 @@
-// src/pages/OrderDetail.jsx
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
@@ -20,7 +19,9 @@ import {
   FaEnvelope,
   FaPrint,
   FaDownload,
-  FaShareAlt
+  FaShareAlt,
+  FaUndo,
+  FaExclamationTriangle
 } from 'react-icons/fa';
 import api from '../../../api/api';
 import ShopDetailLayout from "../../../components/layout/ShopDetailLayout";
@@ -33,8 +34,8 @@ const OrderDetail = () => {
   const [order, setOrder] = useState(null);
   const [cancelling, setCancelling] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [returnInfo, setReturnInfo] = useState(null); // Thêm state để lưu thông tin hoàn trả
 
-  // Status configurations
   const statusConfig = {
     pending: {
       label: 'Chờ xử lý',
@@ -87,8 +88,43 @@ const OrderDetail = () => {
     }
   };
 
+  // Return status config
+  const returnStatusConfig = {
+    pending: {
+      label: 'Chờ xử lý',
+      color: '#ffc107',
+      icon: FaClock,
+      message: 'Yêu cầu hoàn trả đang được xử lý'
+    },
+    approved: {
+      label: 'Đã duyệt',
+      color: '#17a2b8',
+      icon: FaCheckCircle,
+      message: 'Yêu cầu hoàn trả đã được duyệt, tiền sẽ được hoàn trong 3-5 ngày'
+    },
+    rejected: {
+      label: 'Từ chối',
+      color: '#dc3545',
+      icon: FaBan,
+      message: 'Yêu cầu hoàn trả đã bị từ chối'
+    },
+    completed: {
+      label: 'Hoàn thành',
+      color: '#28a745',
+      icon: FaCheckCircle,
+      message: 'Đã hoàn trả thành công'
+    },
+    cancelled: {
+      label: 'Đã hủy',
+      color: '#dc3545',
+      icon: FaBan,
+      message: 'Yêu cầu hoàn trả đã bị hủy'
+    }
+  };
+
   useEffect(() => {
     fetchOrderDetail();
+    checkReturnStatus(); // Thêm kiểm tra trạng thái hoàn trả
   }, [orderId]);
 
   const fetchOrderDetail = async () => {
@@ -109,6 +145,18 @@ const OrderDetail = () => {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Thêm hàm kiểm tra trạng thái hoàn trả
+  const checkReturnStatus = async () => {
+    try {
+      const response = await api.get(`/api/v1/returns/my?order_id=${orderId}`);
+      if (response.data.data && response.data.data.length > 0) {
+        setReturnInfo(response.data.data[0]); // Lấy yêu cầu hoàn trả đầu tiên
+      }
+    } catch (error) {
+      console.error('Error checking return status:', error);
     }
   };
 
@@ -167,6 +215,8 @@ const OrderDetail = () => {
 
   const canCancel = () => {
     if (!order) return false;
+    // Không thể hủy nếu đã có yêu cầu hoàn trả
+    if (returnInfo && ['pending', 'approved'].includes(returnInfo.status)) return false;
     return order.status === 'pending' || order.status === 'paid';
   };
 
@@ -176,7 +226,6 @@ const OrderDetail = () => {
   };
 
   const handleReorder = () => {
-    // Lưu items vào localStorage và chuyển đến trang thanh toán
     const itemsToReorder = order.items.map(item => ({
       ...item,
       quantity: item.quantity
@@ -187,6 +236,26 @@ const OrderDetail = () => {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  // Kiểm tra xem đơn hàng đã được hoàn trả chưa
+  const isReturned = () => {
+    return returnInfo && ['approved', 'completed'].includes(returnInfo.status);
+  };
+
+  // Lấy thông báo hoàn trả
+  const getReturnMessage = () => {
+    if (!returnInfo) return null;
+    
+    const config = returnStatusConfig[returnInfo.status] || returnStatusConfig.pending;
+    const Icon = config.icon;
+    
+    return {
+      icon: Icon,
+      label: config.label,
+      message: config.message,
+      color: config.color
+    };
   };
 
   if (loading) {
@@ -217,6 +286,7 @@ const OrderDetail = () => {
   const StatusIcon = statusInfo.icon;
   const paymentInfo = getPaymentStatusInfo(order.payment_status);
   const PaymentIcon = paymentInfo.icon;
+  const returnMessage = getReturnMessage();
 
   return (
     <ShopDetailLayout>
@@ -230,7 +300,7 @@ const OrderDetail = () => {
             <button className="print-btn" onClick={handlePrint}>
               <FaPrint /> In đơn hàng
             </button>
-            {canReorder() && (
+            {canReorder() && !isReturned() && (
               <button className="reorder-btn" onClick={handleReorder}>
                 <FaShareAlt /> Đặt lại
               </button>
@@ -246,35 +316,63 @@ const OrderDetail = () => {
           </div>
         </div>
 
-        {/* Status Timeline */}
-        <div className="status-timeline">
-          <div className="timeline-steps">
-            <div className={`step ${order.status === 'pending' || order.status === 'paid' || order.status === 'shipped' || order.status === 'completed' ? 'active' : ''}`}>
-              <div className="step-icon">
-                <FaClock />
-              </div>
-              <div className="step-label">Chờ xử lý</div>
+        {/* Thêm thông báo hoàn trả */}
+        {returnMessage && (
+          <div className="return-info-banner" style={{ borderLeftColor: returnMessage.color }}>
+            <div className="return-icon" style={{ color: returnMessage.color }}>
+              <returnMessage.icon size={24} />
             </div>
-            <div className={`step ${order.status === 'paid' || order.status === 'shipped' || order.status === 'completed' ? 'active' : ''}`}>
-              <div className="step-icon">
-                <FaCheckCircle />
+            <div className="return-content">
+              <div className="return-title">Đơn hàng đã được hoàn trả</div>
+              <div className="return-status" style={{ color: returnMessage.color }}>
+                Trạng thái: {returnMessage.label}
               </div>
-              <div className="step-label">Đã thanh toán</div>
-            </div>
-            <div className={`step ${order.status === 'shipped' || order.status === 'completed' ? 'active' : ''}`}>
-              <div className="step-icon">
-                <FaTruck />
-              </div>
-              <div className="step-label">Đang giao</div>
-            </div>
-            <div className={`step ${order.status === 'completed' ? 'active' : ''}`}>
-              <div className="step-icon">
-                <FaCheckCircle />
-              </div>
-              <div className="step-label">Hoàn thành</div>
+              <div className="return-message">{returnMessage.message}</div>
+              {returnInfo?.total_refund && (
+                <div className="return-amount">
+                  Số tiền hoàn trả: <strong>{formatCurrency(returnInfo.total_refund)}</strong>
+                </div>
+              )}
+              {returnInfo?.completed_at && (
+                <div className="return-date">
+                  Ngày hoàn tất: {formatDate(returnInfo.completed_at)}
+                </div>
+              )}
             </div>
           </div>
-        </div>
+        )}
+
+        {/* Status Timeline - Ẩn timeline nếu đã hoàn trả */}
+        {!isReturned() && (
+          <div className="status-timeline">
+            <div className="timeline-steps">
+              <div className={`step ${order.status === 'pending' || order.status === 'paid' || order.status === 'shipped' || order.status === 'completed' ? 'active' : ''}`}>
+                <div className="step-icon">
+                  <FaClock />
+                </div>
+                <div className="step-label">Chờ xử lý</div>
+              </div>
+              <div className={`step ${order.status === 'paid' || order.status === 'shipped' || order.status === 'completed' ? 'active' : ''}`}>
+                <div className="step-icon">
+                  <FaCheckCircle />
+                </div>
+                <div className="step-label">Đã thanh toán</div>
+              </div>
+              <div className={`step ${order.status === 'shipped' || order.status === 'completed' ? 'active' : ''}`}>
+                <div className="step-icon">
+                  <FaTruck />
+                </div>
+                <div className="step-label">Đang giao</div>
+              </div>
+              <div className={`step ${order.status === 'completed' ? 'active' : ''}`}>
+                <div className="step-icon">
+                  <FaCheckCircle />
+                </div>
+                <div className="step-label">Hoàn thành</div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Order Status Cards */}
         <div className="status-cards">
@@ -453,8 +551,8 @@ const OrderDetail = () => {
                 </div>
               )}
 
-              {/* Cancel Button */}
-              {canCancel() && (
+              {/* Cancel Button - Ẩn nếu đã hoàn trả */}
+              {canCancel() && !isReturned() && (
                 <div className="cancel-section">
                   <button 
                     className="cancel-btn"

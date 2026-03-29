@@ -142,87 +142,104 @@ const NotificationBell = ({ userType = 'user' }) => {
   };
 
   // Xử lý click vào thông báo
-  const handleNotificationClick = (notification) => {
+  // src/pages/user/NotificationBell.jsx (hoặc nơi bạn đặt component này)
+// Sửa lại hàm handleNotificationClick
+
+const handleNotificationClick = (notification) => {
     // Đánh dấu đã đọc
     if (!notification.is_read) {
-      markAsRead(notification._id);
+        markAsRead(notification._id);
+    }
+    
+    // THÊM: Kiểm tra nếu là thông báo friend_request và userType là shop thì không xử lý
+    if (userType === 'shop' && (notification.type === 'friend_request' || notification.type === 'friend_accepted')) {
+        console.log('Shop không nhận thông báo kết bạn');
+        setShowDropdown(false);
+        return;
     }
     
     // Chuyển hướng dựa vào loại thông báo và userType
     if (notification.reference_id) {
-      switch (notification.type) {
-        case 'order':
-          if (userType === 'shop') {
-            navigate(`/shop/orders/${notification.reference_id}`);
-          } else if (userType === 'admin') {
-            navigate(`/admin/orders/${notification.reference_id}`);
-          } else {
-            navigate(`/orders/${notification.reference_id}`);
-          }
-          break;
-          
-        case 'payment':
-          if (userType === 'admin') {
-            navigate(`/admin/orders/${notification.reference_id}`);
-          } else {
-            navigate(`/orders/${notification.reference_id}`);
-          }
-          break;
-          
-        case 'shipping':
-          if (userType === 'shop') {
-            navigate(`/shop/orders/${notification.reference_id}`);
-          } else if (userType === 'admin') {
-            navigate(`/admin/orders/${notification.reference_id}`);
-          } else {
-            navigate(`/orders/${notification.reference_id}`);
-          }
-          break;
-          
-        case 'product':
-          if (userType === 'shop') {
-            navigate(`/shop/products/${notification.reference_id}`);
-          } else if (userType === 'admin') {
-            navigate(`/admin/products/${notification.reference_id}`);
-          } else {
-            navigate(`/product/${notification.reference_id}`);
-          }
-          break;
-          
-        case 'review':
-          if (userType === 'shop') {
-            navigate(`/shop/reviews/${notification.reference_id}`);
-          } else if (userType === 'admin') {
-            navigate(`/admin/reviews/${notification.reference_id}`);
-          } else {
-            navigate(`/product/${notification.reference_id}`);
-          }
-          break;
-          
-        case 'friend_request':
-        case 'friend_accepted':
-          // Chuyển đến trang profile của người gửi (reference_id là user_id)
-          navigate(`/profile/${notification.reference_id}`);
-          break;
-          
-        case 'follow':
-          // Chuyển đến trang profile của người theo dõi
-          navigate(`/profile/${notification.reference_id}`);
-          break;
-          
-        case 'system':
-          // Không chuyển hướng, chỉ đánh dấu đã đọc
-          break;
-          
-        default:
-          // Mặc định: không chuyển hướng
-          console.log('Unknown notification type:', notification.type);
-          break;
-      }
+        switch (notification.type) {
+            case 'order':
+                if (userType === 'shop') {
+                    navigate(`/shop/orders/${notification.reference_id}`);
+                } else if (userType === 'admin') {
+                    navigate(`/admin/orders/${notification.reference_id}`);
+                } else {
+                    navigate(`/orders/${notification.reference_id}`);
+                }
+                break;
+                
+            case 'payment':
+                if (userType === 'admin') {
+                    navigate(`/admin/orders/${notification.reference_id}`);
+                } else {
+                    navigate(`/orders/${notification.reference_id}`);
+                }
+                break;
+                
+            case 'shipping':
+                if (userType === 'shop') {
+                    navigate(`/shop/orders/${notification.reference_id}`);
+                } else if (userType === 'admin') {
+                    navigate(`/admin/orders/${notification.reference_id}`);
+                } else {
+                    navigate(`/orders/${notification.reference_id}`);
+                }
+                break;
+                
+            case 'product':
+                if (userType === 'shop') {
+                    navigate(`/shop/products/${notification.reference_id}`);
+                } else if (userType === 'admin') {
+                    navigate(`/admin/products/${notification.reference_id}`);
+                } else {
+                    navigate(`/product/${notification.reference_id}`);
+                }
+                break;
+                
+            case 'review':
+                if (userType === 'shop') {
+                    navigate(`/shop/reviews/${notification.reference_id}`);
+                } else if (userType === 'admin') {
+                    navigate(`/admin/reviews/${notification.reference_id}`);
+                } else {
+                    navigate(`/product/${notification.reference_id}`);
+                }
+                break;
+                
+            case 'friend_request':
+            case 'friend_accepted':
+                // THÊM: Kiểm tra userType trước khi chuyển hướng
+                if (userType === 'shop') {
+                    // Shop không xử lý thông báo kết bạn
+                    console.log('Shop không nhận thông báo kết bạn');
+                } else {
+                    // Chuyển đến trang profile của người gửi
+                    navigate(`/profile/${notification.reference_id}`);
+                }
+                break;
+                
+            case 'follow':
+                if (userType === 'shop') {
+                    console.log('Shop không nhận thông báo follow');
+                } else {
+                    navigate(`/profile/${notification.reference_id}`);
+                }
+                break;
+                
+            case 'system':
+                // Không chuyển hướng
+                break;
+                
+            default:
+                console.log('Unknown notification type:', notification.type);
+                break;
+        }
     }
     setShowDropdown(false);
-  };
-
+};
   const getNotificationIcon = (type) => {
     switch (type) {
       case 'order': return '📦';

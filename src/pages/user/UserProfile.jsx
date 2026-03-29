@@ -67,33 +67,33 @@ const UserProfile = () => {
     };
 
     // src/pages/user/UserProfile.jsx
-const fetchUserPosts = async () => {
-    try {
-        // Truyền currentUser để backend kiểm tra quyền
-        const response = await api.get(`/api/v1/posts/user/${userId}`, {
-            params: {
-                // Không cần params, backend sẽ lấy từ token
-            }
-        });
-        const activePosts = response.data.filter(post => post.is_active !== false);
-        setPosts(activePosts);
-        
-        // Check likes
-        const likeChecks = activePosts.map(post =>
-            api.get(`/api/v1/likes/check/${post._id}`)
-                .then(res => ({ id: post._id, isLiked: res.data.liked }))
-                .catch(() => ({ id: post._id, isLiked: false }))
-        );
-        const likeResults = await Promise.all(likeChecks);
-        const likeMap = {};
-        likeResults.forEach(result => {
-            likeMap[result.id] = result.isLiked;
-        });
-        setLikedPosts(likeMap);
-    } catch (err) {
-        console.error('Error fetching user posts:', err);
-    }
-};
+    const fetchUserPosts = async () => {
+        try {
+            // Truyền currentUser để backend kiểm tra quyền
+            const response = await api.get(`/api/v1/posts/user/${userId}`, {
+                params: {
+                    // Không cần params, backend sẽ lấy từ token
+                }
+            });
+            const activePosts = response.data.filter(post => post.is_active !== false);
+            setPosts(activePosts);
+            
+            // Check likes
+            const likeChecks = activePosts.map(post =>
+                api.get(`/api/v1/likes/check/${post._id}`)
+                    .then(res => ({ id: post._id, isLiked: res.data.liked }))
+                    .catch(() => ({ id: post._id, isLiked: false }))
+            );
+            const likeResults = await Promise.all(likeChecks);
+            const likeMap = {};
+            likeResults.forEach(result => {
+                likeMap[result.id] = result.isLiked;
+            });
+            setLikedPosts(likeMap);
+        } catch (err) {
+            console.error('Error fetching user posts:', err);
+        }
+    };
 
     const checkFollowStatus = async () => {
     if (!currentUser || currentUser._id === userId) return;
