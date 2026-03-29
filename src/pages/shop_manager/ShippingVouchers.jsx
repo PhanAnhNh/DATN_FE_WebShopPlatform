@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   FaPlus, FaEdit, FaTrash, FaEye, FaSearch, FaFilter,
   FaSpinner, FaTimes, FaSave, FaTag, FaPercent, FaMoneyBillWave,
@@ -6,8 +6,281 @@ import {
   FaAngleDoubleLeft, FaAngleDoubleRight, FaExclamationTriangle,
   FaCheckCircle, FaClock, FaPowerOff, FaPlay
 } from 'react-icons/fa';
-import { shopApi } from '../../../api/api';
-import '../../../css/ShippingVouchers.css';
+import { shopApi } from '../../api/api';
+import '../../css/ShippingVouchers.css';
+
+// ========== MODAL COMPONENTS (định nghĩa bên ngoài) ==========
+
+const VoucherFormModal = ({ isOpen, onClose, title, onSubmit, saving, formData, onInputChange }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content voucher-modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>{title}</h2>
+          <button className="close-btn" onClick={onClose}>
+            <FaTimes />
+          </button>
+        </div>
+        
+        <div className="modal-body">
+          <div className="form-grid">
+            <div className="form-group full-width">
+              <label>Mã voucher <span className="required">*</span></label>
+              <input
+                type="text"
+                name="code"
+                value={formData.code}
+                onChange={onInputChange}
+                placeholder="Nhập mã voucher (VD: SHIP10)"
+                disabled={title === 'Sửa voucher'}
+              />
+              {title !== 'Sửa voucher' && (
+                <small>Chỉ nhập chữ in hoa, số và dấu gạch dưới</small>
+              )}
+            </div>
+
+            <div className="form-group">
+              <label>Loại giảm giá <span className="required">*</span></label>
+              <select
+                name="discount_type"
+                value={formData.discount_type}
+                onChange={onInputChange}
+              >
+                <option value="percent">Giảm theo phần trăm (%)</option>
+                <option value="fixed">Giảm theo số tiền cố định</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label>Giá trị giảm <span className="required">*</span></label>
+              <input
+                type="number"
+                name="discount_value"
+                value={formData.discount_value}
+                onChange={onInputChange}
+                placeholder={formData.discount_type === 'percent' ? 'Nhập số phần trăm' : 'Nhập số tiền giảm'}
+                min="0"
+                step={formData.discount_type === 'percent' ? '1' : '1000'}
+              />
+            </div>
+
+            {formData.discount_type === 'percent' && (
+              <div className="form-group">
+                <label>Giảm tối đa</label>
+                <input
+                  type="number"
+                  name="max_discount"
+                  value={formData.max_discount}
+                  onChange={onInputChange}
+                  placeholder="Nhập số tiền giảm tối đa"
+                  min="0"
+                  step="1000"
+                />
+              </div>
+            )}
+
+            <div className="form-group">
+              <label>Đơn hàng tối thiểu</label>
+              <input
+                type="number"
+                name="min_order_value"
+                value={formData.min_order_value}
+                onChange={onInputChange}
+                placeholder="Nhập số tiền tối thiểu"
+                min="0"
+                step="1000"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Giới hạn số lượng</label>
+              <input
+                type="number"
+                name="usage_limit"
+                value={formData.usage_limit}
+                onChange={onInputChange}
+                placeholder="Để trống nếu không giới hạn"
+                min="1"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Ngày bắt đầu <span className="required">*</span></label>
+              <input
+                type="date"
+                name="start_date"
+                value={formData.start_date}
+                onChange={onInputChange}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Ngày kết thúc <span className="required">*</span></label>
+              <input
+                type="date"
+                name="end_date"
+                value={formData.end_date}
+                onChange={onInputChange}
+              />
+            </div>
+
+            <div className="form-group full-width">
+              <label>Mô tả</label>
+              <textarea
+                name="description"
+                value={formData.description}
+                onChange={onInputChange}
+                rows="3"
+                placeholder="Nhập mô tả voucher (nếu có)"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="modal-footer">
+          <button className="cancel-btn" onClick={onClose}>
+            Hủy
+          </button>
+          <button 
+            className="save-btn" 
+            onClick={onSubmit}
+            disabled={saving}
+          >
+            {saving ? <FaSpinner className="spinning" /> : <FaSave />}
+            {saving ? 'Đang lưu...' : (title === 'Thêm voucher' ? 'Thêm voucher' : 'Cập nhật')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const DetailModal = ({ isOpen, onClose, voucher, formatCurrency, formatDateTime, getDiscountDetail, getStatusBadge }) => {
+  if (!isOpen || !voucher) return null;
+
+  const statusInfo = getStatusBadge(voucher.status, voucher.end_date);
+  const StatusIcon = statusInfo.icon;
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content detail-modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Chi tiết voucher</h2>
+          <button className="close-btn" onClick={onClose}>
+            <FaTimes />
+          </button>
+        </div>
+
+        <div className="modal-body">
+          <div className="voucher-detail">
+            <div className="detail-header">
+              <div className="voucher-badge">
+                <FaTag />
+                {voucher.code}
+              </div>
+              <span 
+                className={`status-badge ${statusInfo.class}`}
+                style={{ backgroundColor: statusInfo.color + '20', color: statusInfo.color }}
+              >
+                <StatusIcon size={12} />
+                {statusInfo.label}
+              </span>
+            </div>
+
+            <div className="detail-section">
+              <h3>Thông tin giảm giá</h3>
+              <div className="info-grid">
+                <div className="info-item">
+                  <label>Loại giảm giá:</label>
+                  <span>{voucher.discount_type === 'percent' ? 'Phần trăm (%)' : 'Số tiền cố định'}</span>
+                </div>
+                <div className="info-item">
+                  <label>Giá trị giảm:</label>
+                  <span className="discount-value">{getDiscountDetail(voucher)}</span>
+                </div>
+                {voucher.max_discount && (
+                  <div className="info-item">
+                    <label>Giảm tối đa:</label>
+                    <span>{formatCurrency(voucher.max_discount)}</span>
+                  </div>
+                )}
+                <div className="info-item">
+                  <label>Đơn hàng tối thiểu:</label>
+                  <span>{formatCurrency(voucher.min_order_value)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="detail-section">
+              <h3>Thông tin sử dụng</h3>
+              <div className="info-grid">
+                <div className="info-item">
+                  <label>Đã sử dụng:</label>
+                  <span>{voucher.used_count}/{voucher.usage_limit || '∞'}</span>
+                </div>
+                <div className="info-item">
+                  <label>Ngày bắt đầu:</label>
+                  <span>{formatDateTime(voucher.start_date)}</span>
+                </div>
+                <div className="info-item">
+                  <label>Ngày kết thúc:</label>
+                  <span>{formatDateTime(voucher.end_date)}</span>
+                </div>
+                <div className="info-item">
+                  <label>Ngày tạo:</label>
+                  <span>{formatDateTime(voucher.created_at)}</span>
+                </div>
+              </div>
+            </div>
+
+            {voucher.description && (
+              <div className="detail-section">
+                <h3>Mô tả</h3>
+                <p className="description">{voucher.description}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, voucher }) => {
+  if (!isOpen || !voucher) return null;
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content confirm-modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Xác nhận xóa</h2>
+          <button className="close-btn" onClick={onClose}>
+            <FaTimes />
+          </button>
+        </div>
+
+        <div className="modal-body">
+          <FaExclamationTriangle className="warning-icon" />
+          <p>Bạn có chắc chắn muốn xóa voucher <strong>{voucher.code}</strong>?</p>
+          <p className="warning-text">Hành động này không thể hoàn tác!</p>
+        </div>
+
+        <div className="modal-footer">
+          <button className="cancel-btn" onClick={onClose}>
+            Hủy
+          </button>
+          <button className="delete-btn" onClick={onConfirm}>
+            Xóa voucher
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ========== COMPONENT CHÍNH ==========
 
 const ShippingVouchers = () => {
   const [loading, setLoading] = useState(true);
@@ -115,10 +388,10 @@ const ShippingVouchers = () => {
     }
   };
 
-  const handleInputChange = (e) => {
+  const handleInputChange = useCallback((e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-  };
+  }, []);
 
   const handleAddVoucher = async () => {
     if (!formData.code || !formData.discount_value || !formData.start_date || !formData.end_date) {
@@ -317,278 +590,6 @@ const ShippingVouchers = () => {
     setSearchTerm('');
     setSelectedStatus('');
     setPagination(prev => ({ ...prev, page: 1 }));
-  };
-
-  // Modal: Add/Edit Voucher
-  const VoucherFormModal = ({ isOpen, onClose, title, onSubmit, saving }) => {
-    if (!isOpen) return null;
-
-    return (
-      <div className="modal-overlay" onClick={onClose}>
-        <div className="modal-content voucher-modal" onClick={e => e.stopPropagation()}>
-          <div className="modal-header">
-            <h2>{title}</h2>
-            <button className="close-btn" onClick={onClose}>
-              <FaTimes />
-            </button>
-          </div>
-          
-          <div className="modal-body">
-            <div className="form-grid">
-              <div className="form-group full-width">
-                <label>Mã voucher <span className="required">*</span></label>
-                <input
-                  type="text"
-                  name="code"
-                  value={formData.code}
-                  onChange={handleInputChange}
-                  placeholder="Nhập mã voucher (VD: SHIP10)"
-                  disabled={title === 'Sửa voucher'}
-                />
-                {title !== 'Sửa voucher' && (
-                  <small>Chỉ nhập chữ in hoa, số và dấu gạch dưới</small>
-                )}
-              </div>
-
-              <div className="form-group">
-                <label>Loại giảm giá <span className="required">*</span></label>
-                <select
-                  name="discount_type"
-                  value={formData.discount_type}
-                  onChange={handleInputChange}
-                >
-                  <option value="percent">Giảm theo phần trăm (%)</option>
-                  <option value="fixed">Giảm theo số tiền cố định</option>
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label>Giá trị giảm <span className="required">*</span></label>
-                <input
-                  type="number"
-                  name="discount_value"
-                  value={formData.discount_value}
-                  onChange={handleInputChange}
-                  placeholder={formData.discount_type === 'percent' ? 'Nhập số phần trăm' : 'Nhập số tiền giảm'}
-                  min="0"
-                  step={formData.discount_type === 'percent' ? '1' : '1000'}
-                />
-              </div>
-
-              {formData.discount_type === 'percent' && (
-                <div className="form-group">
-                  <label>Giảm tối đa</label>
-                  <input
-                    type="number"
-                    name="max_discount"
-                    value={formData.max_discount}
-                    onChange={handleInputChange}
-                    placeholder="Nhập số tiền giảm tối đa"
-                    min="0"
-                    step="1000"
-                  />
-                </div>
-              )}
-
-              <div className="form-group">
-                <label>Đơn hàng tối thiểu</label>
-                <input
-                  type="number"
-                  name="min_order_value"
-                  value={formData.min_order_value}
-                  onChange={handleInputChange}
-                  placeholder="Nhập số tiền tối thiểu"
-                  min="0"
-                  step="1000"
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Giới hạn số lượng</label>
-                <input
-                  type="number"
-                  name="usage_limit"
-                  value={formData.usage_limit}
-                  onChange={handleInputChange}
-                  placeholder="Để trống nếu không giới hạn"
-                  min="1"
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Ngày bắt đầu <span className="required">*</span></label>
-                <input
-                  type="date"
-                  name="start_date"
-                  value={formData.start_date}
-                  onChange={handleInputChange}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Ngày kết thúc <span className="required">*</span></label>
-                <input
-                  type="date"
-                  name="end_date"
-                  value={formData.end_date}
-                  onChange={handleInputChange}
-                />
-              </div>
-
-              <div className="form-group full-width">
-                <label>Mô tả</label>
-                <textarea
-                  name="description"
-                  value={formData.description}
-                  onChange={handleInputChange}
-                  rows="3"
-                  placeholder="Nhập mô tả voucher (nếu có)"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="modal-footer">
-            <button className="cancel-btn" onClick={onClose}>
-              Hủy
-            </button>
-            <button 
-              className="save-btn" 
-              onClick={onSubmit}
-              disabled={saving}
-            >
-              {saving ? <FaSpinner className="spinning" /> : <FaSave />}
-              {saving ? 'Đang lưu...' : (title === 'Thêm voucher' ? 'Thêm voucher' : 'Cập nhật')}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // Modal: Detail Voucher
-  const DetailModal = ({ isOpen, onClose, voucher }) => {
-    if (!isOpen || !voucher) return null;
-
-    const statusInfo = getStatusBadge(voucher.status, voucher.end_date);
-    const StatusIcon = statusInfo.icon;
-
-    return (
-      <div className="modal-overlay" onClick={onClose}>
-        <div className="modal-content detail-modal" onClick={e => e.stopPropagation()}>
-          <div className="modal-header">
-            <h2>Chi tiết voucher</h2>
-            <button className="close-btn" onClick={onClose}>
-              <FaTimes />
-            </button>
-          </div>
-
-          <div className="modal-body">
-            <div className="voucher-detail">
-              <div className="detail-header">
-                <div className="voucher-badge">
-                  <FaTag />
-                  {voucher.code}
-                </div>
-                <span 
-                  className={`status-badge ${statusInfo.class}`}
-                  style={{ backgroundColor: statusInfo.color + '20', color: statusInfo.color }}
-                >
-                  <StatusIcon size={12} />
-                  {statusInfo.label}
-                </span>
-              </div>
-
-              <div className="detail-section">
-                <h3>Thông tin giảm giá</h3>
-                <div className="info-grid">
-                  <div className="info-item">
-                    <label>Loại giảm giá:</label>
-                    <span>{voucher.discount_type === 'percent' ? 'Phần trăm (%)' : 'Số tiền cố định'}</span>
-                  </div>
-                  <div className="info-item">
-                    <label>Giá trị giảm:</label>
-                    <span className="discount-value">{getDiscountDetail(voucher)}</span>
-                  </div>
-                  {voucher.max_discount && (
-                    <div className="info-item">
-                      <label>Giảm tối đa:</label>
-                      <span>{formatCurrency(voucher.max_discount)}</span>
-                    </div>
-                  )}
-                  <div className="info-item">
-                    <label>Đơn hàng tối thiểu:</label>
-                    <span>{formatCurrency(voucher.min_order_value)}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="detail-section">
-                <h3>Thông tin sử dụng</h3>
-                <div className="info-grid">
-                  <div className="info-item">
-                    <label>Đã sử dụng:</label>
-                    <span>{voucher.used_count}/{voucher.usage_limit || '∞'}</span>
-                  </div>
-                  <div className="info-item">
-                    <label>Ngày bắt đầu:</label>
-                    <span>{formatDateTime(voucher.start_date)}</span>
-                  </div>
-                  <div className="info-item">
-                    <label>Ngày kết thúc:</label>
-                    <span>{formatDateTime(voucher.end_date)}</span>
-                  </div>
-                  <div className="info-item">
-                    <label>Ngày tạo:</label>
-                    <span>{formatDateTime(voucher.created_at)}</span>
-                  </div>
-                </div>
-              </div>
-
-              {voucher.description && (
-                <div className="detail-section">
-                  <h3>Mô tả</h3>
-                  <p className="description">{voucher.description}</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // Modal: Delete Confirmation
-  const DeleteConfirmModal = ({ isOpen, onClose, onConfirm, voucher }) => {
-    if (!isOpen || !voucher) return null;
-
-    return (
-      <div className="modal-overlay" onClick={onClose}>
-        <div className="modal-content confirm-modal" onClick={e => e.stopPropagation()}>
-          <div className="modal-header">
-            <h2>Xác nhận xóa</h2>
-            <button className="close-btn" onClick={onClose}>
-              <FaTimes />
-            </button>
-          </div>
-
-          <div className="modal-body">
-            <FaExclamationTriangle className="warning-icon" />
-            <p>Bạn có chắc chắn muốn xóa voucher <strong>{voucher.code}</strong>?</p>
-            <p className="warning-text">Hành động này không thể hoàn tác!</p>
-          </div>
-
-          <div className="modal-footer">
-            <button className="cancel-btn" onClick={onClose}>
-              Hủy
-            </button>
-            <button className="delete-btn" onClick={onConfirm}>
-              Xóa voucher
-            </button>
-          </div>
-        </div>
-      </div>
-    );
   };
 
   return (
@@ -871,13 +872,15 @@ const ShippingVouchers = () => {
         </div>
       )}
 
-      {/* Modals */}
+      {/* Modals - gọi các component đã được định nghĩa bên ngoài */}
       <VoucherFormModal
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
         title="Thêm voucher"
         onSubmit={handleAddVoucher}
         saving={saving}
+        formData={formData}
+        onInputChange={handleInputChange}
       />
 
       <VoucherFormModal
@@ -886,12 +889,18 @@ const ShippingVouchers = () => {
         title="Sửa voucher"
         onSubmit={handleUpdateVoucher}
         saving={saving}
+        formData={formData}
+        onInputChange={handleInputChange}
       />
 
       <DetailModal
         isOpen={showDetailModal}
         onClose={() => setShowDetailModal(false)}
         voucher={selectedVoucher}
+        formatCurrency={formatCurrency}
+        formatDateTime={formatDateTime}
+        getDiscountDetail={getDiscountDetail}
+        getStatusBadge={getStatusBadge}
       />
 
       <DeleteConfirmModal

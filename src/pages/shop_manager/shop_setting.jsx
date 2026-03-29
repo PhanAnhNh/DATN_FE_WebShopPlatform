@@ -486,10 +486,6 @@ const ShopSettings = () => {
               </div>
             </div>
           )}
-
-          {/* Các tab khác giữ nguyên, chỉ cần thay text bằng t() */}
-          {/* Payment, Shipping, Security, Invoice, Social, SEO tabs */}
-          {/* ... */}
         </div>
       </div>
 

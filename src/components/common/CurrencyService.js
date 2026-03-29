@@ -2,7 +2,7 @@
 export class CurrencyService {
   static instance = null;
   currentCurrency = 'VND';
-  exchangeRate = 25000;
+  exchangeRate = 27000;
 
   constructor() {
     if (CurrencyService.instance) {

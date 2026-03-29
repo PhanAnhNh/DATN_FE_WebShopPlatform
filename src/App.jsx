@@ -1,4 +1,3 @@
-// File: App.jsx
 import { Routes, Route } from "react-router-dom";
 import { AppProvider } from "./components/common/AppContext"; // Thêm import này
 import Home from "./pages/user/Home.jsx";
@@ -33,8 +32,9 @@ import Orders from "./pages/user/orderHistory.jsx";
 import UserProfile from "./pages/user/UserProfile.jsx";
 import ProductReturns from "./pages/user/shop/product_return.jsx";
 import ShippingUnitManager from "./pages/shop_manager/ShippingUnitManager.jsx";
-import ShippingVouchers from "./pages/user/shop/ShippingVouchers.jsx";
 import AdminProfile from "./pages/admin/Admin_profile.jsx";
+import AdminSettings from "./pages/admin/Setting.jsx";
+import ShippingVouchers from "./pages/shop_manager/ShippingVouchers.jsx";
 
 function App() {
   return (
@@ -98,7 +98,14 @@ function App() {
             </AdminLayout>
           } 
         />
-        
+        <Route 
+          path="/admin/settings" 
+          element={
+            <AdminLayout>
+              <AdminSettings />
+            </AdminLayout>
+          } 
+        />
         {/* Shop Routes */}
         <Route 
           path="/shop/shipping-units" 

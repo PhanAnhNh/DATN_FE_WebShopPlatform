@@ -1,0 +1,264 @@
+/* src/css/AdminSettings.css */
+:root {
+  --primary: #10b981;
+  --primary-hover: #059669;
+  --primary-soft: rgba(16, 185, 129, 0.12);
+  
+  /* Light mode (default) */
+  --bg-page: #f1f5f9;
+  --bg-card: #ffffff;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --border-light: #e2e8f0;
+  --input-bg: #f8fafc;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03);
+  --shadow-md: 0 10px 25px -5px rgba(0,0,0,0.05), 0 8px 10px -6px rgba(0,0,0,0.02);
+}
+
+[data-theme="dark"] {
+  --primary: #f1f5f9;
+  --primary-hover: #6ee7b7;
+  --primary-soft: rgba(52, 211, 153, 0.15);
+  
+  --bg-page: #0f172a;        /* deep navy slate */
+  --bg-card: #1e293b;        /* card background – softer than pure black */
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --border-light: #334155;
+  --input-bg: #0f172a;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+  --shadow-md: 0 10px 25px -5px rgba(0,0,0,0.4), 0 8px 10px -6px rgba(0,0,0,0.3);
+}
+
+/* Base layout */
+.admin-settings {
+  background-color: var(--bg-page);
+  min-height: 100vh;
+  padding: 2rem;
+  color: var(--text-primary);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.settings-containers {
+  max-width: 70vw;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+  background: transparent;
+}
+
+/* Header */
+.settings-header h1 {
+  font-size: 1.875rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--text-primary) 0%, var(--primary) 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.02em;
+}
+
+.settings-header p {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+/* Cards */
+.settings-section {
+  background: var(--bg-card);
+  border-radius: 1.25rem;
+  padding: 1.75rem;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-light);
+  transition: all 0.25s ease;
+}
+
+.section-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid var(--border-light);
+  color: var(--text-primary);
+}
+
+.section-title svg {
+  color: var(--primary);
+  font-size: 1.3rem;
+}
+
+/* Form grid */
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+}
+
+.form-group {
+  margin-bottom: 0;
+}
+
+.form-group label {
+  display: block;
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 0.6rem;
+  color: var(--text-secondary);
+}
+
+.form-group select {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background-color: var(--input-bg);
+  border: 1px solid var(--border-light);
+  border-radius: 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394a3b8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+  background-size: 1rem;
+}
+
+.form-group select:hover {
+  border-color: var(--primary);
+}
+
+.form-group select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+/* Theme toggle cards – đẹp hơn cho dark mode */
+.theme-card {
+  cursor: pointer;
+  padding: 1.25rem;
+  border-radius: 1rem;
+  border: 1.5px solid var(--border-light);
+  background: var(--input-bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  transition: all 0.25s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.theme-card svg {
+  font-size: 2rem;
+  transition: transform 0.2s;
+}
+
+.theme-card:hover {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  transform: translateY(-3px);
+}
+
+.theme-card.active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary);
+  box-shadow: 0 8px 20px -8px rgba(16, 185, 129, 0.3);
+}
+
+.theme-card.active svg {
+  transform: scale(1.08);
+}
+
+/* Save button */
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.5rem;
+}
+
+.save-btn {
+  background: var(--primary);
+  color: white;
+  padding: 0.8rem 2rem;
+  border-radius: 2rem;
+  font-weight: 600;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.save-btn:hover:not(:disabled) {
+  background: var(--primary-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px -8px var(--primary);
+}
+
+.save-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Alerts */
+.alert {
+  padding: 0.9rem 1.2rem;
+  border-radius: 1rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  backdrop-filter: blur(4px);
+}
+
+.alert.success {
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-left: 4px solid var(--primary);
+}
+
+.alert.error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+  border-left: 4px solid #ef4444;
+}
+
+/* Spinner */
+.spinning {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .admin-settings {
+    padding: 1rem;
+  }
+  .theme-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  .settings-section {
+    padding: 1.25rem;
+  }
+  .section-title {
+    font-size: 1rem;
+  }
+  .save-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

@@ -129,9 +129,131 @@
   font-weight:500;
 }
 
-.user-username{
-  font-size:12px;
-  color:#6b7280;
+/* Đảm bảo các phần tử text sử dụng biến đúng */
+.user-username {
+  font-size: 12px;
+  color: var(--admin-text-secondary);
+  /* Nếu muốn đậm hơn trong dark mode, có thể thêm */
+}
+
+/* Đảm bảo toàn bộ nền và chữ thay đổi theo dark mode */
+[data-theme="dark"] .table-container {
+  background: var(--admin-bg-card);
+}
+
+[data-theme="dark"] .data-table thead {
+  background: #1e293b;
+}
+
+[data-theme="dark"] .data-table th,
+[data-theme="dark"] .data-table td {
+  color: var(--admin-text-primary);
+  border-top-color: var(--admin-border);
+}
+
+[data-theme="dark"] .data-table td {
+  background: var(--admin-bg-card);
+}
+
+[data-theme="dark"] .users-search-input {
+  background: var(--admin-input-bg);
+  border-color: var(--admin-border);
+  color: var(--admin-text-primary);
+}
+
+[data-theme="dark"] .users-search-input::placeholder {
+  color: var(--admin-text-secondary);
+}
+
+[data-theme="dark"] .btn-secondary {
+  background: #374151;
+  color: #e5e7eb;
+}
+
+[data-theme="dark"] .pagination-btn {
+  background: #1e293b;
+  border-color: var(--admin-border);
+  color: var(--admin-text-primary);
+}
+
+[data-theme="dark"] .pagination-btn.active {
+  background: #16a34a;
+  color: white;
+}
+
+[data-theme="dark"] .items-per-page-select {
+  background: #1e293b;
+  border-color: var(--admin-border);
+  color: var(--admin-text-primary);
+}
+
+[data-theme="dark"] .modal-content {
+  background: var(--admin-bg-card);
+}
+
+[data-theme="dark"] .modal-header,
+[data-theme="dark"] .modal-footer {
+  border-color: var(--admin-border);
+}
+
+[data-theme="dark"] .form-group input,
+[data-theme="dark"] .form-group select,
+[data-theme="dark"] .form-group textarea {
+  background: var(--admin-input-bg);
+  border-color: var(--admin-border);
+  color: var(--admin-text-primary);
+}
+
+[data-theme="dark"] .user-avatar-small.default {
+  background: #2e7d32;
+  color: white;
+}
+
+/* Đảm bảo status badge trong dark mode */
+[data-theme="dark"] .status-badge.active {
+  background: #064e3b;
+  color: #6ee7b7;
+}
+
+[data-theme="dark"] .status-badge.inactive {
+  background: #7f1d1d;
+  color: #ffffff;
+}
+
+/* Action buttons dark mode */
+[data-theme="dark"] .action-btn.view {
+  background: #1e3a5f;
+  color: #ffffff;
+}
+[data-theme="dark"] .action-btn.edit {
+  background: #4d3e1f;
+  color: #ffffff;
+}
+[data-theme="dark"] .action-btn.delete {
+  background: #3f1e1e;
+  color: #ffffff;
+}
+
+/* ===== DARK MODE - FIX TABLE HEADER HOVER ===== */
+[data-theme="dark"] .data-table thead tr {
+  background-color: #1e293b !important;
+}
+
+[data-theme="dark"] .data-table thead th {
+  background-color: #1e293b !important;
+  color: var(--admin-text-primary) !important;
+}
+
+/* Hover effect for table header cells */
+[data-theme="dark"] .data-table thead th:hover {
+  background-color: #2d3a4e !important;
+  cursor: default;
+}
+
+/* Đảm bảo toàn bộ thead không bị ảnh hưởng bởi các selector khác */
+[data-theme="dark"] .data-table thead tr:hover,
+[data-theme="dark"] .data-table thead tr:hover th {
+  background-color: #1e293b !important;
 }
 
 /* STATUS BADGE */
@@ -679,6 +801,30 @@
 
 .toast.error {
   border-left-color: #ef4444;
+}
+
+/* ===== DARK MODE - FORCE WHITE TEXT FOR ALL TABLE CONTENT ===== */
+[data-theme="dark"] .data-table td,
+[data-theme="dark"] .data-table th,
+[data-theme="dark"] .user-name,
+[data-theme="dark"] .user-username,
+[data-theme="dark"] .user-info-cell div,
+[data-theme="dark"] .user-info-cell .user-name,
+[data-theme="dark"] .user-info-cell .user-username,
+[data-theme="dark"] .status-badge.active,
+[data-theme="dark"] .status-badge.inactive {
+  color: #ffffff !important;
+}
+
+/* Nếu status badge có nền đậm nhưng chữ vẫn cần trắng */
+[data-theme="dark"] .status-badge.active,
+[data-theme="dark"] .status-badge.inactive {
+  color: #ffffff !important;
+}
+
+/* Đảm bảo các liên kết hoặc nút không bị ảnh hưởng */
+[data-theme="dark"] .action-btn svg {
+  color: #ffffff !important;
 }
 
 /* ===== Animations ===== */

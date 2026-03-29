@@ -1,6 +1,7 @@
 // src/context/AppContext.jsx
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { shopApi } from '../../api/api';
+import { currencyService } from './CurrencyService';
 
 const AppContext = createContext();
 
@@ -31,7 +32,13 @@ export const AppProvider = ({ children }) => {
 
   // Tải translations khi ngôn ngữ thay đổi
   useEffect(() => {
-    loadTranslations();
+  const handleChange = (e) => {
+    setCurrency(e.detail); // 👈 trigger re-render
+  };
+  loadTranslations();
+
+  window.addEventListener('currencyChange', handleChange);
+    return () => window.removeEventListener('currencyChange', handleChange);
   }, [language]);
 
   const loadTranslations = async () => {
@@ -72,29 +79,14 @@ export const AppProvider = ({ children }) => {
     window.dispatchEvent(new CustomEvent('languageChange', { detail: lang }));
   };
 
-  const changeCurrency = (curr) => {
-    setCurrency(curr);
-    localStorage.setItem('app_currency', curr);
-    window.dispatchEvent(new CustomEvent('currencyChange', { detail: curr }));
+  const changeCurrency = (cur) => {
+    currencyService.changeCurrency(cur);
   };
+
 
   // Hàm format số tiền theo currency
   const formatCurrency = (amount) => {
-    if (currency === 'USD') {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0
-      }).format(amount / 25000);
-    }
-    
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount);
+    return currencyService.format(amount); // 👈 QUAN TRỌNG
   };
 
   // Hàm dịch văn bản theo module

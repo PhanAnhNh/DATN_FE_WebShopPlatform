@@ -21,6 +21,11 @@ function Home() {
     const [activeCommentMenu, setActiveCommentMenu] = useState(null); 
     const [editingCommentId, setEditingCommentId] = useState(null); 
     const [editCommentContent, setEditCommentContent] = useState("");
+    const [selectedPost, setSelectedPost] = useState(null);
+    const [isPostModalOpen, setIsPostModalOpen] = useState(false);
+    const [modalComments, setModalComments] = useState([]);
+    const [modalCommentInput, setModalCommentInput] = useState("");
+    const [modalLiked, setModalLiked] = useState(false);
 
     const [newPost, setNewPost] = useState({
     content: "",
@@ -235,6 +240,42 @@ function Home() {
             alert("Không thể thực hiện. Vui lòng thử lại!");
         }
     };
+
+   const openPostModal = async (post) => {
+    try {
+        // 1. Gọi API chi tiết để tăng view_count và lấy dữ liệu mới nhất
+        const res = await api.get(`/api/v1/posts/${post._id}`);
+        const updatedPost = res.data;
+        
+        // 2. Cập nhật state
+        setSelectedPost(updatedPost);
+        setIsPostModalOpen(true);
+        setModalCommentInput("");
+        
+        // 3. Cập nhật lại bài viết trong feed (để đồng bộ view_count)
+        setPosts(prevPosts => prevPosts.map(p => 
+            p._id === post._id ? updatedPost : p
+        ));
+        
+        // 4. Kiểm tra like
+        try {
+            const likeRes = await api.get(`/api/v1/likes/check/${post._id}`);
+            setModalLiked(likeRes.data.liked);
+        } catch(e) { setModalLiked(false); }
+        
+        // 5. Tải bình luận
+        try {
+            const commentsRes = await api.get(`/api/v1/comments/${post._id}`);
+            setModalComments(commentsRes.data);
+        } catch(e) { setModalComments([]); }
+        
+    } catch (error) {
+        console.error("Lỗi khi mở bài viết:", error);
+        // Fallback: dùng dữ liệu cũ nếu API lỗi
+        setSelectedPost(post);
+        setIsPostModalOpen(true);
+    }
+};
 
     const handleSharePost = async (postId) => {
         setPosts(prevPosts => prevPosts.map(p => {
@@ -511,7 +552,7 @@ function Home() {
             </div>
 
             {posts.map((post) => (
-                <div key={post._id} style={{ background: "white", borderRadius: "12px", padding: "20px", marginBottom: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
+                <div  key={post._id} style={{ background: "white", borderRadius: "12px", padding: "20px", marginBottom: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
                     {/* Phần nội dung bài viết giữ nguyên */}
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "15px", position: "relative" }}>
                         {/* Phần hiển thị thông tin người đăng bài */}
@@ -617,7 +658,7 @@ function Home() {
                         )}
                     </div>
 
-                    <div style={{ marginBottom: "15px", fontSize: "15px" }}>
+                    <div onClick={() => openPostModal(post)} style={{ marginBottom: "15px", fontSize: "15px", cursor: "pointer" }}>
                         {post.content && <p style={{ margin: "5px 0" }}>{post.content}</p>}
                         {post.location && (
                             <p style={{ margin: "5px 0", color: "#666", fontSize: "14px" }}>
@@ -977,6 +1018,225 @@ function Home() {
                             >
                                 {isSubmitting ? "Đang đăng..." : editingPost ? "Cập nhật" : "Đăng"}
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Modal xem chi tiết bài viết */}
+            {isPostModalOpen && selectedPost && (
+                <div style={{
+                    position: "fixed",
+                    top: 0,
+                    left: 0,
+                    width: "100vw",
+                    height: "100vh",
+                    backgroundColor: "rgba(0,0,0,0.8)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    zIndex: 2000,
+                    overflowY: "auto"
+                }} onClick={() => setIsPostModalOpen(false)}>
+                    <div style={{
+                        background: "white",
+                        width: "700px",
+                        maxWidth: "90%",
+                        maxHeight: "90vh",
+                        borderRadius: "16px",
+                        display: "flex",
+                        flexDirection: "column",
+                        overflow: "hidden",
+                        position: "relative"
+                    }} onClick={(e) => e.stopPropagation()}>
+                        
+                        {/* Header modal */}
+                        <div style={{
+                            padding: "12px 16px",
+                            borderBottom: "1px solid #e4e6eb",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center"
+                        }}>
+                            <h3 style={{ margin: 0, fontSize: "18px" }}>Chi tiết bài viết</h3>
+                            <button
+                                onClick={() => setIsPostModalOpen(false)}
+                                style={{
+                                    background: "transparent",
+                                    border: "none",
+                                    fontSize: "24px",
+                                    cursor: "pointer",
+                                    width: "36px",
+                                    height: "36px",
+                                    borderRadius: "50%",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center"
+                                }}
+                            >✕</button>
+                        </div>
+
+                        {/* Nội dung bài viết (có thể scroll) */}
+                        <div style={{ flex: 1, overflowY: "auto", padding: "16px" }}>
+                            {/* Thông tin người đăng */}
+                            <div style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "15px" }}>
+                                <div style={{ width: "40px", height: "40px", background: "#ddd", borderRadius: "50%", overflow: "hidden" }}>
+                                    {selectedPost.author_avatar ? <img src={selectedPost.author_avatar} alt="avatar" style={{width:"100%", height:"100%", objectFit:"cover"}}/> : "👤"}
+                                </div>
+                                <div>
+                                    <h4 style={{ margin: 0, fontSize: "16px" }}>{selectedPost.author_name}</h4>
+                                    <span style={{ fontSize: "12px", color: "#888" }}>{new Date(selectedPost.created_at).toLocaleString()}</span>
+                                </div>
+                            </div>
+
+                            {/* Nội dung */}
+                            <div style={{ marginBottom: "15px" }}>
+                                {selectedPost.content && <p style={{ margin: "5px 0", fontSize: "15px" }}>{selectedPost.content}</p>}
+                                {selectedPost.location && <p style={{ margin: "5px 0", color: "#666", fontSize: "14px" }}>📍 {selectedPost.location}</p>}
+                                {selectedPost.tags && selectedPost.tags.length > 0 && (
+                                    <p style={{ margin: "5px 0", color: "#2e7d32", fontSize: "14px", fontWeight: "500" }}>
+                                        {selectedPost.tags.map(tag => `#${tag}`).join(" ")}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Ảnh */}
+                            {selectedPost.images && selectedPost.images.length > 0 && (
+                                <div style={{
+                                    display: "grid",
+                                    gridTemplateColumns: selectedPost.images.length > 1 ? "repeat(2, 1fr)" : "1fr",
+                                    gap: "10px",
+                                    marginBottom: "15px"
+                                }}>
+                                    {selectedPost.images.map((img, idx) => (
+                                        <img key={idx} src={img} alt="post" style={{ width: "100%", borderRadius: "8px", objectFit: "cover" }} />
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Thống kê like, comment */}
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", fontSize: "14px", color: "#65676B" }}>
+                                <div>👍 {selectedPost.stats?.like_count || 0} lượt thích</div>
+                                <div>{selectedPost.stats?.comment_count || 0} bình luận</div>
+                            </div>
+
+                            {/* Thanh tương tác */}
+                            <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #eee", borderBottom: "1px solid #eee", padding: "8px 0", marginBottom: "15px" }}>
+                                <div
+                                    onClick={async () => {
+                                        const newLiked = !modalLiked;
+                                        setModalLiked(newLiked);
+                                        // Cập nhật số like
+                                        setSelectedPost(prev => ({
+                                            ...prev,
+                                            stats: { ...prev.stats, like_count: (prev.stats?.like_count || 0) + (newLiked ? 1 : -1) }
+                                        }));
+                                        try {
+                                            await api.post(`/api/v1/likes/${selectedPost._id}`);
+                                        } catch(e) {
+                                            // rollback
+                                            setModalLiked(!newLiked);
+                                            setSelectedPost(prev => ({
+                                                ...prev,
+                                                stats: { ...prev.stats, like_count: (prev.stats?.like_count || 0) + (newLiked ? -1 : 1) }
+                                            }));
+                                        }
+                                    }}
+                                    style={{ flex: 1, textAlign: "center", cursor: "pointer", color: modalLiked ? "#1877F2" : "#555", fontWeight: "500", padding: "6px 0", borderRadius: "6px" }}
+                                >
+                                    👍 Thích
+                                </div>
+                                <div style={{ flex: 1, textAlign: "center", color: "#555", fontWeight: "500", padding: "6px 0" }}>💬 Bình luận</div>
+                                <div style={{ flex: 1, textAlign: "center", cursor: "pointer", color: "#555", fontWeight: "500", padding: "6px 0", borderRadius: "6px" }}
+                                    onClick={async () => {
+                                        // Xử lý chia sẻ nếu cần
+                                        alert("Tính năng chia sẻ đang phát triển");
+                                    }}
+                                >↗️ Chia sẻ</div>
+                            </div>
+
+                            {/* Danh sách bình luận */}
+                            <div style={{ marginTop: "15px" }}>
+                                <h4 style={{ fontSize: "15px", marginBottom: "12px" }}>Bình luận</h4>
+                                {modalComments.length === 0 ? (
+                                    <div style={{ textAlign: "center", color: "#888", padding: "20px 0" }}>Chưa có bình luận nào.</div>
+                                ) : (
+                                    modalComments.map(cmt => (
+                                        <div key={cmt._id} style={{ display: "flex", gap: "10px", marginBottom: "12px", alignItems: "flex-start" }}>
+                                            <div style={{ width: "32px", height: "32px", background: "#2e7d32", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "12px", fontWeight: "bold", flexShrink: 0 }}>
+                                                {cmt.author_name ? cmt.author_name.charAt(0).toUpperCase() : "U"}
+                                            </div>
+                                            <div style={{ background: "#f0f2f5", padding: "8px 12px", borderRadius: "18px", maxWidth: "80%" }}>
+                                                <strong style={{ fontSize: "13px", display: "block", marginBottom: "4px" }}>{cmt.author_name}</strong>
+                                                <span style={{ fontSize: "14px" }}>{cmt.content}</span>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Input bình luận */}
+                        <div style={{ padding: "12px 16px", borderTop: "1px solid #e4e6eb", display: "flex", gap: "10px", alignItems: "center" }}>
+                            <div style={{ width: "32px", height: "32px", background: "#ddd", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>👤</div>
+                            <input
+                                type="text"
+                                placeholder="Viết bình luận..."
+                                value={modalCommentInput}
+                                onChange={(e) => setModalCommentInput(e.target.value)}
+                                onKeyDown={async (e) => {
+                                    if (e.key === "Enter" && modalCommentInput.trim()) {
+                                        try {
+                                            await api.post("/api/v1/comments/", {
+                                                post_id: selectedPost._id,
+                                                content: modalCommentInput
+                                            });
+                                            // Reload comments
+                                            const commentsRes = await api.get(`/api/v1/comments/${selectedPost._id}`);
+                                            setModalComments(commentsRes.data);
+                                            setModalCommentInput("");
+                                            // Cập nhật số comment trong selectedPost
+                                            setSelectedPost(prev => ({
+                                                ...prev,
+                                                stats: { ...prev.stats, comment_count: (prev.stats?.comment_count || 0) + 1 }
+                                            }));
+                                        } catch(err) {
+                                            console.error(err);
+                                            alert("Không thể đăng bình luận");
+                                        }
+                                    }
+                                }}
+                                style={{
+                                    flex: 1,
+                                    padding: "8px 12px",
+                                    borderRadius: "20px",
+                                    border: "none",
+                                    background: "#f0f2f5",
+                                    outline: "none",
+                                    fontSize: "14px"
+                                }}
+                            />
+                            <button
+                                onClick={async () => {
+                                    if (!modalCommentInput.trim()) return;
+                                    try {
+                                        await api.post("/api/v1/comments/", {
+                                            post_id: selectedPost._id,
+                                            content: modalCommentInput
+                                        });
+                                        const commentsRes = await api.get(`/api/v1/comments/${selectedPost._id}`);
+                                        setModalComments(commentsRes.data);
+                                        setModalCommentInput("");
+                                        setSelectedPost(prev => ({
+                                            ...prev,
+                                            stats: { ...prev.stats, comment_count: (prev.stats?.comment_count || 0) + 1 }
+                                        }));
+                                    } catch(err) {
+                                        console.error(err);
+                                        alert("Không thể đăng bình luận");
+                                    }
+                                }}
+                                style={{ border: "none", background: "transparent", color: "#1877F2", fontWeight: "bold", cursor: "pointer" }}
+                            >Gửi</button>
                         </div>
                     </div>
                 </div>

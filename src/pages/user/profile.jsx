@@ -220,8 +220,6 @@ function Profile() {
         }
     };
 
-    // ... các hàm handleToggleComments, handlePostComment, handleToggleLike, handleSharePost giữ nguyên ...
-
     // Các hàm khác giữ nguyên
     const handleToggleComments = async (postId) => { /* ... */ };
     const handlePostComment = async (postId) => { /* ... */ };
