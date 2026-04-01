@@ -35,171 +35,175 @@ import ShippingUnitManager from "./pages/shop_manager/ShippingUnitManager.jsx";
 import AdminProfile from "./pages/admin/Admin_profile.jsx";
 import AdminSettings from "./pages/admin/Setting.jsx";
 import ShippingVouchers from "./pages/shop_manager/ShippingVouchers.jsx";
+import SavedPosts from "./pages/user/SavedPosts.jsx";
 
 function App() {
   return (
-    <AppProvider>  {/* Wrap tất cả routes với AppProvider */}
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/register" element={<Register />} /> 
-        <Route path="/admin/login" element={<AdminLogin />} /> 
-        <Route path="/use/shop" element={<ShopPage />} />
-        <Route path="/shop/:shop_id" element={<ShopDetailPage />} />
-        <Route path="/product/:product_id" element={<ProductDetailPage />} />
-        <Route path="/checkout" element={<CheckoutPage />} />
-        <Route path="/cart" element={<CartPage />} />
-        <Route path="/payment/instructions/:orderId" element={<PaymentInstructions />} />
-        <Route path="/orders/:orderId" element={<OrderDetail />} />
-        <Route path="/history/orders" element={<Orders />} />
-        <Route path="/profile/:userId" element={<UserProfile />} />
-        <Route path="/user/returns" element={<ProductReturns />} />
+    <AppProvider>
+      
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/register" element={<Register />} /> 
+            <Route path="/admin/login" element={<AdminLogin />} /> 
+            <Route path="/use/shop" element={<ShopPage />} />
+            <Route path="/shop/:shop_id" element={<ShopDetailPage />} />
+            <Route path="/product/:product_id" element={<ProductDetailPage />} />
+            <Route path="/checkout" element={<CheckoutPage />} />
+            <Route path="/cart" element={<CartPage />} />
+            <Route path="/payment/instructions/:orderId" element={<PaymentInstructions />} />
+            <Route path="/orders/:orderId" element={<OrderDetail />} />
+            <Route path="/history/orders" element={<Orders />} />
+            <Route path="/profile/:userId" element={<UserProfile />} />
+            <Route path="/user/returns" element={<ProductReturns />} />
+            <Route path="/user/saved-posts" element={<SavedPosts  />} />
+            
+            {/* Admin Routes */}
+            <Route 
+              path="/admin/dashboard" 
+              element={
+                <AdminLayout>
+                  <DashboardPage />
+                </AdminLayout>
+              } 
+            />
+            <Route 
+              path="/admin/users" 
+              element={
+                <AdminLayout>
+                  <UsersManagement />
+                </AdminLayout>
+              } 
+            />
+            <Route 
+              path="/admin/stores" 
+              element={
+                <AdminLayout>
+                  <ShopsManagement />
+                </AdminLayout>
+              } 
+            />
+            <Route 
+              path="/admin/posts" 
+              element={
+                <AdminLayout>
+                  <PostsManagement />
+                </AdminLayout>
+              } 
+            />
+            
+            <Route 
+              path="/admin/profile" 
+              element={
+                <AdminLayout>
+                  <AdminProfile />
+                </AdminLayout>
+              } 
+            />
+            <Route 
+              path="/admin/settings" 
+              element={
+                <AdminLayout>
+                  <AdminSettings />
+                </AdminLayout>
+              } 
+            />
+            {/* Shop Routes */}
+            <Route 
+              path="/shop/shipping-units" 
+              element={
+                <ShopLayout>
+                  <ShippingUnitManager />
+                </ShopLayout>
+              } 
+            />
+            <Route 
+              path="/shop/dashboard" 
+              element={
+                <ShopLayout>
+                  <ShopDashboard />
+                </ShopLayout>
+              } 
+            />
+            <Route 
+              path="/shop/login" 
+              element={<ShopLogin/>} 
+            />
+            <Route 
+              path="/shop/profile" 
+              element={
+                <ShopLayout>
+                  <ShopProfile />
+                </ShopLayout>
+              } 
+            />
+            <Route 
+              path="/shop/customers" 
+              element={
+                <ShopLayout>
+                  <ShopCustomers />
+                </ShopLayout>
+              } 
+            />
+            <Route 
+              path="/shop/products" 
+              element={
+                <ShopLayout>
+                  <ShopProducts />
+                </ShopLayout>
+              } 
+            />
+            <Route 
+              path="/shop/orders" 
+              element={
+                <ShopLayout>
+                  <ShopOrders />
+                </ShopLayout>
+              } 
+            />
+            <Route 
+              path="/shop/revenue" 
+              element={
+                <ShopLayout>
+                  <ShopRevenue />
+                </ShopLayout>
+              } 
+            />
+            <Route 
+              path="/shop/returns" 
+              element={
+                <ShopLayout>
+                  <ShopReturns />
+                </ShopLayout>
+              } 
+            />
+            <Route 
+              path="/shop/shipping-vouchers" 
+              element={
+                <ShopLayout>
+                  <ShippingVouchers />
+                </ShopLayout>
+              } 
+            />
+            <Route
+              path="/shop/settings"
+              element={
+                <ShopLayout>
+                  <ShopSetting/>
+                </ShopLayout>
+              }
+            />
+            <Route
+              path="/shop/vouchers"
+              element={
+                <ShopLayout>
+                  <ShopVouchers/>
+                </ShopLayout>
+              }
+            />
+          </Routes>
         
-        {/* Admin Routes */}
-        <Route 
-          path="/admin/dashboard" 
-          element={
-            <AdminLayout>
-              <DashboardPage />
-            </AdminLayout>
-          } 
-        />
-        <Route 
-          path="/admin/users" 
-          element={
-            <AdminLayout>
-              <UsersManagement />
-            </AdminLayout>
-          } 
-        />
-        <Route 
-          path="/admin/stores" 
-          element={
-            <AdminLayout>
-              <ShopsManagement />
-            </AdminLayout>
-          } 
-        />
-        <Route 
-          path="/admin/posts" 
-          element={
-            <AdminLayout>
-              <PostsManagement />
-            </AdminLayout>
-          } 
-        />
-        
-        <Route 
-          path="/admin/profile" 
-          element={
-            <AdminLayout>
-              <AdminProfile />
-            </AdminLayout>
-          } 
-        />
-        <Route 
-          path="/admin/settings" 
-          element={
-            <AdminLayout>
-              <AdminSettings />
-            </AdminLayout>
-          } 
-        />
-        {/* Shop Routes */}
-        <Route 
-          path="/shop/shipping-units" 
-          element={
-            <ShopLayout>
-              <ShippingUnitManager />
-            </ShopLayout>
-          } 
-        />
-        <Route 
-          path="/shop/dashboard" 
-          element={
-            <ShopLayout>
-              <ShopDashboard />
-            </ShopLayout>
-          } 
-        />
-        <Route 
-          path="/shop/login" 
-          element={<ShopLogin/>} 
-        />
-        <Route 
-          path="/shop/profile" 
-          element={
-            <ShopLayout>
-              <ShopProfile />
-            </ShopLayout>
-          } 
-        />
-        <Route 
-          path="/shop/customers" 
-          element={
-            <ShopLayout>
-              <ShopCustomers />
-            </ShopLayout>
-          } 
-        />
-        <Route 
-          path="/shop/products" 
-          element={
-            <ShopLayout>
-              <ShopProducts />
-            </ShopLayout>
-          } 
-        />
-        <Route 
-          path="/shop/orders" 
-          element={
-            <ShopLayout>
-              <ShopOrders />
-            </ShopLayout>
-          } 
-        />
-        <Route 
-          path="/shop/revenue" 
-          element={
-            <ShopLayout>
-              <ShopRevenue />
-            </ShopLayout>
-          } 
-        />
-        <Route 
-          path="/shop/returns" 
-          element={
-            <ShopLayout>
-              <ShopReturns />
-            </ShopLayout>
-          } 
-        />
-        <Route 
-          path="/shop/shipping-vouchers" 
-          element={
-            <ShopLayout>
-              <ShippingVouchers />
-            </ShopLayout>
-          } 
-        />
-        <Route
-          path="/shop/settings"
-          element={
-            <ShopLayout>
-              <ShopSetting/>
-            </ShopLayout>
-          }
-        />
-        <Route
-          path="/shop/vouchers"
-          element={
-            <ShopLayout>
-              <ShopVouchers/>
-            </ShopLayout>
-          }
-        />
-      </Routes>
     </AppProvider>
   );
 }

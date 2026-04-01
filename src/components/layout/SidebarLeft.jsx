@@ -56,6 +56,15 @@ function SidebarLeft({ userProfile = null }) {
         setEditData(prev => ({ ...prev, [name]: value }));
     };
 
+    const handleProfileClick = () => {
+        if (user && (user.id || user._id)) {
+            const userId = user.id || user._id;
+            navigate(`/profile`);
+        } else {
+            navigate("/profile");
+        }
+    };
+
     const handleSave = async () => {
         setLoading(true);
         try {
@@ -116,16 +125,31 @@ function SidebarLeft({ userProfile = null }) {
     );
 
     const getMenuItemStyle = (categoryType) => {
-        const isActive = currentCategory === categoryType && !isProfilePage;
-        return {
-            display: "flex", gap: "15px", alignItems: "center", cursor: "pointer", 
-            padding: "8px 10px", borderRadius: "8px",
-            color: isActive ? "#2e7d32" : "#050505",
-            fontWeight: isActive ? "bold" : "500",
-            transition: "background 0.2s",
-            background: isActive ? "#f0f2f5" : "transparent"
-        };
+    let isActive = false;
+
+    // Trang saved
+    if (categoryType === "saved") {
+        isActive = location.pathname === "/user/saved-posts";
+    } 
+    // Trang home + category
+    else {
+        const isHome = location.pathname === "/";
+        isActive = isHome && currentCategory === categoryType;
+    }
+
+    return {
+        display: "flex",
+        gap: "15px",
+        alignItems: "center",
+        cursor: "pointer",
+        padding: "8px 10px",
+        borderRadius: "8px",
+        color: isActive ? "#2e7d32" : "#050505",
+        fontWeight: isActive ? "bold" : "500",
+        background: isActive ? "#f0f2f5" : "transparent",
+        transition: "background 0.2s"
     };
+};
 
     const shouldShowProfileInfo = isProfilePage || (isUserProfilePage && userProfile);
 
@@ -149,14 +173,19 @@ function SidebarLeft({ userProfile = null }) {
                         <>
                             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "15px" }}>
                                 {user.avatar_url ? (
-                                    <img src={user.avatar_url} alt="avatar" style={{ width: "50px", height: "50px", borderRadius: "50%", objectFit: "cover" }} />
+                                     <img 
+                                        src={user.avatar_url} 
+                                        alt="avatar" 
+                                        style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover", cursor: "pointer" }}
+                                        onClick={handleProfileClick}
+                                    />
                                 ) : (
-                                    <div style={{ width: "50px", height: "50px", background: "#2e7d32", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: "bold", fontSize: "20px" }}>
+                                    <div onClick={handleProfileClick} style={{ width: "50px", height: "50px", background: "#2e7d32", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: "bold", fontSize: "20px" }}>
                                         {firstLetter}
                                     </div>
                                 )}
-                                <div>
-                                    <h4 style={{ margin: 0, fontSize: "16px" }}>{user.full_name || user.username}</h4>
+                                <div >
+                                    <h4 onClick={handleProfileClick} style={{ margin: 0, fontSize: "16px" }}>{user.full_name || user.username}</h4>
                                     <span style={{ fontSize: "12px", color: "#65676b" }}>@{user.username}</span>
                                 </div>
                             </div>
@@ -209,17 +238,36 @@ function SidebarLeft({ userProfile = null }) {
                     )}
                 </div>
             ) : (
-                /* Menu Trang Chủ */
+            /* Menu Trang Chủ */
                 <div style={cardStyle}>
                     <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "15px" }}>
                         {user.avatar_url ? (
-                            <img src={user.avatar_url} alt="avatar" style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover" }} />
+                            <img 
+                                src={user.avatar_url} 
+                                alt="avatar" 
+                                style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover", cursor: "pointer" }}
+                                onClick={handleProfileClick}
+                            />
                         ) : (
-                            <div style={{ width: "36px", height: "36px", background: "#2e7d32", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: "bold" }}>
+                            <div 
+                                onClick={handleProfileClick}
+                                style={{ width: "36px", height: "36px", background: "#2e7d32", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: "bold", cursor: "pointer" }}
+                            >
                                 {firstLetter}
                             </div>
                         )}
-                        <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600" }}>{user.full_name || user.username}</h4>
+                        <h4 
+                            onClick={handleProfileClick}
+                            style={{ 
+                                margin: 0, 
+                                fontSize: "15px", 
+                                fontWeight: "600",
+                                cursor: "pointer",
+                                color: "#2e7d32"
+                            }}
+                        >
+                            {user.full_name || user.username}
+                        </h4>
                     </div>
 
                     <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "5px" }}>
@@ -235,13 +283,13 @@ function SidebarLeft({ userProfile = null }) {
                         <li style={getMenuItemStyle("specialty")} onClick={() => handleCategoryClick("specialty")}>
                             <span style={{ fontSize: "20px" }}>📦</span> <span>Đặc sản</span>
                         </li>
-                        <li style={getMenuItemStyle("saved")} onClick={() => navigate("/saved")}>
+                        <li style={getMenuItemStyle("saved")} onClick={() => navigate("/user/saved-posts")}>
                             <span style={{ fontSize: "20px" }}>📌</span> <span>Đã lưu</span>
                         </li>
                     </ul>
                 </div>
             )}
-
+               
             {/* Khối Được quan tâm */}
             <h4 style={{ fontSize: "16px", margin: "15px 0 10px 5px", color: "#65676b", fontWeight: "600" }}>Được quan tâm</h4>
             <div style={cardStyle}>

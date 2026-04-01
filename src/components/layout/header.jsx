@@ -1,14 +1,16 @@
 // components/layout/header.jsx
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaShoppingCart, FaBell, FaUser, FaBook, FaCog, FaSignOutAlt } from 'react-icons/fa';
+import { FaShoppingCart, FaBell, FaUser, FaBook, FaCog, FaSignOutAlt, FaComment } from 'react-icons/fa';
 import api from "../../api/api";
 import NotificationBell from "../../pages/user/NotificationBell";
-
+import ChatModal from "../Chat/ChatModal";
 
 function Header() {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [cartCount, setCartCount] = useState(0);
+    const [isChatOpen, setIsChatOpen] = useState(false);
+    const [unreadCount, setUnreadCount] = useState(0);
     
     const menuRef = useRef(null);
     const navigate = useNavigate();
@@ -30,6 +32,27 @@ function Header() {
             setCartCount(0);
         }
     };
+
+    // Thêm vào Header.jsx
+    useEffect(() => {
+        const fetchUnreadCount = async () => {
+            try {
+                const token = localStorage.getItem("user_token");
+                if (!token) return;
+                
+                const res = await api.get('/api/v1/chat/unread-count');
+                setUnreadCount(res.data.unread_count || 0);
+            } catch (error) {
+                console.error("Error fetching unread count:", error);
+            }
+        };
+
+        fetchUnreadCount();
+
+    // Cập nhật mỗi 10 giây
+    const interval = setInterval(fetchUnreadCount, 10000);
+    return () => clearInterval(interval);
+}, []);
 
     // Effect đầu tiên: fetch khi component mount và set interval
     useEffect(() => {
@@ -139,6 +162,44 @@ function Header() {
                 alignItems: "center", 
                 fontSize: "20px" 
             }}>
+                {/* Icon Chat */}
+                <div 
+                    style={{ position: "relative", cursor: "pointer" }}
+                    onClick={() => setIsChatOpen(!isChatOpen)}
+                >
+                    <span style={{
+                        display: "flex",
+                        border: "1px solid #ddd",
+                        padding: "10px",
+                        borderRadius: "50%",
+                        backgroundColor: "#f0f2f5",
+                        transition: "all 0.3s"
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = "#e8f5e9";
+                        e.currentTarget.style.borderColor = "#2e7d32";
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = "#f0f2f5";
+                        e.currentTarget.style.borderColor = "#ddd";
+                    }}>
+                        <FaComment size={18} color="#2e7d32" />
+                    </span>
+                    
+                    {/* Badge unread */}
+                    {unreadCount > 0 && (
+                        <span style={{
+                            position: "absolute", top: "-5px", right: "-5px",
+                            background: "#ff4444", color: "white",
+                            borderRadius: "50%", width: "18px", height: "18px",
+                            fontSize: "10px", display: "flex",
+                            alignItems: "center", justifyContent: "center"
+                        }}>
+                            {unreadCount > 99 ? "99+" : unreadCount}
+                        </span>
+                    )}
+                </div>
+                
                 {/* Icon Giỏ hàng */}
                 <div style={{ position: "relative", cursor: "pointer" }} onClick={handleCartClick}>
                     <span style={{ 
@@ -338,6 +399,10 @@ function Header() {
                     )}
                 </div>
             </div>
+            <ChatModal 
+                isOpen={isChatOpen} 
+                onClose={() => setIsChatOpen(false)} 
+            />
         </div>
     );
 }
