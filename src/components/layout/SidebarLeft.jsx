@@ -3,15 +3,31 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import api from "../../api/api";
 
 function SidebarLeft({ userProfile = null }) {
-    const [user, setUser] = useState({
-        full_name: "",
-        username: "",
-        avatar_url: "",
-        gender: "",
-        dob: "",
-        email: "",
-        phone: "",
-        address: ""
+    const [user, setUser] = useState(() => {
+        // Lấy từ cache nếu có
+        const cachedUser = sessionStorage.getItem("sidebar_user");
+        if (cachedUser) {
+            try {
+                const parsed = JSON.parse(cachedUser);
+                const cacheTime = sessionStorage.getItem("sidebar_user_cache_time");
+                if (cacheTime && (Date.now() - parseInt(cacheTime) < 300000)) {
+                    console.log("Using cached sidebar user data");
+                    return parsed;
+                }
+            } catch (e) {
+                console.error("Error parsing cached user:", e);
+            }
+        }
+        return {
+            full_name: "",
+            username: "",
+            avatar_url: "",
+            gender: "",
+            dob: "",
+            email: "",
+            phone: "",
+            address: ""
+        };
     });
 
     // Trạng thái phục vụ chỉnh sửa
@@ -28,6 +44,14 @@ function SidebarLeft({ userProfile = null }) {
     const isUserProfilePage = location.pathname.startsWith("/profile/");
     const currentCategory = searchParams.get("category") || "general";
 
+    // Lưu cache khi user thay đổi
+    useEffect(() => {
+        if (user && (user.full_name || user.username)) {
+            sessionStorage.setItem("sidebar_user", JSON.stringify(user));
+            sessionStorage.setItem("sidebar_user_cache_time", Date.now().toString());
+        }
+    }, [user]);
+
     useEffect(() => {
         if (userProfile) {
             setUser(userProfile);
@@ -36,6 +60,22 @@ function SidebarLeft({ userProfile = null }) {
         }
 
         const fetchMyProfile = async () => {
+            // Kiểm tra cache trước khi fetch
+            const cachedUser = sessionStorage.getItem("sidebar_user");
+            const cacheTime = sessionStorage.getItem("sidebar_user_cache_time");
+            const isCacheValid = cachedUser && cacheTime && (Date.now() - parseInt(cacheTime) < 300000);
+            
+            if (isCacheValid && !user.full_name) {
+                try {
+                    const parsedUser = JSON.parse(cachedUser);
+                    setUser(parsedUser);
+                    setEditData(parsedUser);
+                    return;
+                } catch (e) {
+                    console.error("Error using cached user:", e);
+                }
+            }
+
             try {
                 const res = await api.get("/api/v1/auth/me");
                 setUser(res.data);
@@ -68,7 +108,6 @@ function SidebarLeft({ userProfile = null }) {
     const handleSave = async () => {
         setLoading(true);
         try {
-            // Thay đổi endpoint tùy theo API thực tế của bạn
             const res = await api.put("/api/v1/auth/update", editData);
             setUser(res.data);
             setIsEditing(false);
@@ -79,6 +118,12 @@ function SidebarLeft({ userProfile = null }) {
         } finally {
             setLoading(false);
         }
+    };
+
+    // Clear cache function
+    const clearUserCache = () => {
+        sessionStorage.removeItem("sidebar_user");
+        sessionStorage.removeItem("sidebar_user_cache_time");
     };
 
     const firstLetter = user.full_name 
@@ -125,31 +170,31 @@ function SidebarLeft({ userProfile = null }) {
     );
 
     const getMenuItemStyle = (categoryType) => {
-    let isActive = false;
+        let isActive = false;
 
-    // Trang saved
-    if (categoryType === "saved") {
-        isActive = location.pathname === "/user/saved-posts";
-    } 
-    // Trang home + category
-    else {
-        const isHome = location.pathname === "/";
-        isActive = isHome && currentCategory === categoryType;
-    }
+        // Trang saved
+        if (categoryType === "saved") {
+            isActive = location.pathname === "/user/saved-posts";
+        } 
+        // Trang home + category
+        else {
+            const isHome = location.pathname === "/";
+            isActive = isHome && currentCategory === categoryType;
+        }
 
-    return {
-        display: "flex",
-        gap: "15px",
-        alignItems: "center",
-        cursor: "pointer",
-        padding: "8px 10px",
-        borderRadius: "8px",
-        color: isActive ? "#2e7d32" : "#050505",
-        fontWeight: isActive ? "bold" : "500",
-        background: isActive ? "#f0f2f5" : "transparent",
-        transition: "background 0.2s"
+        return {
+            display: "flex",
+            gap: "15px",
+            alignItems: "center",
+            cursor: "pointer",
+            padding: "8px 10px",
+            borderRadius: "8px",
+            color: isActive ? "#2e7d32" : "#050505",
+            fontWeight: isActive ? "bold" : "500",
+            background: isActive ? "#f0f2f5" : "transparent",
+            transition: "background 0.2s"
+        };
     };
-};
 
     const shouldShowProfileInfo = isProfilePage || (isUserProfilePage && userProfile);
 
@@ -185,7 +230,7 @@ function SidebarLeft({ userProfile = null }) {
                                     </div>
                                 )}
                                 <div >
-                                    <h4 onClick={handleProfileClick} style={{ margin: 0, fontSize: "16px" }}>{user.full_name || user.username}</h4>
+                                    <h4 onClick={handleProfileClick} style={{ margin: 0, fontSize: "16px", cursor: "pointer", color: "#2e7d32" }}>{user.full_name || user.username}</h4>
                                     <span style={{ fontSize: "12px", color: "#65676b" }}>@{user.username}</span>
                                 </div>
                             </div>

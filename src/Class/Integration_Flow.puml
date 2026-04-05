@@ -1,0 +1,88 @@
+@startuml Integration_Flow
+!theme plain
+skinparam sequence {
+  ArrowColor #2E7D32
+  LifeLineBorderColor #2E7D32
+  LifeLineBackgroundColor #E8F5E9
+}
+
+title <size:16><b>LUỒNG DỮ LIỆU CHÍNH TRONG HỆ THỐNG</b></size>
+
+' ============================================
+' LUỒNG 1: ĐĂNG NHẬP
+' ============================================
+box "LUỒNG 1: ĐĂNG NHẬP" #LightGray
+participant "Client\n(ReactJS)" as Client
+participant "AuthRouter\n(FastAPI)" as AuthAPI
+participant "UserService" as UserSvc
+database "MongoDB\n(users)" as DB
+end box
+
+Client -> AuthAPI: POST /auth/login\n{username, password}
+AuthAPI -> UserSvc: get_user_by_username()
+UserSvc -> DB: find_one()
+DB --> UserSvc: user_data
+UserSvc --> AuthAPI: user
+AuthAPI -> AuthAPI: verify_password()
+AuthAPI -> AuthAPI: create_access_token()
+AuthAPI --> Client: {access_token, user_info}
+
+' ============================================
+' LUỒNG 2: ĐĂNG BÀI VIẾT
+' ============================================
+box "LUỒNG 2: ĐĂNG BÀI VIẾT" #LightBlue
+participant "Client\n(ReactJS)" as Client2
+participant "PostRouter\n(FastAPI)" as PostAPI
+participant "PostService" as PostSvc2
+database "MongoDB\n(social_posts)" as DB2
+end box
+
+Client2 -> PostAPI: POST /posts/\n{content, images, tags}
+PostAPI -> PostSvc2: create_post()
+PostSvc2 -> DB2: insert_one()
+DB2 --> PostSvc2: post_id
+PostSvc2 --> PostAPI: post_data
+PostAPI --> Client2: {post, message}
+
+' ============================================
+' LUỒNG 3: ĐẶT HÀNG
+' ============================================
+box "LUỒNG 3: ĐẶT HÀNG" #LightYellow
+participant "Client\n(ReactJS)" as Client3
+participant "OrderRouter\n(FastAPI)" as OrderAPI
+participant "OrderService" as OrderSvc3
+participant "PaymentService" as PaySvc3
+database "MongoDB\n(orders)" as DB3
+database "MongoDB\n(products)" as DB3_1
+end box
+
+Client3 -> OrderAPI: POST /orders/\n{items, shipping_address}
+OrderAPI -> OrderSvc3: create_order()
+OrderSvc3 -> DB3_1: update stock
+OrderSvc3 -> DB3: insert_one()
+DB3 --> OrderSvc3: order_data
+OrderSvc3 -> PaySvc3: create_payment()
+PaySvc3 --> OrderSvc3: payment_url
+OrderSvc3 --> OrderAPI: order_info
+OrderAPI --> Client3: {order, payment_url}
+
+' ============================================
+' LUỒNG 4: CHAT REALTIME
+' ============================================
+box "LUỒNG 4: CHAT REALTIME" #LightGreen
+participant "Client A\n(ReactJS)" as ClientA
+participant "Socket.IO\nServer" as SocketIO
+participant "ChatService" as ChatSvc4
+database "MongoDB\n(messages)" as DB4
+participant "Client B\n(ReactJS)" as ClientB
+end box
+
+ClientA -> SocketIO: emit('send_chat_message', data)
+SocketIO -> ChatSvc4: send_message()
+ChatSvc4 -> DB4: insert_one()
+DB4 --> ChatSvc4: saved_msg
+ChatSvc4 --> SocketIO: success
+SocketIO -> ClientB: emit('new_message', msg)
+SocketIO --> ClientA: emit('message_sent', msg)
+
+@enduml

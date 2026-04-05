@@ -1,0 +1,315 @@
+@startuml Architecture
+!theme plain
+skinparam linetype ortho
+skinparam component {
+  BackgroundColor #E8F5E9
+  BorderColor #2E7D32
+  FontColor #1B5E20
+}
+skinparam node {
+  BackgroundColor #FFF3E0
+  BorderColor #E65100
+  FontColor #BF360C
+}
+skinparam database {
+  BackgroundColor #E3F2FD
+  BorderColor #1565C0
+  FontColor #0D47A1
+}
+skinparam cloud {
+  BackgroundColor #F3E5F5
+  BorderColor #6A1B9A
+  FontColor #4A148C
+}
+skinparam arrow {
+  Color #333333
+  FontColor #333333
+}
+skinparam title {
+  BackgroundColor #FFFFFF
+  FontColor #2E7D32
+  FontSize 18
+  FontStyle bold
+}
+
+title <size:20><b>KIẾN TRÚC TỔNG QUAN HỆ THỐNG</b></size>\n<b>"ĐẶC SẢN QUÊ TÔI"</b>
+
+' ============================================
+' TẦNG 1: TRÌNH DUYỆT (CLIENT)
+' ============================================
+
+node "TẦNG TRÌNH BÀY\n(Presentation Layer)" as Presentation {
+  
+  frame "ReactJS Application" as ReactApp {
+    
+    component "Trang chủ\n(Home)" as Home
+    component "Hồ sơ\n(Profile)" as Profile
+    component "Cửa hàng\n(Shop)" as ShopPage
+    component "Giỏ hàng\n(Cart)" as Cart
+    component "Thanh toán\n(Checkout)" as Checkout
+    component "Quản trị\n(Admin Dashboard)" as AdminDash
+    component "Tin nhắn\n(Chat Modal)" as ChatModal
+    component "Bài viết\n(Post Detail)" as PostDetail
+    
+    component "Quản lý trạng thái\n(React Hooks)" as State
+    component "Điều hướng\n(React Router)" as Routing
+    component "HTTP Client\n(Axios)" as HttpClient
+    component "WebSocket\n(Socket.IO)" as WSClient
+  }
+  
+  note right of ReactApp
+    <b>Công nghệ:</b>
+    • React 18+
+    • Vite
+    • React Router DOM v6
+    • Axios
+    • Socket.IO-client
+    • React Icons
+  end note
+}
+
+' ============================================
+' TẦNG 2: BACKEND SERVER
+' ============================================
+
+node "TẦNG XỬ LÝ NGHIỆP VỤ\n(Business Logic Layer)" as Business {
+  
+  frame "FastAPI Application" as FastAPIApp {
+    
+    frame "API ROUTERS" as Routers {
+      component "User\nRouter" as UserRouter
+      component "Post\nRouter" as PostRouter
+      component "Product\nRouter" as ProductRouter
+      component "Order\nRouter" as OrderRouter
+      component "Chat\nRouter" as ChatRouter
+      component "Friend\nRouter" as FriendRouter
+      component "Payment\nRouter" as PaymentRouter
+      component "Admin\nRouter" as AdminRouter
+      component "Cart\nRouter" as CartRouter
+      component "Return\nRouter" as ReturnRouter
+      component "Voucher\nRouter" as VoucherRouter
+      component "Shipping\nRouter" as ShippingRouter
+      component "Review\nRouter" as ReviewRouter
+    }
+    
+    frame "SERVICES (Business Logic)" as Services {
+      component "UserService" as UserSvc
+      component "PostService" as PostSvc
+      component "ProductService" as ProductSvc
+      component "OrderService" as OrderSvc
+      component "ChatService" as ChatSvc
+      component "PaymentService" as PaymentSvc
+      component "FriendService" as FriendSvc
+      component "NotificationService" as NotifySvc
+      component "ReturnService" as ReturnSvc
+    }
+    
+    frame "MIDDLEWARE" as Middleware {
+      component "CORS" as CORS
+      component "JWT Auth" as JWTAuth
+      component "Rate Limit" as RateLimit
+      component "Logging" as Logging
+    }
+    
+    frame "SOCKET HANDLERS" as SocketHandlers {
+      component "Chat\nHandler" as ChatHandler
+      component "Notification\nHandler" as NotifyHandler
+    }
+  }
+  
+  note right of FastAPIApp
+    <b>Công nghệ:</b>
+    • FastAPI (Python)
+    • Socket.IO
+    • JWT (python-jose)
+    • bcrypt / passlib
+    • Pydantic
+    • Motor (Async MongoDB)
+  end note
+}
+
+' ============================================
+' TẦNG 3: CƠ SỞ DỮ LIỆU
+' ============================================
+
+database "TẦNG DỮ LIỆU\n(Data Layer)" as Database {
+  database "MongoDB" as MongoDB {
+    
+    frame "Core Collections" as CoreCollections {
+      component "users" as users
+      component "social_posts" as social_posts
+      component "products" as products
+      component "orders" as orders
+    }
+    
+    frame "Interaction Collections" as InteractionCollections {
+      component "post_comments" as post_comments
+      component "post_likes" as post_likes
+      component "post_shares" as post_shares
+      component "saved_posts" as saved_posts
+    }
+    
+    frame "Social Collections" as SocialCollections {
+      component "messages" as messages
+      component "friends" as friends
+      component "follows" as follows
+      component "notifications" as notifications
+      component "admin_notifications" as admin_notifications
+    }
+    
+    frame "E-commerce Collections" as EcommerceCollections {
+      component "categories" as categories
+      component "product_variants" as product_variants
+      component "carts" as carts
+      component "returns" as returns
+      component "payments" as payments
+    }
+    
+    frame "Business Collections" as BusinessCollections {
+      component "shops" as shops
+      component "vouchers" as vouchers
+      component "shipping_units" as shipping_units
+      component "shipping_vouchers" as shipping_vouchers
+      component "shop_reviews" as shop_reviews
+      component "product_reviews" as product_reviews
+      component "reports" as reports
+    }
+    
+    frame "System Collections" as SystemCollections {
+      component "addresses" as addresses
+      component "shop_settings" as shop_settings
+    }
+  }
+  
+  note right of MongoDB
+    <b>Công nghệ:</b>
+    • MongoDB 7.0+
+    • NoSQL Document-based
+    • Replica Set (HA)
+    • Indexing
+  end note
+}
+
+' ============================================
+' DỊCH VỤ BÊN THỨ BA
+' ============================================
+
+cloud "DỊCH VỤ BÊN THỨ BA\n(External Services)" as External {
+  component "Momo API" as Momo
+  component "VNPay API" as VNPay
+  component "Upload API\n(Cloudinary)" as Upload
+  component "Socket.IO\nServer" as SocketIO
+}
+
+' ============================================
+' KẾT NỐI TỪ CLIENT ĐẾN BACKEND
+' ============================================
+
+HttpClient --> UserRouter : HTTP (REST API)
+HttpClient --> PostRouter : HTTP (REST API)
+HttpClient --> ProductRouter : HTTP (REST API)
+HttpClient --> OrderRouter : HTTP (REST API)
+HttpClient --> ChatRouter : HTTP (REST API)
+HttpClient --> FriendRouter : HTTP (REST API)
+HttpClient --> PaymentRouter : HTTP (REST API)
+HttpClient --> AdminRouter : HTTP (REST API)
+HttpClient --> CartRouter : HTTP (REST API)
+HttpClient --> ReturnRouter : HTTP (REST API)
+HttpClient --> VoucherRouter : HTTP (REST API)
+HttpClient --> ShippingRouter : HTTP (REST API)
+HttpClient --> ReviewRouter : HTTP (REST API)
+
+WSClient --> SocketHandlers : WebSocket (Socket.IO)
+
+' ============================================
+' KẾT NỐI TRONG BACKEND
+' ============================================
+
+UserRouter --> UserSvc
+PostRouter --> PostSvc
+ProductRouter --> ProductSvc
+OrderRouter --> OrderSvc
+ChatRouter --> ChatSvc
+PaymentRouter --> PaymentSvc
+FriendRouter --> FriendSvc
+ReturnRouter --> ReturnSvc
+
+PostSvc --> NotifySvc : Tạo thông báo
+OrderSvc --> NotifySvc : Tạo thông báo
+FriendSvc --> NotifySvc : Tạo thông báo
+
+UserSvc --> JWTAuth : Authentication
+PostSvc --> JWTAuth : Authorization
+OrderSvc --> JWTAuth : Authorization
+ProductSvc --> JWTAuth : Authorization
+
+UserSvc --> Logging
+PostSvc --> Logging
+OrderSvc --> Logging
+
+ChatHandler --> ChatSvc
+NotifyHandler --> NotifySvc
+
+' ============================================
+' KẾT NỐI TỪ BACKEND ĐẾN DATABASE
+' ============================================
+
+UserSvc --> CoreCollections
+PostSvc --> CoreCollections
+ProductSvc --> CoreCollections
+OrderSvc --> CoreCollections
+
+ChatSvc --> SocialCollections
+FriendSvc --> SocialCollections
+NotifySvc --> SocialCollections
+
+PaymentSvc --> EcommerceCollections
+ReturnSvc --> EcommerceCollections
+
+ProductSvc --> BusinessCollections
+OrderSvc --> BusinessCollections
+
+UserSvc --> SystemCollections
+PostSvc --> InteractionCollections
+
+' ============================================
+' KẾT NỐI ĐẾN DỊCH VỤ BÊN THỨ BA
+' ============================================
+
+PaymentSvc --> Momo : HTTP (Payment API)
+PaymentSvc --> VNPay : HTTP (Payment API)
+PostSvc --> Upload : HTTP (Upload Image)
+ChatHandler --> SocketIO : Real-time Events
+NotifyHandler --> SocketIO : Real-time Events
+
+' ============================================
+' KẾT NỐI GIỮA CÁC TẦNG
+' ============================================
+
+Presentation -[#2E7D32]down-> Business : HTTP / WebSocket
+Business -[#1565C0]down-> Database : Driver (Motor/PyMongo)
+Business -[#6A1B9A]right-> External : API Calls
+
+' ============================================
+' CHÚ THÍCH
+' ============================================
+
+note bottom of Presentation
+  <b>Luồng dữ liệu chính:</b>
+  1. Client gửi request (HTTP/WebSocket)
+  2. Middleware xử lý (CORS, Auth, Rate Limit)
+  3. Router điều hướng đến Service
+  4. Service xử lý business logic
+  5. Service tương tác với Database
+  6. Service gọi External API (nếu cần)
+  7. Response trả về Client
+end note
+
+note top of External
+  <b>Tích hợp thanh toán:</b>
+  • Momo API
+  • VNPay API
+  • COD (Nhận hàng)
+end note
+
+@enduml

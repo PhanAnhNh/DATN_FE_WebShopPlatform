@@ -1,6 +1,6 @@
 // components/Chat/ChatModal.jsx
 import React, { useState, useEffect } from 'react';
-import { FaTimes } from 'react-icons/fa';
+import { FaTimes, FaFilter } from 'react-icons/fa';
 import FriendList from './FriendList';
 import ChatWindow from './ChatWindow';
 import api from '../../api/api';
@@ -9,6 +9,7 @@ const ChatModal = ({ isOpen, onClose }) => {
     const [selectedFriend, setSelectedFriend] = useState(null);
     const [friends, setFriends] = useState([]);
     const [recentChats, setRecentChats] = useState([]);
+    const [onlyUnread, setOnlyUnread] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
@@ -21,88 +22,79 @@ const ChatModal = ({ isOpen, onClose }) => {
         try {
             const res = await api.get('/api/v1/friends/list');
             setFriends(res.data);
-        } catch (err) {
-            console.error("Lỗi lấy danh sách bạn bè:", err);
-        }
+        } catch (err) { console.error(err); }
     };
 
     const fetchRecentChats = async () => {
         try {
             const res = await api.get('/api/v1/chat/recent');
             setRecentChats(res.data);
-        } catch (err) {
-            console.error("Lỗi lấy recent chats:", err);
-        }
+        } catch (err) { console.error(err); }
     };
 
     if (!isOpen) return null;
 
     return (
         <div style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(0,0,0,0.5)', zIndex: 2000,
-            display: 'flex', justifyContent: 'center', alignItems: 'center'
+            position: 'fixed', 
+            right: '20px', 
+            bottom: '0', 
+            zIndex: 2000,
+            display: 'flex', 
+            alignItems: 'flex-end'
         }}>
             <div style={{
-                width: '900px', height: '600px', background: 'white',
-                borderRadius: '12px', boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
-                display: 'flex', overflow: 'hidden',
-                position: 'relative'
+                width: '380px', 
+                height: '500px', 
+                background: 'white',
+                borderRadius: '12px 12px 0 0', 
+                boxShadow: '0 -5px 25px rgba(0,0,0,0.15)',
+                display: 'flex', 
+                flexDirection: 'column',
+                overflow: 'hidden', // Ngăn con đè cha
+                border: '1px solid #ddd'
             }}>
-                {/* Nút đóng modal */}
-                <button
-                    onClick={onClose}
-                    style={{
-                        position: 'absolute',
-                        top: '12px',
-                        right: '12px',
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '50%',
-                        background: '#f0f2f5',
-                        border: 'none',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        zIndex: 10,
-                        transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#e4e6eb';
-                    }}
-                    onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = '#f0f2f5';
-                    }}
-                >
-                    <FaTimes size={16} color="#65676b" />
-                </button>
-
-                {/* Danh sách bên trái */}
-                <div style={{ width: '320px', borderRight: '1px solid #ddd', background: '#f8f9fa' }}>
-                    <div style={{ padding: '16px', fontWeight: 'bold', borderBottom: '1px solid #ddd' }}>
-                        Tin nhắn
+                {/* Header Modal - Cố định */}
+                <div style={{ 
+                    padding: '12px 16px', 
+                    background: '#2e7d32', 
+                    color: 'white', 
+                    display: 'flex', 
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexShrink: 0 
+                }}>
+                    <span style={{ fontWeight: 'bold' }}>
+                        {selectedFriend ? "Trò chuyện" : "Tin nhắn"}
+                    </span>
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                        {!selectedFriend && (
+                            <FaFilter 
+                                size={14} 
+                                style={{ cursor: 'pointer', color: onlyUnread ? '#ffeb3b' : 'white' }} 
+                                onClick={() => setOnlyUnread(!onlyUnread)}
+                            />
+                        )}
+                        <FaTimes style={{ cursor: 'pointer' }} onClick={onClose} />
                     </div>
-                    <FriendList 
-                        friends={friends} 
-                        recentChats={recentChats}
-                        onSelectFriend={setSelectedFriend} 
-                    />
                 </div>
 
-                {/* Khung chat bên phải */}
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                {/* Nội dung linh hoạt */}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                     {selectedFriend ? (
                         <ChatWindow 
                             friend={selectedFriend} 
                             onClose={() => setSelectedFriend(null)} 
+                            onCloseModal={onClose}
                         />
                     ) : (
-                        <div style={{ 
-                            flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            color: '#65676b', fontSize: '18px', textAlign: 'center', padding: '40px'
-                        }}>
-                            Chọn một người bạn để bắt đầu trò chuyện
+                        <div style={{ flex: 1, overflowY: 'auto' }}>
+                            <FriendList 
+                                friends={friends} 
+                                recentChats={recentChats}
+                                onSelectFriend={setSelectedFriend} 
+                                filterUnread={onlyUnread}
+                            />
                         </div>
                     )}
                 </div>

@@ -1,7 +1,7 @@
 // components/layout/header.jsx
 import React, { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
-import { FaShoppingCart, FaBell, FaUser, FaBook, FaCog, FaSignOutAlt, FaComment } from 'react-icons/fa';
+import { useNavigate, useLocation } from "react-router-dom";
+import { FaShoppingCart, FaBell, FaUser, FaBook, FaCog, FaSignOutAlt, FaComment, FaSearch } from 'react-icons/fa';
 import api from "../../api/api";
 import NotificationBell from "../../pages/user/NotificationBell";
 import ChatModal from "../Chat/ChatModal";
@@ -11,9 +11,15 @@ function Header() {
     const [cartCount, setCartCount] = useState(0);
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [searchKeyword, setSearchKeyword] = useState("");
+    const [searchResults, setSearchResults] = useState([]);
+    const [showSearchResults, setShowSearchResults] = useState(false);
+    const [isSearching, setIsSearching] = useState(false);
     
     const menuRef = useRef(null);
+    const searchRef = useRef(null);
     const navigate = useNavigate();
+    const location = useLocation();
 
     // Định nghĩa hàm fetchCartCount ở ngoài useEffect để có thể tái sử dụng
     const fetchCartCount = async () => {
@@ -33,26 +39,57 @@ function Header() {
         }
     };
 
-    // Thêm vào Header.jsx
+    // Hàm tìm kiếm
+    const handleSearch = async (keyword) => {
+        if (!keyword.trim()) {
+            setSearchResults([]);
+            setShowSearchResults(false);
+            return;
+        }
+
+        setIsSearching(true);
+        try {
+            const token = localStorage.getItem("user_token");
+            if (!token) {
+                console.log("Chưa đăng nhập");
+                return;
+            }
+
+            const response = await api.get(`/api/v1/posts/search?keyword=${encodeURIComponent(keyword)}`);
+            setSearchResults(response.data);
+            setShowSearchResults(true);
+        } catch (error) {
+            console.error("Lỗi tìm kiếm:", error);
+            setSearchResults([]);
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
+    // Debounce tìm kiếm
     useEffect(() => {
-        const fetchUnreadCount = async () => {
-            try {
-                const token = localStorage.getItem("user_token");
-                if (!token) return;
-                
-                const res = await api.get('/api/v1/chat/unread-count');
-                setUnreadCount(res.data.unread_count || 0);
-            } catch (error) {
-                console.error("Error fetching unread count:", error);
+        const delayDebounce = setTimeout(() => {
+            if (searchKeyword) {
+                handleSearch(searchKeyword);
+            } else {
+                setSearchResults([]);
+                setShowSearchResults(false);
+            }
+        }, 500);
+
+        return () => clearTimeout(delayDebounce);
+    }, [searchKeyword]);
+
+    // Đóng kết quả tìm kiếm khi click ra ngoài
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (searchRef.current && !searchRef.current.contains(event.target)) {
+                setShowSearchResults(false);
             }
         };
-
-        fetchUnreadCount();
-
-    // Cập nhật mỗi 10 giây
-    const interval = setInterval(fetchUnreadCount, 10000);
-    return () => clearInterval(interval);
-}, []);
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
 
     // Effect đầu tiên: fetch khi component mount và set interval
     useEffect(() => {
@@ -98,6 +135,28 @@ function Header() {
         navigate("/cart");
     };
 
+    const handleResultClick = (post) => {
+    setShowSearchResults(false);
+    setSearchKeyword("");
+    if (post.author_id) {
+        navigate(`/profile/${post.author_id}`);
+    } else {
+        // Fallback: scroll đến bài viết nếu không có author_id
+        if (location.pathname === "/") {
+            const element = document.getElementById(`post-${post._id}`);
+            if (element) {
+                element.scrollIntoView({ behavior: "smooth" });
+                element.style.backgroundColor = "#fff3cd";
+                setTimeout(() => {
+                    element.style.backgroundColor = "";
+                }, 2000);
+            }
+        } else {
+            navigate(`/?postId=${post._id}`);
+        }
+    }
+};
+
     const menuItemStyle = {
         display: "flex",
         alignItems: "center",
@@ -129,28 +188,164 @@ function Header() {
             </div>
 
             {/* Thanh tìm kiếm */}
-            <div style={{ flex: 1, display: "flex", justifyContent: "center" }}>
-                <input
-                    placeholder="Tìm kiếm bài viết, sản phẩm"
-                    style={{
-                        width: "100%",
-                        maxWidth: "500px",
-                        padding: "12px 20px",
-                        borderRadius: "20px",
-                        border: "1px solid #ddd",
-                        backgroundColor: "#f0f2f5",
-                        outline: "none",
-                        transition: "all 0.3s"
-                    }}
-                    onFocus={(e) => {
-                        e.target.style.borderColor = "#2e7d32";
-                        e.target.style.backgroundColor = "white";
-                    }}
-                    onBlur={(e) => {
-                        e.target.style.borderColor = "#ddd";
-                        e.target.style.backgroundColor = "#f0f2f5";
-                    }}
-                />
+            <div style={{ flex: 1, display: "flex", justifyContent: "center", position: "relative" }} ref={searchRef}>
+                <div style={{ position: "relative", width: "100%", maxWidth: "500px" }}>
+                    <input
+                        placeholder="Tìm kiếm bài viết, sản phẩm..."
+                        value={searchKeyword}
+                        onChange={(e) => setSearchKeyword(e.target.value)}
+                        style={{
+                            width: "100%",
+                            padding: "12px 40px 12px 20px",
+                            borderRadius: "20px",
+                            border: "1px solid #ddd",
+                            backgroundColor: "#f0f2f5",
+                            outline: "none",
+                            transition: "all 0.3s"
+                        }}
+                        onFocus={(e) => {
+                            e.target.style.borderColor = "#2e7d32";
+                            e.target.style.backgroundColor = "white";
+                            if (searchKeyword && searchResults.length > 0) {
+                                setShowSearchResults(true);
+                            }
+                        }}
+                        onBlur={(e) => {
+                            e.target.style.borderColor = "#ddd";
+                            e.target.style.backgroundColor = "#f0f2f5";
+                        }}
+                    />
+                    <FaSearch 
+                        style={{
+                            position: "absolute",
+                            right: "15px",
+                            top: "50%",
+                            transform: "translateY(-50%)",
+                            color: "#999",
+                            cursor: "pointer"
+                        }}
+                        onClick={() => handleSearch(searchKeyword)}
+                    />
+
+                    
+                    {showSearchResults && (
+    <div style={{
+        position: "absolute",
+        top: "100%",
+        left: 0,
+        right: 0,
+        marginTop: "8px",
+        backgroundColor: "white",
+        borderRadius: "12px",
+        boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+        maxHeight: "400px",
+        overflowY: "auto",
+        zIndex: 1001
+    }}>
+        {isSearching ? (
+            <div style={{ padding: "20px", textAlign: "center", color: "#666" }}>
+                Đang tìm kiếm...
+            </div>
+        ) : searchResults.length === 0 ? (
+            <div style={{ padding: "20px", textAlign: "center", color: "#666" }}>
+                Không tìm thấy kết quả nào
+            </div>
+        ) : (
+            <>
+                <div style={{ 
+                    padding: "10px 15px", 
+                    borderBottom: "1px solid #eee",
+                    fontSize: "12px",
+                    color: "#666",
+                    fontWeight: "bold"
+                }}>
+                    Tìm thấy {searchResults.length} kết quả cho "{searchKeyword}"
+                </div>
+                {searchResults.map((post) => (
+                    <div
+                        key={post._id}
+                        onClick={() => handleResultClick(post)}  // Truyền cả post object
+                        style={{
+                            padding: "12px 15px",
+                            borderBottom: "1px solid #f0f0f0",
+                            cursor: "pointer",
+                            transition: "background-color 0.2s"
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f5f5f5"}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "white"}
+                    >
+                        <div style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+                            <div style={{ 
+                                width: "40px", 
+                                height: "40px", 
+                                background: "#e4e6eb", 
+                                borderRadius: "50%", 
+                                display: "flex", 
+                                alignItems: "center", 
+                                justifyContent: "center",
+                                flexShrink: 0
+                            }}>
+                                {post.author_avatar ? (
+                                    <img src={post.author_avatar} alt="avatar" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }}/>
+                                ) : (
+                                    <span>👤</span>
+                                )}
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                {/* Hiển thị tên tác giả với highlight */}
+                                <div style={{ fontWeight: "bold", fontSize: "14px", color: "#333", marginBottom: "4px" }}>
+                                    {post.author_name_highlighted ? (
+                                        <span dangerouslySetInnerHTML={{ __html: post.author_name_highlighted }} />
+                                    ) : (
+                                        post.author_name
+                                    )}
+                                </div>
+                                
+                                {/* Hiển thị nội dung với highlight */}
+                                <div style={{ 
+                                    fontSize: "13px", 
+                                    color: "#666",
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap"
+                                }}>
+                                    {post.content_highlighted ? (
+                                        <span dangerouslySetInnerHTML={{ __html: post.content_highlighted }} />
+                                    ) : (
+                                        post.content || "Không có nội dung"
+                                    )}
+                                </div>
+                                
+                                {/* Hiển thị tags matching */}
+                                {post.matching_tags && post.matching_tags.length > 0 && (
+                                    <div style={{ 
+                                        fontSize: "11px", 
+                                        color: "#2e7d32",
+                                        marginTop: "4px",
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis",
+                                        whiteSpace: "nowrap"
+                                    }}>
+                                        {post.matching_tags.map(tag => `#${tag}`).join(" ")}
+                                    </div>
+                                )}
+                                
+                                <div style={{ 
+                                    fontSize: "11px", 
+                                    color: "#999",
+                                    marginTop: "4px"
+                                }}>
+                                    {new Date(post.created_at).toLocaleDateString()} • {post.stats?.like_count || 0} thích • {post.stats?.comment_count || 0} bình luận
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </>
+        )}
+    </div>
+)}
+                </div>
             </div>
 
             {/* Cụm Icon */}

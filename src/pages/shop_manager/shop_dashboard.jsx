@@ -95,6 +95,7 @@ const ShopDashboard = () => {
   };
 
   useEffect(() => {
+    document.title = "Quản lý shop - Shop Dashboard";
     // Kiểm tra token trước khi fetch
     const shopToken = localStorage.getItem('shop_token');
     if (!shopToken) {

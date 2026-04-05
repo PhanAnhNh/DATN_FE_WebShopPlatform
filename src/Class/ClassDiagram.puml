@@ -1,0 +1,712 @@
+@startuml ClassDiagram
+!theme plain
+skinparam classAttributeIconSize 0
+skinparam backgroundColor #FEFEFE
+skinparam class {
+  BackgroundColor #F5F5F5
+  BorderColor #333333
+  ArrowColor #2E7D32
+}
+skinparam stereotype {
+  BackgroundColor #E8F5E9
+  BorderColor #2E7D32
+}
+
+' ============================================
+' USER MANAGEMENT
+' ============================================
+
+class User {
+  - _id: ObjectId
+  - username: String
+  - email: String
+  - full_name: String
+  - phone: String
+  - gender: String
+  - dob: Date
+  - address: String
+  - avatar_url: String
+  - cover_url: String
+  - role: UserRole
+  - is_active: Boolean
+  - is_verified: Boolean
+  - followers_count: Int
+  - following_count: Int
+  - posts_count: Int
+  - shop_id: ObjectId
+  - default_address_id: ObjectId
+  - hashed_password: String
+  - created_at: DateTime
+  - updated_at: DateTime
+  - last_login: DateTime
+  --
+  + login()
+  + register()
+  + updateProfile()
+  + followUser()
+  + unfollowUser()
+  + createPost()
+}
+
+class Admin {
+  - permissions: List<String>
+  - admin_level: Int
+  --
+  + deletePost()
+  + banUser()
+  + banShop()
+  + viewReports()
+}
+
+class Shop {
+  - _id: ObjectId
+  - name: String
+  - slug: String
+  - description: String
+  - phone: String
+  - email: String
+  - address: String
+  - province: String
+  - district: String
+  - ward: String
+  - logo_url: String
+  - banner_url: String
+  - owner_id: ObjectId
+  - status: String
+  - is_verified: Boolean
+  - products_count: Int
+  - posts_count: Int
+  - followers_count: Int
+  - total_orders: Int
+  - total_revenue: Float
+  - view_count: Int
+  - created_at: DateTime
+  - updated_at: DateTime
+  --
+  + addProduct()
+  + updateOrderStatus()
+  + getRevenue()
+}
+
+User <|-- Admin : extends
+User "1" -- "0..1" Shop : owns
+
+' ============================================
+' ADDRESS
+' ============================================
+
+class Address {
+  - _id: ObjectId
+  - user_id: ObjectId
+  - name: String
+  - phone: String
+  - street: String
+  - ward: String
+  - district: String
+  - city: String
+  - country: String
+  - is_default: Boolean
+  - address_type: String
+  - note: String
+  - created_at: DateTime
+  - updated_at: DateTime
+  --
+  + fullAddress(): String
+  + setDefault()
+}
+
+User "1" -- "0..*" Address : has
+
+' ============================================
+' SOCIAL POSTS
+' ============================================
+
+class SocialPost {
+  - _id: ObjectId
+  - author_id: ObjectId
+  - author_type: String
+  - content: String
+  - images: List<String>
+  - videos: List<String>
+  - tags: List<String>
+  - location: String
+  - visibility: String
+  - post_type: String
+  - product_category: String
+  - allow_comment: Boolean
+  - allow_share: Boolean
+  - product_id: ObjectId
+  - shared_post_id: ObjectId
+  - stats: SocialPostStats
+  - ai: SocialPostAI
+  - is_active: Boolean
+  - is_approved: Boolean
+  - is_pinned: Boolean
+  - report_count: Int
+  - feed_score: Float
+  - deleted_at: DateTime
+  - is_permanently_deleted: Boolean
+  - created_at: DateTime
+  - updated_at: DateTime
+  --
+  + addComment()
+  + addLike()
+  + share()
+  + delete()
+}
+
+class SocialPostStats {
+  - like_count: Int
+  - comment_count: Int
+  - share_count: Int
+  - save_count: Int
+  - view_count: Int
+}
+
+class SocialPostAI {
+  - sentiment: String
+  - topics: List<String>
+  - is_spam: Boolean
+  - is_sensitive: Boolean
+}
+
+SocialPost *-- SocialPostStats : contains
+SocialPost *-- SocialPostAI : contains
+
+' ============================================
+' INTERACTIONS
+' ============================================
+
+class PostComment {
+  - _id: ObjectId
+  - post_id: ObjectId
+  - user_id: ObjectId
+  - author_id: ObjectId
+  - parent_id: ObjectId
+  - content: String
+  - image_url: String
+  - created_at: DateTime
+  - updated_at: DateTime
+  --
+  + edit()
+  + delete()
+  + reply()
+}
+
+class PostLike {
+  - post_id: ObjectId
+  - user_id: ObjectId
+  - created_at: DateTime
+}
+
+class PostShare {
+  - post_id: ObjectId
+  - user_id: ObjectId
+  - created_at: DateTime
+}
+
+class SavedPost {
+  - _id: ObjectId
+  - post_id: ObjectId
+  - user_id: ObjectId
+  - note: String
+  - created_at: DateTime
+}
+
+SocialPost "1" -- "0..*" PostComment : has
+SocialPost "1" -- "0..*" PostLike : receives
+SocialPost "1" -- "0..*" PostShare : receives
+SocialPost "1" -- "0..*" SavedPost : saved by
+
+User "1" -- "0..*" PostComment : writes
+User "1" -- "0..*" PostLike : gives
+User "1" -- "0..*" PostShare : shares
+User "1" -- "0..*" SavedPost : saves
+
+PostComment "1" -- "0..*" PostComment : replies
+
+' ============================================
+' CHAT SYSTEM
+' ============================================
+
+class Message {
+  - _id: ObjectId
+  - sender_id: ObjectId
+  - receiver_id: ObjectId
+  - content: String
+  - message_type: String
+  - is_read: Boolean
+  - created_at: DateTime
+  --
+  + markAsRead()
+  + delete()
+}
+
+User "1" -- "0..*" Message : sends
+User "1" -- "0..*" Message : receives
+
+' ============================================
+' FRIENDSHIP
+' ============================================
+
+class FriendRequest {
+  - _id: ObjectId
+  - user_id: ObjectId
+  - friend_id: ObjectId
+  - status: String
+  - created_at: DateTime
+  - updated_at: DateTime
+  --
+  + accept()
+  + reject()
+  + block()
+}
+
+User "1" -- "0..*" FriendRequest : sends
+User "1" -- "0..*" FriendRequest : receives
+
+' ============================================
+' FOLLOW SYSTEM
+' ============================================
+
+class Follow {
+  - follower_id: ObjectId
+  - following_id: ObjectId
+  - created_at: DateTime
+}
+
+User "1" -- "0..*" Follow : follows
+User "1" -- "0..*" Follow : followed by
+
+' ============================================
+' PRODUCT & SHOPPING
+' ============================================
+
+class Product {
+  - _id: ObjectId
+  - name: String
+  - description: String
+  - category_id: ObjectId
+  - shop_id: ObjectId
+  - origin: String
+  - certification: String
+  - image_url: String
+  - price: Float
+  - stock: Int
+  - qr_code_url: String
+  - created_at: DateTime
+  --
+  + updateStock()
+  + generateQRCode()
+}
+
+class ProductVariant {
+  - _id: ObjectId
+  - product_id: ObjectId
+  - name: String
+  - price: Float
+  - stock: Int
+  - sku: String
+  - image_url: String
+  - created_at: DateTime
+}
+
+class Category {
+  - _id: ObjectId
+  - name: String
+  - parent_id: ObjectId
+  - icon_url: String
+  - created_at: DateTime
+}
+
+Product "1" -- "0..*" ProductVariant : has
+Product "*" -- "1" Category : belongs to
+Shop "1" -- "0..*" Product : sells
+
+' ============================================
+' ORDER SYSTEM
+' ============================================
+
+class Order {
+  - _id: ObjectId
+  - user_id: ObjectId
+  - items: List<OrderItem>
+  - total_amount: Float
+  - subtotal: Float
+  - discount: Float
+  - shipping_fee: Float
+  - shipping_address: ShippingAddress
+  - note: String
+  - payment_method: String
+  - status: OrderStatus
+  - voucher: VoucherInfo
+  - shipping_unit_id: ObjectId
+  - created_at: DateTime
+  - updated_at: DateTime
+  --
+  + updateStatus()
+  + calculateTotal()
+}
+
+class OrderItem {
+  - product_id: ObjectId
+  - quantity: Int
+  - price: Float
+  - shop_id: ObjectId
+  - variant_id: ObjectId
+  - variant_name: String
+  - subtotal: Float
+}
+
+class ShippingAddress {
+  - name: String
+  - phone: String
+  - street: String
+  - ward: String
+  - district: String
+  - city: String
+  - country: String
+  - full_address: String
+}
+
+Order *-- OrderItem : contains
+Order *-- ShippingAddress : contains
+User "1" -- "0..*" Order : places
+
+' ============================================
+' PAYMENT SYSTEM
+' ============================================
+
+enum PaymentMethod {
+  COD
+  MOMO
+  VNPAY
+  ZALOPAY
+  BANK_TRANSFER
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+class Payment {
+  - _id: ObjectId
+  - order_id: ObjectId
+  - user_id: ObjectId
+  - method: PaymentMethod
+  - amount: Float
+  - status: PaymentStatus
+  - transaction_id: String
+  - payment_url: String
+  - created_at: DateTime
+  - completed_at: DateTime
+  --
+  + process()
+  + refund()
+}
+
+Order "1" -- "1" Payment : has
+
+' ============================================
+' RETURN SYSTEM
+' ============================================
+
+enum ReturnStatus {
+  pending
+  approved
+  rejected
+  completed
+  cancelled
+}
+
+enum ReturnReason {
+  wrong_product
+  damaged
+  expired
+  quality
+  change_mind
+  other
+}
+
+class Return {
+  - _id: ObjectId
+  - return_code: String
+  - user_id: ObjectId
+  - order_id: ObjectId
+  - order_code: String
+  - items: List<ReturnItem>
+  - total_refund: Float
+  - status: ReturnStatus
+  - reason_note: String
+  - admin_note: String
+  - approved_items: List<String>
+  - rejected_reason: String
+  - refund_amount: Float
+  - bank_name: String
+  - bank_account: String
+  - bank_holder: String
+  - created_at: DateTime
+  - processed_at: DateTime
+  - completed_at: DateTime
+  --
+  + approve()
+  + reject()
+  + complete()
+}
+
+class ReturnItem {
+  - order_item_id: ObjectId
+  - product_id: ObjectId
+  - product_name: String
+  - variant_id: ObjectId
+  - variant_name: String
+  - quantity: Int
+  - price: Float
+  - reason: ReturnReason
+  - reason_note: String
+  - images: List<String>
+}
+
+Return *-- ReturnItem : contains
+Order "1" -- "0..1" Return : may have
+User "1" -- "0..*" Return : requests
+
+' ============================================
+' REVIEW SYSTEM
+' ============================================
+
+class ProductReview {
+  - _id: ObjectId
+  - product_id: ObjectId
+  - user_id: ObjectId
+  - rating: Int
+  - comment: String
+  - image_url: String
+  - created_at: DateTime
+}
+
+class ShopReview {
+  - _id: ObjectId
+  - shop_id: ObjectId
+  - user_id: ObjectId
+  - rating: Int
+  - comment: String
+  - created_at: DateTime
+}
+
+Product "1" -- "0..*" ProductReview : has
+Shop "1" -- "0..*" ShopReview : has
+User "1" -- "0..*" ProductReview : writes
+User "1" -- "0..*" ShopReview : writes
+
+' ============================================
+' SHIPPING SYSTEM
+' ============================================
+
+enum ShippingUnitStatus {
+  active
+  inactive
+  suspended
+}
+
+class ShippingUnit {
+  - _id: ObjectId
+  - shop_id: ObjectId
+  - name: String
+  - code: String
+  - logo_url: String
+  - description: String
+  - website: String
+  - phone: String
+  - email: String
+  - shipping_fee_base: Float
+  - free_shipping_threshold: Float
+  - estimated_delivery_days: Int
+  - supported_provinces: List<String>
+  - status: ShippingUnitStatus
+  - created_at: DateTime
+  - updated_at: DateTime
+  - total_orders: Int
+  - total_revenue: Float
+}
+
+class ShippingVoucher {
+  - _id: ObjectId
+  - code: String
+  - discount_type: String
+  - discount_value: Float
+  - max_discount: Float
+  - min_order_value: Float
+  - usage_limit: Int
+  - used_count: Int
+  - shipping_unit_id: ObjectId
+  - start_date: DateTime
+  - end_date: DateTime
+  - status: String
+  - description: String
+  - created_by: String
+  - shop_id: ObjectId
+  - created_at: DateTime
+}
+
+Shop "1" -- "0..*" ShippingUnit : manages
+ShippingUnit "1" -- "0..*" ShippingVoucher : offers
+
+' ============================================
+' VOUCHER SYSTEM
+' ============================================
+
+class Voucher {
+  - _id: ObjectId
+  - code: String
+  - discount_type: String
+  - discount_value: Float
+  - max_discount: Float
+  - min_order_value: Float
+  - usage_limit: Int
+  - used_count: Int
+  - start_date: DateTime
+  - end_date: DateTime
+  - target_type: String
+  - shop_id: ObjectId
+  - product_id: ObjectId
+  - created_by: String
+  - status: String
+  - created_at: DateTime
+}
+
+Order "0..1" -- "0..1" Voucher : uses
+
+' ============================================
+' NOTIFICATION SYSTEM
+' ============================================
+
+enum NotificationType {
+  ORDER
+  PAYMENT
+  SHIPPING
+  SYSTEM
+  PROMOTION
+  REVIEW
+  FOLLOW
+  FRIEND_REQUEST
+  FRIEND_ACCEPTED
+}
+
+class Notification {
+  - _id: ObjectId
+  - user_id: ObjectId
+  - type: NotificationType
+  - reference_id: String
+  - title: String
+  - message: String
+  - is_read: Boolean
+  - image_url: String
+  - created_at: DateTime
+  --
+  + markAsRead()
+}
+
+enum AdminNotificationType {
+  NEW_USER
+  NEW_SHOP
+  NEW_POST
+  REPORT_USER
+  REPORT_SHOP
+  REPORT_POST
+  SYSTEM
+}
+
+class AdminNotification {
+  - _id: ObjectId
+  - user_id: ObjectId
+  - type: AdminNotificationType
+  - reference_id: String
+  - title: String
+  - message: String
+  - is_read: Boolean
+  - image_url: String
+  - created_at: DateTime
+}
+
+User "1" -- "0..*" Notification : receives
+Admin "1" -- "0..*" AdminNotification : receives
+
+' ============================================
+' REPORT SYSTEM
+' ============================================
+
+class Report {
+  - _id: ObjectId
+  - reporter_id: ObjectId
+  - target_type: String
+  - target_id: ObjectId
+  - reason: String
+  - description: String
+  - status: String
+  - created_at: DateTime
+  --
+  + resolve()
+  + reject()
+}
+
+User "1" -- "0..*" Report : creates
+Admin "1" -- "0..*" Report : processes
+
+' ============================================
+' SHOP SETTINGS
+' ============================================
+
+class ShopSettings {
+  - shop_id: ObjectId
+  - general: GeneralSettings
+  - notifications: NotificationSettings
+  - payment: PaymentSettings
+  - shipping: ShippingSettings
+  - security: SecuritySettings
+  - invoice: InvoiceSettings
+  - social: SocialSettings
+  - seo: SeoSettings
+  - updated_at: DateTime
+}
+
+Shop "1" -- "1" ShopSettings : has
+
+' ============================================
+' CART SYSTEM
+' ============================================
+
+class CartItem {
+  - product_id: ObjectId
+  - quantity: Int
+  - shop_id: ObjectId
+}
+
+class Cart {
+  - items: List<CartItem>
+  --
+  + addItem()
+  + removeItem()
+  + updateQuantity()
+  + getTotal()
+}
+
+User "1" -- "1" Cart : has
+
+' ============================================
+' SUMMARY RELATIONSHIPS
+' ============================================
+
+note top of User : Người dùng chính của hệ thống
+note top of Admin : Quản trị viên, kế thừa từ User
+note top of Shop : Cửa hàng bán sản phẩm
+note top of SocialPost : Bài viết trên mạng xã hội
+note top of Order : Đơn hàng từ giỏ hàng
+note top of Payment : Thanh toán cho đơn hàng
+note top of Return : Yêu cầu hoàn trả sản phẩm
+
+@enduml

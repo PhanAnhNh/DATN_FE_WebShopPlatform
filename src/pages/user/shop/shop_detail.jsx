@@ -4,39 +4,18 @@ import { useParams, useNavigate } from "react-router-dom";
 import ShopDetailLayout from "../../../components/layout/ShopDetailLayout";
 import api from "../../../api/api";
 import { 
-  FaStore, 
-  FaUsers, 
-  FaCommentDots, 
-  FaStar, 
-  FaStarHalfAlt,
-  FaRegStar,
-  FaMapMarkerAlt,
-  FaPhone,
-  FaEnvelope,
-  FaCalendarAlt,
-  FaHeart,
-  FaRegHeart,
-  FaSearch,
-  FaBox,
-  FaShoppingCart,
-  FaEye,
-  FaCheckCircle,
-  FaShareAlt,
-  FaFacebook,
-  FaTwitter,
-  FaInstagram,
-  FaTruck,
-  FaShieldAlt,
-  FaClock,
-  FaReply,
-  FaThumbsUp,
-  FaUserCircle,
-  FaEdit
+  FaStore, FaUsers, FaCommentDots, FaStar, FaStarHalfAlt,
+  FaRegStar, FaMapMarkerAlt, FaPhone, FaEnvelope, FaCalendarAlt,
+  FaHeart, FaRegHeart, FaSearch, FaBox, FaShoppingCart, FaEye,
+  FaCheckCircle, FaShareAlt, FaFacebook, FaTwitter, FaInstagram,
+  FaTruck, FaShieldAlt, FaClock, FaReply, FaThumbsUp, FaUserCircle, FaEdit
 } from 'react-icons/fa';
 
 const ShopDetailPage = () => {
     const { shop_id } = useParams();
     const navigate = useNavigate();
+    
+    // State với cache initialization - sử dụng ref để tránh vấn đề async
     const [activeTab, setActiveTab] = useState("products");
     const [shop, setShop] = useState(null);
     const [products, setProducts] = useState([]);
@@ -48,17 +27,112 @@ const ShopDetailPage = () => {
     const [isFollowing, setIsFollowing] = useState(false);
     const [followLoading, setFollowLoading] = useState(false);
     const [showShareMenu, setShowShareMenu] = useState(false);
-    const [hoveredProductId, setHoveredProductId] = useState(null); // Đổi tên để rõ ràng hơn
+    const [hoveredProductId, setHoveredProductId] = useState(null);
     const [hoveredReviewId, setHoveredReviewId] = useState(null);
     const [likedReviews, setLikedReviews] = useState({});
-    const [newRating, setNewRating] = useState(5); // Thêm state rating
-    const [showRatingSelector, setShowRatingSelector] = useState(false); // Hiển thị chọn sao
+    const [newRating, setNewRating] = useState(5);
+    const [showRatingSelector, setShowRatingSelector] = useState(false);
+    const [isCacheLoaded, setIsCacheLoaded] = useState(false);
 
-    useEffect(() => {
-        if (shop_id) {
-            fetchShopData();
-            checkFollowStatus();
+    // Hàm đọc cache
+    const loadFromCache = (id) => {
+        if (!id) return false;
+        
+        const cachedShop = sessionStorage.getItem(`shop_data_${id}`);
+        const cacheTime = sessionStorage.getItem(`shop_cache_time_${id}`);
+        const isCacheValid = cachedShop && cacheTime && (Date.now() - parseInt(cacheTime) < 300000);
+        
+        if (isCacheValid) {
+            try {
+                const parsedShop = JSON.parse(cachedShop);
+                setShop(parsedShop);
+                
+                const cachedProducts = sessionStorage.getItem(`shop_products_${id}`);
+                if (cachedProducts) {
+                    setProducts(JSON.parse(cachedProducts));
+                }
+                
+                const cachedReviews = sessionStorage.getItem(`shop_reviews_${id}`);
+                if (cachedReviews) {
+                    setReviews(JSON.parse(cachedReviews));
+                }
+                
+                const cachedTab = sessionStorage.getItem(`shop_tab_${id}`);
+                if (cachedTab) {
+                    setActiveTab(cachedTab);
+                }
+                
+                const cachedFollowing = sessionStorage.getItem(`shop_following_${id}`);
+                if (cachedFollowing !== null) {
+                    setIsFollowing(cachedFollowing === "true");
+                }
+                
+                const cachedLiked = sessionStorage.getItem(`shop_liked_reviews_${id}`);
+                if (cachedLiked) {
+                    setLikedReviews(JSON.parse(cachedLiked));
+                }
+                
+                console.log("✅ Loaded from cache for shop:", id);
+                return true;
+            } catch (e) {
+                console.error("Error parsing cache:", e);
+            }
         }
+        return false;
+    };
+
+    // Hàm lưu cache
+    const saveToCache = (id) => {
+        if (!id) return;
+        
+        if (shop) {
+            sessionStorage.setItem(`shop_data_${id}`, JSON.stringify(shop));
+            sessionStorage.setItem(`shop_cache_time_${id}`, Date.now().toString());
+        }
+        if (products.length > 0) {
+            sessionStorage.setItem(`shop_products_${id}`, JSON.stringify(products));
+        }
+        if (reviews.length > 0) {
+            sessionStorage.setItem(`shop_reviews_${id}`, JSON.stringify(reviews));
+        }
+        sessionStorage.setItem(`shop_tab_${id}`, activeTab);
+        sessionStorage.setItem(`shop_following_${id}`, isFollowing);
+        sessionStorage.setItem(`shop_liked_reviews_${id}`, JSON.stringify(likedReviews));
+    };
+
+    // Effect để lưu cache khi có thay đổi
+    useEffect(() => {
+        if (shop_id && (shop || products.length > 0 || reviews.length > 0)) {
+            saveToCache(shop_id);
+        }
+    }, [shop, products, reviews, activeTab, isFollowing, likedReviews, shop_id]);
+
+    // Effect chính - load dữ liệu
+    useEffect(() => {
+        if (!shop_id) return;
+        
+        console.log("=== Loading shop data for ID:", shop_id);
+        
+        // Thử đọc cache trước
+        const hasCache = loadFromCache(shop_id);
+        
+        if (hasCache) {
+            console.log("Using cached data, skipping API call");
+            setLoading(false);
+            setIsCacheLoaded(true);
+        } else {
+            console.log("No valid cache, fetching from API");
+            setLoading(true);
+            fetchShopData();
+        }
+        
+        // Kiểm tra follow status từ API (không cache vì có thể thay đổi)
+        checkFollowStatus();
+        
+        // Cleanup function
+        return () => {
+            console.log("Cleaning up for shop:", shop_id);
+        };
     }, [shop_id]);
 
     const checkFollowStatus = async () => {
@@ -81,12 +155,10 @@ const ShopDetailPage = () => {
 
             try {
                 const productsRes = await api.get(`/api/v1/shops/${shop_id}/products`);
-                // QUAN TRỌNG: Chuẩn hóa dữ liệu sản phẩm - đảm bảo có trường id
                 const normalizedProducts = (productsRes.data || []).map(product => ({
                     ...product,
                     id: product.id || product._id || product.product_id || String(product.id || Math.random())
                 }));
-                console.log("Normalized products:", normalizedProducts); // Debug: kiểm tra dữ liệu
                 setProducts(normalizedProducts);
             } catch (productsError) {
                 console.log("Products API not available, using mock data");
@@ -102,7 +174,6 @@ const ShopDetailPage = () => {
 
             try {
                 const reviewsRes = await api.get(`/api/v1/shops/${shop_id}/reviews`);
-                // Chuẩn hóa reviews tương tự
                 const normalizedReviews = (reviewsRes.data || []).map(review => ({
                     ...review,
                     id: review.id || review._id || review.review_id || String(review.id || Math.random())
@@ -138,6 +209,8 @@ const ShopDetailPage = () => {
             setLoading(false);
         }
     };
+
+    // ... (giữ nguyên các hàm formatNumber, formatCurrency, formatDate, renderStars, handleFollow, handleSendMessage, handleProductClick, handleSubmitComment, handleLikeReview)
 
     const formatNumber = (num) => {
         if (num >= 1000) {
@@ -186,23 +259,23 @@ const ShopDetailPage = () => {
     const handleProductClick = (productId) => navigate(`/product/${productId}`);
     
     const handleSubmitComment = async () => {
-    if (!newComment.trim()) return;
-    try {
-        await api.post(`/api/v1/shops/${shop_id}/reviews`, { 
-            comment: newComment, 
-            rating: newRating  // Sử dụng rating đã chọn
-        });
-        setReviews([{
-            id: Date.now(),
-            user_name: "Bạn",
-            user_avatar: null,
-            rating: newRating,
-            comment: newComment,
-            date: new Date().toISOString(),
-            likes: 0
-        }, ...reviews]);
-        setNewComment("");
-        setNewRating(5); // Reset về 5 sao
+        if (!newComment.trim()) return;
+        try {
+            await api.post(`/api/v1/shops/${shop_id}/reviews`, { 
+                comment: newComment, 
+                rating: newRating
+            });
+            setReviews([{
+                id: Date.now(),
+                user_name: "Bạn",
+                user_avatar: null,
+                rating: newRating,
+                comment: newComment,
+                date: new Date().toISOString(),
+                likes: 0
+            }, ...reviews]);
+            setNewComment("");
+            setNewRating(5);
         } catch (error) {
             console.error("Error submitting comment:", error);
         }
@@ -214,16 +287,6 @@ const ShopDetailPage = () => {
             [reviewId]: !prev[reviewId]
         }));
     };
-
-    const filteredReviews = reviews.filter(review => !ratingFilter || review.rating === ratingFilter);
-    const ratingDistribution = { 
-        5: reviews.filter(r => r.rating === 5).length, 
-        4: reviews.filter(r => r.rating === 4).length, 
-        3: reviews.filter(r => r.rating === 3).length, 
-        2: reviews.filter(r => r.rating === 2).length, 
-        1: reviews.filter(r => r.rating === 1).length 
-    };
-    const ratingOptions = [{ value: 5, label: "5 sao" }, { value: 4, label: "4 sao" }, { value: 3, label: "3 sao" }, { value: 2, label: "2 sao" }, { value: 1, label: "1 sao" }];
 
     const renderStars = (rating) => {
         const stars = [];
@@ -237,7 +300,19 @@ const ShopDetailPage = () => {
         return stars;
     };
 
-    if (loading) return (
+    const filteredReviews = reviews.filter(review => !ratingFilter || review.rating === ratingFilter);
+    const ratingDistribution = { 
+        5: reviews.filter(r => r.rating === 5).length, 
+        4: reviews.filter(r => r.rating === 4).length, 
+        3: reviews.filter(r => r.rating === 3).length, 
+        2: reviews.filter(r => r.rating === 2).length, 
+        1: reviews.filter(r => r.rating === 1).length 
+    };
+    const ratingOptions = [{ value: 5, label: "5 sao" }, { value: 4, label: "4 sao" }, { value: 3, label: "3 sao" }, { value: 2, label: "2 sao" }, { value: 1, label: "1 sao" }];
+    const chatResponseRate = shop?.chat_response_rate !== undefined && shop?.chat_response_rate !== null ? shop.chat_response_rate : 0;
+
+    // Loading state
+    if (loading && !shop && !isCacheLoaded) return (
         <ShopDetailLayout shop={null}>
             <div style={{ textAlign: "center", padding: "80px 20px" }}>
                 <div style={{ width: "50px", height: "50px", border: "3px solid #f3f3f3", borderTop: "3px solid #4CAF50", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 20px" }} />
@@ -255,12 +330,13 @@ const ShopDetailPage = () => {
         </ShopDetailLayout>
     );
 
-    // Lấy giá trị chat_response_rate, nếu undefined hoặc null thì hiển thị 0
-    const chatResponseRate = shop?.chat_response_rate !== undefined && shop?.chat_response_rate !== null ? shop.chat_response_rate : 0;
-
     return (
         <ShopDetailLayout shop={shop}>
+
             <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
+                {/* Phần còn lại giữ nguyên - Hero Section, Shop Info, Tabs, etc. */}
+                {/* ... (giữ nguyên toàn bộ phần render từ Hero Section đến hết) ... */}
+                
                 {/* Hero Section */}
                 <div style={{ position: "relative", marginBottom: "60px" }}>
                     <div style={{

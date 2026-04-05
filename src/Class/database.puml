@@ -1,0 +1,132 @@
+@startuml RoutersAndServices
+!theme plain
+skinparam component {
+  BackgroundColor #E8F5E9
+  BorderColor #2E7D32
+}
+skinparam arrow {
+  Color #333333
+}
+
+title <size:16><b>CHI TIẾT ROUTERS VÀ SERVICES</b></size>
+
+package "API ROUTERS (FastAPI)" {
+  
+  package "Authentication & User" {
+    component "AuthRouter" as AR
+    component "UserRouter" as UR
+    component "AddressRouter" as AddR
+  }
+  
+  package "Social Features" {
+    component "PostRouter" as PR
+    component "CommentRouter" as CR
+    component "LikeRouter" as LR
+    component "ShareRouter" as SR
+    component "SaveRouter" as SaR
+    component "FollowRouter" as FR
+    component "FriendRouter" as FiR
+  }
+  
+  package "E-commerce" {
+    component "ProductRouter" as ProdR
+    component "CategoryRouter" as CatR
+    component "CartRouter" as CartR
+    component "OrderRouter" as OR
+    component "PaymentRouter" as PayR
+    component "ReturnRouter" as RetR
+    component "VoucherRouter" as VR
+    component "ReviewRouter" as RevR
+  }
+  
+  package "Shop Management" {
+    component "ShopRouter" as ShopR
+    component "ShopProductRouter" as ShopProdR
+    component "ShopOrderRouter" as ShopOrdR
+    component "ShopCustomerRouter" as ShopCustR
+    component "ShopReturnRouter" as ShopRetR
+    component "ShopVoucherRouter" as ShopVR
+    component "ShopSettingRouter" as ShopSetR
+    component "ShippingRouter" as ShipR
+  }
+  
+  package "Admin & System" {
+    component "AdminRouter" as AdminR
+    component "AdminPostRouter" as AdminPostR
+    component "AdminShopRouter" as AdminShopR
+    component "AdminUserRouter" as AdminUserR
+    component "NotificationRouter" as NotiR
+    component "ReportRouter" as RepR
+  }
+}
+
+package "SERVICES (Business Logic)" {
+  
+  component "UserService" as UserSvc
+  component "PostService" as PostSvc
+  component "CommentService" as CommentSvc
+  component "LikeService" as LikeSvc
+  component "ShareService" as ShareSvc
+  component "SaveService" as SaveSvc
+  component "FollowService" as FollowSvc
+  component "FriendService" as FriendSvc
+  
+  component "ProductService" as ProductSvc
+  component "CategoryService" as CategorySvc
+  component "CartService" as CartSvc
+  component "OrderService" as OrderSvc
+  component "PaymentService" as PaymentSvc
+  component "ReturnService" as ReturnSvc
+  component "VoucherService" as VoucherSvc
+  component "ReviewService" as ReviewSvc
+  
+  component "ShopService" as ShopSvc
+  component "AddressService" as AddressSvc
+  component "ShippingService" as ShippingSvc
+  component "NotificationService" as NotificationSvc
+  component "ReportService" as ReportSvc
+  component "AdminService" as AdminSvc
+}
+
+' ============================================
+' KẾT NỐI ROUTERS -> SERVICES
+' ============================================
+
+AR --> UserSvc
+UR --> UserSvc
+AddR --> AddressSvc
+
+PR --> PostSvc
+CR --> CommentSvc
+LR --> LikeSvc
+SR --> ShareSvc
+SaR --> SaveSvc
+FR --> FollowSvc
+FiR --> FriendSvc
+
+ProdR --> ProductSvc
+CatR --> CategorySvc
+CartR --> CartSvc
+OR --> OrderSvc
+PayR --> PaymentSvc
+RetR --> ReturnSvc
+VR --> VoucherSvc
+RevR --> ReviewSvc
+
+ShopR --> ShopSvc
+ShopProdR --> ProductSvc
+ShopOrdR --> OrderSvc
+ShopCustR --> UserSvc
+ShopRetR --> ReturnSvc
+ShopVR --> VoucherSvc
+ShopSetR --> ShopSvc
+ShipR --> ShippingSvc
+
+AdminR --> AdminSvc
+AdminPostR --> PostSvc
+AdminShopR --> ShopSvc
+AdminUserR --> UserSvc
+NotiR --> NotificationSvc
+RepR --> ReportSvc
+
+@enduml

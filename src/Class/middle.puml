@@ -1,0 +1,64 @@
+@startuml middleware_diagram
+!theme plain
+skinparam component {
+  BackgroundColor #FFF3E0
+  BorderColor #E65100
+}
+skinparam node {
+  BackgroundColor #F5F5F5
+  BorderColor #9E9E9E
+}
+
+title <size:16><b>MIDDLEWARE VÀ CƠ CHẾ BẢO MẬT</b></size>
+
+node "HTTP Request" as Request
+
+node "MIDDLEWARE CHAIN" as MiddlewareChain {
+  
+  component "CORS Middleware" as CORS {
+    portin "Request" as CORS_In
+    portout "Response" as CORS_Out
+  }
+  
+  component "Rate Limit Middleware" as RateLimit {
+    portin "Request" as RL_In
+    portout "Response" as RL_Out
+  }
+  
+  component "JWT Authentication\nMiddleware" as JWTAuth {
+    portin "Request" as JWT_In
+    portout "Response" as JWT_Out
+  }
+  
+  component "Logging Middleware" as Logging {
+    portin "Request" as Log_In
+    portout "Response" as Log_Out
+  }
+}
+
+node "API Router" as Router
+node "Response" as Response
+
+Request --> CORS_In
+CORS_Out --> RL_In
+RL_Out --> JWT_In
+JWT_Out --> Log_In
+Log_Out --> Router
+Router --> Response
+
+note right of JWTAuth
+  <b>Cơ chế xác thực:</b>
+  • JWT token từ Header
+  • Token hết hạn sau 7 ngày
+  • Refresh token cơ chế
+  • Phân quyền (Admin/Shop/User)
+end note
+
+note right of RateLimit
+  <b>Giới hạn request:</b>
+  • API công khai: 100 req/phút
+  • API đăng nhập: 10 req/phút
+  • API nhạy cảm: 30 req/phút
+end note
+
+@enduml

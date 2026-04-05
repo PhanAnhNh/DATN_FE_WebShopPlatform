@@ -1,0 +1,55 @@
+@startuml system
+left to right direction
+
+' Tinh chỉnh giao diện chung
+skinparam {
+    ' Màu nền cho toàn bộ ảnh
+    BackgroundColor #F4F7F6
+    
+    ActorBorderColor #2C3E50
+    ActorBackgroundColor #ECF0F1
+    
+    ' Màu nền cho khối chữ nhật Admin System
+    RectangleBorderColor #34495E
+    RectangleBackgroundColor #FFFFFF 
+    RectangleFontSize 16
+    RectangleFontStyle bold
+    
+    UsecaseBackgroundColor #D6EAF8
+    UsecaseBorderColor #2E86C1
+    UsecaseArrowColor #2E86C1
+    UsecaseFontSize 13
+}
+
+actor "Shop" as Shop #E67E22
+
+' Thêm màu nền trực tiếp cho rectangle bằng mã màu phía sau tên
+rectangle "Admin System" #FEFEFE {
+  usecase "Đăng nhập" as Login #AED6F1
+  usecase "Tổng quan" as Dashboard #85C1E9
+  
+  ' Các chức năng con với màu sắc nhẹ nhàng hơn
+  usecase "Quản lý khách hàng" as CustomerManage #D5F5E3
+  usecase "Quản lý sản phẩm" as ProductManage #D5F5E3
+  usecase "Quản lý đơn hàng" as OrderManage #FCF3CF
+  usecase "Quản lý voucher" as VoucherManage #FCF3CF
+  usecase "Thống kê" as Analytics #F5CBA7
+  usecase "Quản lý đổi trả" as ReturnManage #FADBD8
+  usecase "Quản lý vận chuyển" as ShippingManage #FADBD8
+  usecase "Cài đặt hệ thống" as Setting #D7BDE2
+}
+
+' Kết nối
+Shop -[#E67E22]-> Login
+Login -[#2E86C1]-> Dashboard
+
+Dashboard -[#28B463]-> CustomerManage
+Dashboard -[#28B463]-> ProductManage
+Dashboard -[#D4AC0D]-> OrderManage
+Dashboard -[#D4AC0D]-> VoucherManage
+Dashboard -[#D35400]-> Analytics
+Dashboard -[#CB4335]-> ReturnManage 
+Dashboard -[#CB4335]-> ShippingManage
+Dashboard -[#884EA0]-> Setting
+
+@enduml

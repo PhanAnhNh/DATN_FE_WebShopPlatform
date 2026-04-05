@@ -1,0 +1,43 @@
+@startuml systerm
+left to right direction
+
+actor "Người dùng" as User
+actor "Admin" as Admin
+actor "Shop" as Shop
+
+rectangle "Hệ thống Đặc Sản Quê Tôi" {
+  usecase "Tài khoản" as Authentication
+  usecase "Đăng nhập(Khác token)" as Login
+  usecase "Đăng ký" as Register
+  usecase "Email xác thực" as Email
+  usecase "Gửi otp" as SendOTP
+  usecase "Xác thực otp" as VerifyOTP
+  usecase "Đổi mật khẩu" as ChangePassword
+  usecase "Quên mật khẩu" as ForgotPassword
+  usecase "Admin quản lý" as AdminManage
+  usecase "Shop quản lý" as ShopManage
+  usecase "Giao diện người dùng" as UserInterface
+}
+
+Login --> AdminManage
+Login --> ShopManage
+Login --> UserInterface
+Register --> Email
+
+
+User --> Authentication
+Admin --> Authentication
+Shop --> Authentication
+
+Authentication --> Login
+Authentication --> Register
+Authentication --> ForgotPassword
+
+Email --> Login
+
+ForgotPassword --> SendOTP
+SendOTP --> VerifyOTP
+VerifyOTP --> ChangePassword
+ChangePassword --> Login
+
+@enduml

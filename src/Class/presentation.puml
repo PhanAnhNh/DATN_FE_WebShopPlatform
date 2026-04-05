@@ -1,0 +1,180 @@
+@startuml SystemArchitecture
+!theme plain
+skinparam linetype ortho
+skinparam component {
+  BackgroundColor #E8F5E9
+  BorderColor #2E7D32
+  FontColor #1B5E20
+}
+skinparam node {
+  BackgroundColor #FFF3E0
+  BorderColor #E65100
+  FontColor #BF360C
+}
+skinparam database {
+  BackgroundColor #E3F2FD
+  BorderColor #1565C0
+  FontColor #0D47A1
+}
+skinparam cloud {
+  BackgroundColor #F3E5F5
+  BorderColor #6A1B9A
+  FontColor #4A148C
+}
+skinparam arrow {
+  Color #333333
+  FontColor #333333
+}
+
+title <size:18><b>KIẾN TRÚC TỔNG THỂ HỆ THỐNG</b></size>
+\n<b>"ĐẶC SẢN QUÊ TÔI"</b>
+
+' ============================================
+' TẦNG 1: CLIENT
+' ============================================
+node "TẦNG TRÌNH BÀY\n(Presentation Layer)" as Presentation {
+  component "ReactJS App" as ReactApp
+  
+  frame "Pages" {
+    component "Home" as Home
+    component "Profile" as Profile
+    component "Shop" as ShopUI
+    component "Cart" as CartUI
+    component "Admin Dashboard" as AdminUI
+    component "Chat Modal" as ChatUI
+  }
+  
+  frame "Services" {
+    component "Axios (HTTP)" as Axios
+    component "Socket.IO" as SocketClient
+    component "React Router" as Router
+  }
+}
+
+' ============================================
+' TẦNG 2: BACKEND
+' ============================================
+node "TẦNG XỬ LÝ NGHIỆP VỤ\n(Business Layer)" as Business {
+  component "FastAPI Application" as FastAPI
+  
+  frame "Routers (API Endpoints)" as Routers {
+    component "Auth Router" as AuthRouter
+    component "User Router" as UserRouter
+    component "Post Router" as PostRouter
+    component "Product Router" as ProductRouter
+    component "Order Router" as OrderRouter
+    component "Cart Router" as CartRouter
+    component "Chat Router" as ChatRouter
+    component "Friend Router" as FriendRouter
+    component "Payment Router" as PaymentRouter
+    component "Return Router" as ReturnRouter
+    component "Shop Router" as ShopRouter
+    component "Admin Router" as AdminRouter
+    component "Voucher Router" as VoucherRouter
+    component "Notification Router" as NotifyRouter
+    component "Review Router" as ReviewRouter
+    component "Follow Router" as FollowRouter
+    component "Comment Router" as CommentRouter
+    component "Like Router" as LikeRouter
+    component "Share Router" as ShareRouter
+    component "Save Router" as SaveRouter
+    component "Report Router" as ReportRouter
+    component "Category Router" as CategoryRouter
+    component "Address Router" as AddressRouter
+    component "Shipping Router" as ShippingRouter
+    component "ShippingVoucher Router" as ShippingVoucherRouter
+  }
+  
+  frame "Services (Business Logic)" as Services {
+    component "UserService" as UserSvc
+    component "PostService" as PostSvc
+    component "ProductService" as ProductSvc
+    component "OrderService" as OrderSvc
+    component "CartService" as CartSvc
+    component "ChatService" as ChatSvc
+    component "FriendService" as FriendSvc
+    component "PaymentService" as PaymentSvc
+    component "ReturnService" as ReturnSvc
+    component "ShopService" as ShopSvc
+    component "VoucherService" as VoucherSvc
+    component "NotificationService" as NotifySvc
+    component "ReviewService" as ReviewSvc
+    component "FollowService" as FollowSvc
+    component "CommentService" as CommentSvc
+    component "LikeService" as LikeSvc
+    component "ShareService" as ShareSvc
+    component "SaveService" as SaveSvc
+    component "ReportService" as ReportSvc
+    component "CategoryService" as CategorySvc
+    component "AddressService" as AddressSvc
+    component "ShippingService" as ShippingSvc
+    component "AdminService" as AdminSvc
+  }
+  
+  frame "Middleware" as Middleware {
+    component "CORS" as CORSMW
+    component "JWT Auth" as JWTMW
+    component "Rate Limit" as RateLimitMW
+  }
+  
+  frame "Socket Handlers" as SocketHandlers {
+    component "Chat Handler" as ChatHandler
+    component "Notification Handler" as NotifyHandler
+  }
+}
+
+' ============================================
+' TẦNG 3: DATABASE
+' ============================================
+database "TẦNG DỮ LIỆU\n(Data Layer)" as Database {
+  database "MongoDB" as MongoDB {
+    collections
+    [
+      users
+      social_posts
+      post_comments
+      post_likes
+      post_shares
+      saved_posts
+      products
+      product_variants
+      categories
+      orders
+      payments
+      returns
+      messages
+      friends
+      follows
+      notifications
+      admin_notifications
+      reports
+      shops
+      addresses
+      vouchers
+      shipping_units
+      shipping_vouchers
+      shop_settings
+      carts
+      reviews
+    ]
+  }
+}
+
+' ============================================
+' DỊCH VỤ NGOÀI
+' ============================================
+cloud "DỊCH VỤ BÊN THỨ BA\n(External Services)" as External {
+  component "Momo API" as Momo
+  component "VNPay API" as VNPay
+  component "Upload API" as Upload
+}
+
+' ============================================
+' KẾT NỐI
+' ============================================
+
+Presentation --> Business : HTTP / WebSocket
+Business --> Database : Driver (Motor/PyMongo)
+Business --> External : API Calls
+
+@enduml

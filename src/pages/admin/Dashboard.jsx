@@ -35,6 +35,7 @@ const Dashboard = () => {
   }, []);
 
   useEffect(() => {
+    document.title = "Hệ thống Quản trị - Admin";
     const fetchData = async () => {
       try {
         setLoading(true);

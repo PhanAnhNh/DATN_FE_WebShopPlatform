@@ -1,0 +1,546 @@
+@startuml qh
+!theme plain
+skinparam linetype ortho
+skinparam class {
+  BackgroundColor #F5F5F5
+  BorderColor #333333
+  ArrowColor #2E7D32
+}
+skinparam stereotype {
+  BackgroundColor #E8F5E9
+  BorderColor #2E7D32
+}
+
+' ============================================
+' 1. USER MANAGEMENT
+' ============================================
+
+class "users" as users {
+  + _id : ObjectId <<PK>>
+  --
+  + username : String <<UK>>
+  + email : String <<UK>>
+  full_name : String
+  phone : String
+  gender : String
+  dob : Date
+  address : String
+  avatar_url : String
+  cover_url : String
+  role : String
+  is_active : Boolean
+  is_verified : Boolean
+  followers_count : Int
+  following_count : Int
+  posts_count : Int
+  shop_id : ObjectId <<FK>>
+  default_address_id : ObjectId <<FK>>
+  hashed_password : String
+  created_at : DateTime
+  updated_at : DateTime
+  last_login : DateTime
+}
+
+class "admins" as admins {
+  + _id : ObjectId <<PK>>
+  --
+  user_id : ObjectId <<FK>>
+  permissions : List<String>
+  admin_level : Int
+}
+
+class "shops" as shops {
+  + _id : ObjectId <<PK>>
+  --
+  name : String
+  slug : String <<UK>>
+  description : String
+  phone : String
+  email : String
+  address : String
+  province : String
+  district : String
+  ward : String
+  logo_url : String
+  banner_url : String
+  owner_id : ObjectId <<FK>>
+  status : String
+  is_verified : Boolean
+  products_count : Int
+  posts_count : Int
+  followers_count : Int
+  total_orders : Int
+  total_revenue : Float
+  view_count : Int
+  created_at : DateTime
+  updated_at : DateTime
+}
+
+class "addresses" as addresses {
+  + _id : ObjectId <<PK>>
+  --
+  user_id : ObjectId <<FK>>
+  name : String
+  phone : String
+  street : String
+  ward : String
+  district : String
+  city : String
+  country : String
+  is_default : Boolean
+  address_type : String
+  note : String
+  created_at : DateTime
+  updated_at : DateTime
+}
+
+' ============================================
+' 2. SOCIAL POSTS
+' ============================================
+
+class "social_posts" as social_posts {
+  + _id : ObjectId <<PK>>
+  --
+  author_id : ObjectId <<FK>>
+  author_type : String
+  content : String
+  images : List<String>
+  videos : List<String>
+  tags : List<String>
+  location : String
+  visibility : String
+  post_type : String
+  product_category : String
+  allow_comment : Boolean
+  allow_share : Boolean
+  product_id : ObjectId <<FK>>
+  shared_post_id : ObjectId <<FK>>
+  like_count : Int
+  comment_count : Int
+  share_count : Int
+  save_count : Int
+  view_count : Int
+  sentiment : String
+  topics : List<String>
+  is_spam : Boolean
+  is_sensitive : Boolean
+  is_active : Boolean
+  is_approved : Boolean
+  is_pinned : Boolean
+  report_count : Int
+  feed_score : Float
+  deleted_at : DateTime
+  is_permanently_deleted : Boolean
+  created_at : DateTime
+  updated_at : DateTime
+}
+
+class "post_comments" as post_comments {
+  + _id : ObjectId <<PK>>
+  --
+  post_id : ObjectId <<FK>>
+  user_id : ObjectId <<FK>>
+  author_id : ObjectId <<FK>>
+  parent_id : ObjectId <<FK>>
+  content : String
+  image_url : String
+  created_at : DateTime
+  updated_at : DateTime
+}
+
+class "post_likes" as post_likes {
+  + _id : ObjectId <<PK>>
+  --
+  post_id : ObjectId <<FK>>
+  user_id : ObjectId <<FK>>
+  created_at : DateTime
+}
+
+class "post_shares" as post_shares {
+  + _id : ObjectId <<PK>>
+  --
+  post_id : ObjectId <<FK>>
+  user_id : ObjectId <<FK>>
+  created_at : DateTime
+}
+
+class "saved_posts" as saved_posts {
+  + _id : ObjectId <<PK>>
+  --
+  post_id : ObjectId <<FK>>
+  user_id : ObjectId <<FK>>
+  note : String
+  created_at : DateTime
+}
+
+' ============================================
+' 3. CHAT & FRIENDSHIP
+' ============================================
+
+class "messages" as messages {
+  + _id : ObjectId <<PK>>
+  --
+  sender_id : ObjectId <<FK>>
+  receiver_id : ObjectId <<FK>>
+  content : String
+  message_type : String
+  is_read : Boolean
+  created_at : DateTime
+}
+
+class "friend_requests" as friend_requests {
+  + _id : ObjectId <<PK>>
+  --
+  user_id : ObjectId <<FK>>
+  friend_id : ObjectId <<FK>>
+  status : String
+  created_at : DateTime
+  updated_at : DateTime
+}
+
+class "follows" as follows {
+  + _id : ObjectId <<PK>>
+  --
+  follower_id : ObjectId <<FK>>
+  following_id : ObjectId <<FK>>
+  created_at : DateTime
+}
+
+' ============================================
+' 4. PRODUCT & CATEGORY
+' ============================================
+
+class "categories" as categories {
+  + _id : ObjectId <<PK>>
+  --
+  name : String
+  parent_id : ObjectId <<FK>>
+  icon_url : String
+  created_at : DateTime
+}
+
+class "products" as products {
+  + _id : ObjectId <<PK>>
+  --
+  name : String
+  description : String
+  category_id : ObjectId <<FK>>
+  shop_id : ObjectId <<FK>>
+  origin : String
+  certification : String
+  image_url : String
+  price : Float
+  stock : Int
+  qr_code_url : String
+  created_at : DateTime
+}
+
+class "product_variants" as product_variants {
+  + _id : ObjectId <<PK>>
+  --
+  product_id : ObjectId <<FK>>
+  name : String
+  price : Float
+  stock : Int
+  sku : String
+  image_url : String
+  created_at : DateTime
+}
+
+' ============================================
+' 5. ORDER & PAYMENT
+' ============================================
+
+class "orders" as orders {
+  + _id : ObjectId <<PK>>
+  --
+  user_id : ObjectId <<FK>>
+  items : List<OrderItem>
+  total_amount : Float
+  subtotal : Float
+  discount : Float
+  shipping_fee : Float
+  shipping_address : Object
+  note : String
+  payment_method : String
+  status : String
+  voucher : Object
+  shipping_unit_id : ObjectId <<FK>>
+  created_at : DateTime
+  updated_at : DateTime
+}
+
+class "payments" as payments {
+  + _id : ObjectId <<PK>>
+  --
+  order_id : ObjectId <<FK>>
+  user_id : ObjectId <<FK>>
+  method : String
+  amount : Float
+  status : String
+  transaction_id : String
+  payment_url : String
+  created_at : DateTime
+  completed_at : DateTime
+}
+
+class "returns" as returns {
+  + _id : ObjectId <<PK>>
+  --
+  return_code : String <<UK>>
+  user_id : ObjectId <<FK>>
+  order_id : ObjectId <<FK>>
+  order_code : String
+  items : List<ReturnItem>
+  total_refund : Float
+  status : String
+  reason_note : String
+  admin_note : String
+  approved_items : List<String>
+  rejected_reason : String
+  refund_amount : Float
+  bank_name : String
+  bank_account : String
+  bank_holder : String
+  created_at : DateTime
+  processed_at : DateTime
+  completed_at : DateTime
+}
+
+' ============================================
+' 6. REVIEW SYSTEM
+' ============================================
+
+class "product_reviews" as product_reviews {
+  + _id : ObjectId <<PK>>
+  --
+  product_id : ObjectId <<FK>>
+  user_id : ObjectId <<FK>>
+  rating : Int
+  comment : String
+  image_url : String
+  created_at : DateTime
+}
+
+class "shop_reviews" as shop_reviews {
+  + _id : ObjectId <<PK>>
+  --
+  shop_id : ObjectId <<FK>>
+  user_id : ObjectId <<FK>>
+  rating : Int
+  comment : String
+  created_at : DateTime
+}
+
+' ============================================
+' 7. SHIPPING SYSTEM
+' ============================================
+
+class "shipping_units" as shipping_units {
+  + _id : ObjectId <<PK>>
+  --
+  shop_id : ObjectId <<FK>>
+  name : String
+  code : String
+  logo_url : String
+  description : String
+  website : String
+  phone : String
+  email : String
+  shipping_fee_base : Float
+  free_shipping_threshold : Float
+  estimated_delivery_days : Int
+  supported_provinces : List<String>
+  status : String
+  created_at : DateTime
+  updated_at : DateTime
+  total_orders : Int
+  total_revenue : Float
+}
+
+class "shipping_vouchers" as shipping_vouchers {
+  + _id : ObjectId <<PK>>
+  --
+  code : String <<UK>>
+  discount_type : String
+  discount_value : Float
+  max_discount : Float
+  min_order_value : Float
+  usage_limit : Int
+  used_count : Int
+  shipping_unit_id : ObjectId <<FK>>
+  start_date : DateTime
+  end_date : DateTime
+  status : String
+  description : String
+  created_by : String
+  shop_id : ObjectId <<FK>>
+  created_at : DateTime
+}
+
+' ============================================
+' 8. VOUCHER SYSTEM
+' ============================================
+
+class "vouchers" as vouchers {
+  + _id : ObjectId <<PK>>
+  --
+  code : String <<UK>>
+  discount_type : String
+  discount_value : Float
+  max_discount : Float
+  min_order_value : Float
+  usage_limit : Int
+  used_count : Int
+  start_date : DateTime
+  end_date : DateTime
+  target_type : String
+  shop_id : ObjectId <<FK>>
+  product_id : ObjectId <<FK>>
+  created_by : String
+  status : String
+  created_at : DateTime
+}
+
+' ============================================
+' 9. NOTIFICATION SYSTEM
+' ============================================
+
+class "notifications" as notifications {
+  + _id : ObjectId <<PK>>
+  --
+  user_id : ObjectId <<FK>>
+  type : String
+  reference_id : String
+  title : String
+  message : String
+  is_read : Boolean
+  image_url : String
+  created_at : DateTime
+}
+
+class "admin_notifications" as admin_notifications {
+  + _id : ObjectId <<PK>>
+  --
+  user_id : ObjectId <<FK>>
+  type : String
+  reference_id : String
+  title : String
+  message : String
+  is_read : Boolean
+  image_url : String
+  created_at : DateTime
+}
+
+' ============================================
+' 10. REPORT SYSTEM
+' ============================================
+
+class "reports" as reports {
+  + _id : ObjectId <<PK>>
+  --
+  reporter_id : ObjectId <<FK>>
+  target_type : String
+  target_id : ObjectId
+  reason : String
+  description : String
+  status : String
+  created_at : DateTime
+}
+
+' ============================================
+' 11. SHOP SETTINGS & CART
+' ============================================
+
+class "shop_settings" as shop_settings {
+  + _id : ObjectId <<PK>>
+  --
+  shop_id : ObjectId <<FK>>
+  general : Object
+  notifications : Object
+  payment : Object
+  shipping : Object
+  security : Object
+  invoice : Object
+  social : Object
+  seo : Object
+  updated_at : DateTime
+}
+
+class "carts" as carts {
+  + _id : ObjectId <<PK>>
+  --
+  user_id : ObjectId <<FK>>
+  items : List<CartItem>
+  created_at : DateTime
+  updated_at : DateTime
+}
+
+' ============================================
+' RELATIONSHIPS
+' ============================================
+
+' User relationships
+users ||--o| admins : extends
+users ||--o| shops : owns
+users ||--o{ addresses : has
+users ||--o{ social_posts : creates
+users ||--o{ post_comments : writes
+users ||--o{ post_likes : gives
+users ||--o{ post_shares : shares
+users ||--o{ saved_posts : saves
+users ||--o{ messages : sends
+users ||--o{ messages : receives
+users ||--o{ friend_requests : sends
+users ||--o{ friend_requests : receives
+users ||--o{ follows : follows
+users ||--o{ follows : "followed by"
+users ||--o{ orders : places
+users ||--o{ payments : makes
+users ||--o{ returns : requests
+users ||--o{ product_reviews : writes
+users ||--o{ shop_reviews : writes
+users ||--o{ notifications : receives
+users ||--o{ reports : creates
+users ||--o{ carts : has
+
+' Admin relationships
+admins ||--o{ admin_notifications : receives
+admins ||--o{ reports : processes
+
+' Shop relationships
+shops ||--o{ products : sells
+shops ||--o{ shop_reviews : has
+shops ||--o{ shipping_units : manages
+shops ||--o{ shipping_vouchers : creates
+shops ||--o{ vouchers : creates
+shops ||--|| shop_settings : has
+
+' Social post relationships
+social_posts ||--o{ post_comments : has
+social_posts ||--o{ post_likes : receives
+social_posts ||--o{ post_shares : receives
+social_posts ||--o{ saved_posts : "saved by"
+social_posts ||--o| social_posts : "shares"
+
+' Post comment self-reference
+post_comments ||--o{ post_comments : "replies to"
+
+' Category self-reference
+categories ||--o{ categories : "has parent"
+
+' Product relationships
+categories ||--o{ products : "belongs to"
+products ||--o{ product_variants : has
+products ||--o{ product_reviews : has
+products ||--o{ vouchers : "applies to"
+
+' Order relationships
+orders ||--|| payments : has
+orders ||--o| returns : "may have"
+orders ||--o| shipping_units : uses
+
+' Shipping relationships
+shipping_units ||--o{ shipping_vouchers : offers
+
+@enduml

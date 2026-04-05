@@ -2,64 +2,124 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../../api/api";
 import Layout from "../../components/layout/Layout";
+import ShareModal from "./ShareModal";
+import SharedPostCard from "./SharedPostCard";
 
 function Home() {
-    const navigate = useNavigate(); // Thêm useNavigate
-    const [posts, setPosts] = useState([]);
-    const [currentUser, setCurrentUser] = useState(null);
+    const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const category = searchParams.get("category") || "general";
+    
+    // State với cache initialization
+    const [posts, setPosts] = useState(() => {
+        const cached = sessionStorage.getItem(`home_posts_${category}`);
+        if (cached) {
+            try {
+                const parsed = JSON.parse(cached);
+                const cacheTime = sessionStorage.getItem(`home_cache_time_${category}`);
+                if (cacheTime && (Date.now() - parseInt(cacheTime) < 300000)) {
+                    console.log("Using cached posts for category:", category);
+                    return parsed;
+                }
+            } catch (e) {
+                console.error("Error parsing cached posts:", e);
+            }
+        }
+        return [];
+    });
+    
+    const [currentUser, setCurrentUser] = useState(() => {
+        const storedUserData = localStorage.getItem("user_data");
+        const storedUserLegacy = localStorage.getItem("user");
+        if (storedUserData) {
+            return JSON.parse(storedUserData);
+        } else if (storedUserLegacy) {
+            return JSON.parse(storedUserLegacy);
+        }
+        return null;
+    });
+    
     const [showComments, setShowComments] = useState({});
     const [postComments, setPostComments] = useState({});
     const [commentInputs, setCommentInputs] = useState({});
-    const [likedPosts, setLikedPosts] = useState({}); 
-    const [searchParams] = useSearchParams();
-    const category = searchParams.get("category") || "general";
+    const [likedPosts, setLikedPosts] = useState(() => {
+        const cached = sessionStorage.getItem(`home_liked_${category}`);
+        return cached ? JSON.parse(cached) : {};
+    });
     const [activePostMenu, setActivePostMenu] = useState(null);
     const [editingPost, setEditingPost] = useState(null);
     const [newPostContent, setNewPostContent] = useState("");
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [activeCommentMenu, setActiveCommentMenu] = useState(null); 
-    const [editingCommentId, setEditingCommentId] = useState(null); 
+    const [activeCommentMenu, setActiveCommentMenu] = useState(null);
+    const [editingCommentId, setEditingCommentId] = useState(null);
     const [editCommentContent, setEditCommentContent] = useState("");
     const [selectedPost, setSelectedPost] = useState(null);
     const [isPostModalOpen, setIsPostModalOpen] = useState(false);
     const [modalComments, setModalComments] = useState([]);
     const [modalCommentInput, setModalCommentInput] = useState("");
     const [modalLiked, setModalLiked] = useState(false);
-    const [commentPage, setCommentPage] = useState(1); // Thêm state phân trang
-    const [commentLimit] = useState(5); // Mỗi lần hiển thị 5 bình luận
-    const [totalComments, setTotalComments] = useState(0); // Tổng số bình luận
-    const [replyingTo, setReplyingTo] = useState(null); // State cho trả lời bình luận
-    const [replyInput, setReplyInput] = useState(""); // Nội dung trả lời
+    const [commentPage, setCommentPage] = useState(1);
+    const [commentLimit] = useState(5);
+    const [totalComments, setTotalComments] = useState(0);
+    const [replyingTo, setReplyingTo] = useState(null);
+    const [replyInput, setReplyInput] = useState("");
+    const [sharePost, setSharePost] = useState(null);
+    const [showShareModal, setShowShareModal] = useState(false);
+    const [loading, setLoading] = useState(() => {
+        const cached = sessionStorage.getItem(`home_posts_${category}`);
+        const cacheTime = sessionStorage.getItem(`home_cache_time_${category}`);
+        if (cached && cacheTime && (Date.now() - parseInt(cacheTime) < 300000)) {
+            return false;
+        }
+        return true;
+    });
 
     const [newPost, setNewPost] = useState({
-    content: "",
-    images: [],
-    videos: [],
-    tags: [],
-    location: "",
-    visibility: "public",
-    post_type: "text",
-    product_category: "general",
-    allow_comment: true,
-    allow_share: true
-});
+        content: "",
+        images: [],
+        videos: [],
+        tags: [],
+        location: "",
+        visibility: "public",
+        post_type: "text",
+        product_category: "general",
+        allow_comment: true,
+        allow_share: true
+    });
 
     const [imageUrls, setImageUrls] = useState([]);
     const [uploadingImages, setUploadingImages] = useState(false);
     const [savedPosts, setSavedPosts] = useState({});
     const [toastConfig, setToastConfig] = useState({ show: false, message: '', type: 'success' });
+    
     const showToast = (message, type = 'success') => {
         setToastConfig({ show: true, message, type });
+        setTimeout(() => setToastConfig({ show: false, message: '', type: 'success' }), 3000);
     };
 
+    // Lưu cache khi posts thay đổi
+    useEffect(() => {
+        if (posts.length > 0) {
+            sessionStorage.setItem(`home_posts_${category}`, JSON.stringify(posts));
+            sessionStorage.setItem(`home_cache_time_${category}`, Date.now().toString());
+        }
+    }, [posts, category]);
+
+    // Lưu liked posts cache
+    useEffect(() => {
+        if (Object.keys(likedPosts).length > 0) {
+            sessionStorage.setItem(`home_liked_${category}`, JSON.stringify(likedPosts));
+        }
+    }, [likedPosts, category]);
 
     useEffect(() => {
         console.log("=== DEBUG AUTH ===");
         console.log("user_token:", localStorage.getItem("user_token")?.substring(0, 20) + "...");
         console.log("user_data:", localStorage.getItem("user_data"));
         console.log("user:", localStorage.getItem("user"));
-        
+        document.title = "Đặc sản quê tôi - Trang chủ";
+
         const handleClickOutside = (event) => {
             if (!event.target.closest('.menu-trigger') && !event.target.closest('.popup-menu')) {
                 setActivePostMenu(null);
@@ -68,97 +128,102 @@ function Home() {
         };
         document.addEventListener("mousedown", handleClickOutside);
         
-        const storedUserData = localStorage.getItem("user_data");
-        const storedUserLegacy = localStorage.getItem("user");
+        // Kiểm tra cache
+        const cachedPosts = sessionStorage.getItem(`home_posts_${category}`);
+        const cacheTime = sessionStorage.getItem(`home_cache_time_${category}`);
+        const isCacheValid = cachedPosts && cacheTime && (Date.now() - parseInt(cacheTime) < 300000);
         
-        let userData = null;
-        if (storedUserData) {
-            userData = JSON.parse(storedUserData);
-            setCurrentUser(userData);
-            console.log("Set currentUser from user_data:", userData);
-        } else if (storedUserLegacy) {
-            userData = JSON.parse(storedUserLegacy);
-            setCurrentUser(userData);
-            console.log("Set currentUser from user:", userData);
+        if (!isCacheValid || posts.length === 0) {
+            fetchFeedAndLikes();
+        } else {
+            setLoading(false);
         }
         
-        const fetchFeedAndLikes = async () => {
-            try {
-                let url = "/api/v1/posts/feed";
-                if (category !== "general") {
-                    url += `?category=${category}`; 
-                }
-
-                const token = localStorage.getItem("user_token");
-                if (!token) {
-                    console.log("Không tìm thấy token, chuyển hướng đến login");
-                    window.location.href = "/login";
-                    return;
-                }
-
-                const res = await api.get(url);
-                console.log("Feed response:", res.data);
-                const fetchedPosts = res.data;
-                
-                setPosts(fetchedPosts);
-
-                const likeChecks = fetchedPosts.map(post => 
-                    api.get(`/api/v1/likes/check/${post._id}`)
-                        .then(res => ({ id: post._id, isLiked: res.data.liked }))
-                        .catch(() => ({ id: post._id, isLiked: false }))
-                );
-
-                const likeResults = await Promise.all(likeChecks);
-                
-                const likeMap = {};
-                likeResults.forEach(result => {
-                    likeMap[result.id] = result.isLiked;
-                });
-                setLikedPosts(likeMap);
-
-            } catch (err) {
-                console.error("Lỗi khi tải Feed:", err);
-                if (err.response?.status === 401) {
-                    localStorage.removeItem("user_token");
-                    localStorage.removeItem("user_data");
-                    localStorage.removeItem("user");
-                    window.location.href = "/login";
-                }
-            }
-        };
-
-        fetchFeedAndLikes();
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
     }, [category]);
 
-    useEffect(() => {
-    const checkSavedStatus = async () => {
-        if (!currentUser) return;
-        
-        const savedChecks = posts.map(post => 
-            api.get(`/api/v1/saves/check/${post._id}`)
-                .then(res => ({ id: post._id, isSaved: res.data.is_saved }))
-                .catch(() => ({ id: post._id, isSaved: false }))
-        );
-        
-        const savedResults = await Promise.all(savedChecks);
-        const savedMap = {};
-        savedResults.forEach(result => {
-            savedMap[result.id] = result.isSaved;
-        });
-        setSavedPosts(savedMap);
-    };
-    
-    if (posts.length > 0 && currentUser) {
-        checkSavedStatus();
-    }
-}, [posts, currentUser]);
+    const fetchFeedAndLikes = async () => {
+        try {
+            setLoading(true);
+            let url = "/api/v1/posts/feed";
+            if (category !== "general") {
+                url += `?category=${category}`;
+            }
 
-    // Hàm chuyển trang
+            const token = localStorage.getItem("user_token");
+            if (!token) {
+                console.log("Không tìm thấy token, chuyển hướng đến login");
+                window.location.href = "/login";
+                return;
+            }
+
+            const res = await api.get(url);
+            console.log("Feed response:", res.data);
+            const fetchedPosts = res.data;
+            
+            setPosts(fetchedPosts);
+
+            const likeChecks = fetchedPosts.map(post => 
+                api.get(`/api/v1/likes/check/${post._id}`)
+                    .then(res => ({ id: post._id, isLiked: res.data.liked }))
+                    .catch(() => ({ id: post._id, isLiked: false }))
+            );
+
+            const likeResults = await Promise.all(likeChecks);
+            
+            const likeMap = {};
+            likeResults.forEach(result => {
+                likeMap[result.id] = result.isLiked;
+            });
+            setLikedPosts(likeMap);
+
+        } catch (err) {
+            console.error("Lỗi khi tải Feed:", err);
+            if (err.response?.status === 401) {
+                localStorage.removeItem("user_token");
+                localStorage.removeItem("user_data");
+                localStorage.removeItem("user");
+                window.location.href = "/login";
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+
+
+    useEffect(() => {
+        const checkSavedStatus = async () => {
+            if (!currentUser) return;
+            
+            const savedChecks = posts.map(post => 
+                api.get(`/api/v1/saves/check/${post._id}`)
+                    .then(res => ({ id: post._id, isSaved: res.data.is_saved }))
+                    .catch(() => ({ id: post._id, isSaved: false }))
+            );
+            
+            const savedResults = await Promise.all(savedChecks);
+            const savedMap = {};
+            savedResults.forEach(result => {
+                savedMap[result.id] = result.isSaved;
+            });
+            setSavedPosts(savedMap);
+        };
+        
+        if (posts.length > 0 && currentUser) {
+            checkSavedStatus();
+        }
+    }, [posts, currentUser]);
+
+    const handleOpenShare = (post) => {
+        setSharePost(post);
+        setShowShareModal(true);
+    };
+
     const goToForum = () => {
-        navigate('/forum');
+        navigate('/');
     };
 
     const goToShop = () => {
@@ -206,32 +271,32 @@ function Home() {
     };
 
     const handleImageUpload = async (e) => {
-    const files = Array.from(e.target.files);
-    if (files.length === 0) return;
-    
-    setUploadingImages(true);
-    try {
-        const formData = new FormData();
-        files.forEach(file => {
-            formData.append('files', file);
-        });
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
         
-        const response = await api.post('/api/v1/upload/images', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-        });
-        
-        const urls = response.data.urls;
-        setImageUrls(prev => [...prev, ...urls]);
-        setNewPost(prev => ({
-            ...prev,
-            images: [...prev.images, ...urls]
-        }));
-    } catch (error) {
-        console.error('Lỗi upload ảnh:', error);
-        alert('Không thể upload ảnh. Vui lòng thử lại!');
-    } finally {
-        setUploadingImages(false);
-    }
+        setUploadingImages(true);
+        try {
+            const formData = new FormData();
+            files.forEach(file => {
+                formData.append('files', file);
+            });
+            
+            const response = await api.post('/api/v1/upload/images', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            
+            const urls = response.data.urls;
+            setImageUrls(prev => [...prev, ...urls]);
+            setNewPost(prev => ({
+                ...prev,
+                images: [...prev.images, ...urls]
+            }));
+        } catch (error) {
+            console.error('Lỗi upload ảnh:', error);
+            alert('Không thể upload ảnh. Vui lòng thử lại!');
+        } finally {
+            setUploadingImages(false);
+        }
     };
 
     const handleToggleLike = async (postId) => {
@@ -283,7 +348,7 @@ function Home() {
             setSelectedPost(updatedPost);
             setIsPostModalOpen(true);
             setModalCommentInput("");
-            setCommentPage(1); // Reset phân trang
+            setCommentPage(1);
             setReplyingTo(null);
             
             setPosts(prevPosts => prevPosts.map(p => 
@@ -295,7 +360,6 @@ function Home() {
                 setModalLiked(likeRes.data.liked);
             } catch(e) { setModalLiked(false); }
             
-            // Tải bình luận với phân trang
             await fetchModalComments(post._id, 1);
             
         } catch (error) {
@@ -305,86 +369,77 @@ function Home() {
         }
     };
 
-// Thay thế hàm fetchModalComments
-const fetchModalComments = async (postId, page) => {
-    try {
-        const skip = (page - 1) * commentLimit;
-        // Lấy tất cả comment (không phân trang trên backend, để frontend xử lý nhóm)
-        const commentsRes = await api.get(`/api/v1/comments/${postId}`);
-        const allComments = commentsRes.data;
-        
-        // Phân loại comment cha và comment con
-        const parentComments = allComments.filter(c => !c.parent_id);
-        const childComments = allComments.filter(c => c.parent_id);
-        
-        // Nhóm reply theo parent_id
-        const repliesMap = {};
-        childComments.forEach(reply => {
-            const parentId = reply.parent_id;
-            if (!repliesMap[parentId]) {
-                repliesMap[parentId] = [];
-            }
-            repliesMap[parentId].push(reply);
-        });
-        
-        // Gắn replies vào comment cha
-        const commentsWithReplies = parentComments.map(parent => ({
-            ...parent,
-            replies: repliesMap[parent._id] || []
-        }));
-        
-        // Phân trang trên frontend
-        const start = (page - 1) * commentLimit;
-        const end = start + commentLimit;
-        const paginatedComments = commentsWithReplies.slice(start, end);
-        
-        setModalComments(paginatedComments);
-        setTotalComments(commentsWithReplies.length);
-        
-    } catch(e) { 
-        console.error("Lỗi tải bình luận:", e);
-        setModalComments([]);
-        setTotalComments(0);
-    }
-};
+    const fetchModalComments = async (postId, page) => {
+        try {
+            const commentsRes = await api.get(`/api/v1/comments/${postId}`);
+            const allComments = commentsRes.data;
+            
+            const parentComments = allComments.filter(c => !c.parent_id);
+            const childComments = allComments.filter(c => c.parent_id);
+            
+            const repliesMap = {};
+            childComments.forEach(reply => {
+                const parentId = reply.parent_id;
+                if (!repliesMap[parentId]) {
+                    repliesMap[parentId] = [];
+                }
+                repliesMap[parentId].push(reply);
+            });
+            
+            const commentsWithReplies = parentComments.map(parent => ({
+                ...parent,
+                replies: repliesMap[parent._id] || []
+            }));
+            
+            const start = (page - 1) * commentLimit;
+            const end = start + commentLimit;
+            const paginatedComments = commentsWithReplies.slice(start, end);
+            
+            setModalComments(paginatedComments);
+            setTotalComments(commentsWithReplies.length);
+            
+        } catch(e) { 
+            console.error("Lỗi tải bình luận:", e);
+            setModalComments([]);
+            setTotalComments(0);
+        }
+    };
 
-// Cập nhật loadMoreComments
-const loadMoreComments = async () => {
-    const nextPage = commentPage + 1;
-    try {
-        const commentsRes = await api.get(`/api/v1/comments/${selectedPost._id}`);
-        const allComments = commentsRes.data;
-        
-        // Phân loại và nhóm reply
-        const parentComments = allComments.filter(c => !c.parent_id);
-        const childComments = allComments.filter(c => c.parent_id);
-        
-        const repliesMap = {};
-        childComments.forEach(reply => {
-            const parentId = reply.parent_id;
-            if (!repliesMap[parentId]) {
-                repliesMap[parentId] = [];
-            }
-            repliesMap[parentId].push(reply);
-        });
-        
-        const commentsWithReplies = parentComments.map(parent => ({
-            ...parent,
-            replies: repliesMap[parent._id] || []
-        }));
-        
-        const start = (nextPage - 1) * commentLimit;
-        const end = start + commentLimit;
-        const newComments = commentsWithReplies.slice(start, end);
-        
-        setModalComments(prev => [...prev, ...newComments]);
-        setCommentPage(nextPage);
-        setTotalComments(commentsWithReplies.length);
-        
-    } catch(e) {
-        console.error("Lỗi tải thêm bình luận:", e);
-    }
-};
+    const loadMoreComments = async () => {
+        const nextPage = commentPage + 1;
+        try {
+            const commentsRes = await api.get(`/api/v1/comments/${selectedPost._id}`);
+            const allComments = commentsRes.data;
+            
+            const parentComments = allComments.filter(c => !c.parent_id);
+            const childComments = allComments.filter(c => c.parent_id);
+            
+            const repliesMap = {};
+            childComments.forEach(reply => {
+                const parentId = reply.parent_id;
+                if (!repliesMap[parentId]) {
+                    repliesMap[parentId] = [];
+                }
+                repliesMap[parentId].push(reply);
+            });
+            
+            const commentsWithReplies = parentComments.map(parent => ({
+                ...parent,
+                replies: repliesMap[parent._id] || []
+            }));
+            
+            const start = (nextPage - 1) * commentLimit;
+            const end = start + commentLimit;
+            const newComments = commentsWithReplies.slice(start, end);
+            
+            setModalComments(prev => [...prev, ...newComments]);
+            setCommentPage(nextPage);
+            setTotalComments(commentsWithReplies.length);
+            
+        } catch(e) {
+            console.error("Lỗi tải thêm bình luận:", e);
+        }
+    };
 
     const handleModalComment = async (parentId = null) => {
         const content = parentId ? replyInput : modalCommentInput;
@@ -401,7 +456,6 @@ const loadMoreComments = async () => {
             
             await api.post("/api/v1/comments/", commentData);
             
-            // Reload comments
             await fetchModalComments(selectedPost._id, 1);
             setModalCommentInput("");
             setReplyInput("");
@@ -418,41 +472,6 @@ const loadMoreComments = async () => {
         }
     };
 
-    const handleSharePost = async (postId) => {
-        setPosts(prevPosts => prevPosts.map(p => {
-            if (p._id === postId) {
-                const currentShares = p.stats?.share_count || 0;
-                return {
-                    ...p,
-                    stats: { 
-                        ...p.stats, 
-                        share_count: currentShares + 1 
-                    }
-                };
-            }
-            return p;
-        }));
-        try {
-            await api.post(`/api/v1/shares/${postId}`);
-        } catch (error) {
-            console.error("Lỗi khi chia sẻ bài viết:", error);
-            setPosts(prevPosts => prevPosts.map(p => {
-                if (p._id === postId) {
-                    const currentShares = p.stats?.share_count || 0;
-                    return {
-                        ...p,
-                        stats: { 
-                            ...p.stats, 
-                            share_count: Math.max(0, currentShares - 1) 
-                        }
-                    };
-                }
-                return p;
-            }));
-            alert("Không thể chia sẻ lúc này. Vui lòng thử lại!");
-        }
-    };
-
     const handleEditComment = (comment) => {
         setEditingCommentId(comment._id);      
         setEditCommentContent(comment.content); 
@@ -460,76 +479,78 @@ const loadMoreComments = async () => {
     };
 
     const handleEditPost = (post) => {
-    setEditingPost(post);
-    setNewPost({
-        content: post.content || "",
-        images: post.images || [],
-        videos: post.videos || [],
-        tags: post.tags || [],
-        location: post.location || "",
-        visibility: post.visibility || "public",
-        post_type: post.post_type || "text",
-        product_category: post.product_category || "general",
-        allow_comment: post.allow_comment !== false,
-        allow_share: post.allow_share !== false
-    });
-    setImageUrls(post.images || []);
-    setIsCreateModalOpen(true);
-    setActivePostMenu(null);
+        setEditingPost(post);
+        setNewPost({
+            content: post.content || "",
+            images: post.images || [],
+            videos: post.videos || [],
+            tags: post.tags || [],
+            location: post.location || "",
+            visibility: post.visibility || "public",
+            post_type: post.post_type || "text",
+            product_category: post.product_category || "general",
+            allow_comment: post.allow_comment !== false,
+            allow_share: post.allow_share !== false
+        });
+        setImageUrls(post.images || []);
+        setIsCreateModalOpen(true);
+        setActivePostMenu(null);
     };
 
     const handleSubmitPost = async () => {
-    if (!newPost.content.trim() && newPost.images.length === 0 && newPost.videos.length === 0) {
-        alert("Vui lòng nhập nội dung hoặc thêm ảnh/video");
-        return;
-    }
-    
-    setIsSubmitting(true);
-    try {
-        const postData = {
-            content: newPost.content,
-            images: newPost.images,
-            videos: newPost.videos,
-            tags: newPost.tags,
-            location: newPost.location,
-            visibility: newPost.visibility,
-            post_type: newPost.post_type,
-            product_category: newPost.product_category,
-            allow_comment: newPost.allow_comment,
-            allow_share: newPost.allow_share
-        };
-        
-        if (editingPost) {
-            await api.put(`/api/v1/posts/${editingPost._id}`, postData);
-            setPosts(posts.map(p => 
-                p._id === editingPost._id ? { ...p, ...postData } : p
-            ));
-        } else {
-            const res = await api.post("/api/v1/posts/", postData);
-            setPosts([res.data, ...posts]);
+        if (!newPost.content.trim() && newPost.images.length === 0 && newPost.videos.length === 0) {
+            alert("Vui lòng nhập nội dung hoặc thêm ảnh/video");
+            return;
         }
         
-        setIsCreateModalOpen(false);
-        setNewPost({
-            content: "",
-            images: [],
-            videos: [],
-            tags: [],
-            location: "",
-            visibility: "public",
-            post_type: "text",
-            product_category: "general",
-            allow_comment: true,
-            allow_share: true
-        });
-        setImageUrls([]);
-        setEditingPost(null);
-    } catch (error) {
-        console.error("Lỗi khi đăng/sửa bài:", error);
-        alert("Không thể lưu bài viết. Hãy kiểm tra lại!");
-    } finally {
-        setIsSubmitting(false);
-    }
+        setIsSubmitting(true);
+        try {
+            const postData = {
+                content: newPost.content,
+                images: newPost.images,
+                videos: newPost.videos,
+                tags: newPost.tags,
+                location: newPost.location,
+                visibility: newPost.visibility,
+                post_type: newPost.post_type,
+                product_category: newPost.product_category,
+                allow_comment: newPost.allow_comment,
+                allow_share: newPost.allow_share
+            };
+            
+            if (editingPost) {
+                await api.put(`/api/v1/posts/${editingPost._id}`, postData);
+                setPosts(posts.map(p => 
+                    p._id === editingPost._id ? { ...p, ...postData } : p
+                ));
+            } else {
+                const res = await api.post("/api/v1/posts/", postData);
+                setPosts([res.data, ...posts]);
+            }
+            
+            clearCache();
+            
+            setIsCreateModalOpen(false);
+            setNewPost({
+                content: "",
+                images: [],
+                videos: [],
+                tags: [],
+                location: "",
+                visibility: "public",
+                post_type: "text",
+                product_category: "general",
+                allow_comment: true,
+                allow_share: true
+            });
+            setImageUrls([]);
+            setEditingPost(null);
+        } catch (error) {
+            console.error("Lỗi khi đăng/sửa bài:", error);
+            alert("Không thể lưu bài viết. Hãy kiểm tra lại!");
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     const handleDeletePost = async (postId) => {
@@ -537,7 +558,8 @@ const loadMoreComments = async () => {
             try {
                 await api.delete(`/api/v1/posts/${postId}`);
                 setPosts(posts.filter(p => p._id !== postId));
-                setActivePostMenu(null); 
+                clearCache();
+                setActivePostMenu(null);
             } catch (error) {
                 console.error("Lỗi khi xóa bài:", error);
                 alert("Không thể xóa bài viết. Vui lòng thử lại!");
@@ -609,7 +631,7 @@ const loadMoreComments = async () => {
     };
 
     const goToUserProfile = (userId) => {
-            navigate(`/profile/${userId}`);
+        navigate(`/profile/${userId}`);
     };
 
     const menuButtonStyle = {
@@ -625,40 +647,10 @@ const loadMoreComments = async () => {
     };
     
     const handleSavePost = async (postId) => {
-    const isCurrentlySaved = savedPosts[postId];
-    
-    // Optimistic update
-    setSavedPosts(prev => ({ ...prev, [postId]: !isCurrentlySaved }));
-    
-    // Cập nhật số lượng saved trong post stats
-    setPosts(prevPosts => prevPosts.map(p => {
-        if (p._id === postId) {
-            const currentSaved = p.stats?.saved_count || 0;
-            return {
-                ...p,
-                stats: {
-                    ...p.stats,
-                    saved_count: isCurrentlySaved ? Math.max(0, currentSaved - 1) : currentSaved + 1
-                }
-            };
-        }
-        return p;
-    }));
-    
-    try {
-        if (isCurrentlySaved) {
-            // Bỏ lưu
-            await api.delete(`/api/v1/saves/${postId}`);
-            showToast("Đã bỏ lưu bài viết", "success");
-        } else {
-            // Lưu bài viết
-            await api.post('/api/v1/saves/', { post_id: postId });
-            showToast("Đã lưu bài viết", "success");
-        }
-    } catch (error) {
-        console.error("Lỗi khi lưu/bỏ lưu bài viết:", error);
-        // Rollback
-        setSavedPosts(prev => ({ ...prev, [postId]: isCurrentlySaved }));
+        const isCurrentlySaved = savedPosts[postId];
+        
+        setSavedPosts(prev => ({ ...prev, [postId]: !isCurrentlySaved }));
+        
         setPosts(prevPosts => prevPosts.map(p => {
             if (p._id === postId) {
                 const currentSaved = p.stats?.saved_count || 0;
@@ -666,21 +658,71 @@ const loadMoreComments = async () => {
                     ...p,
                     stats: {
                         ...p.stats,
-                        saved_count: isCurrentlySaved ? currentSaved + 1 : Math.max(0, currentSaved - 1)
+                        saved_count: isCurrentlySaved ? Math.max(0, currentSaved - 1) : currentSaved + 1
                     }
                 };
             }
             return p;
         }));
-        showToast("Không thể thực hiện. Vui lòng thử lại!", "error");
-    }
+        
+        try {
+            if (isCurrentlySaved) {
+                await api.delete(`/api/v1/saves/${postId}`);
+                showToast("Đã bỏ lưu bài viết", "success");
+            } else {
+                await api.post('/api/v1/saves/', { post_id: postId });
+                showToast("Đã lưu bài viết", "success");
+            }
+        } catch (error) {
+            console.error("Lỗi khi lưu/bỏ lưu bài viết:", error);
+            setSavedPosts(prev => ({ ...prev, [postId]: isCurrentlySaved }));
+            setPosts(prevPosts => prevPosts.map(p => {
+                if (p._id === postId) {
+                    const currentSaved = p.stats?.saved_count || 0;
+                    return {
+                        ...p,
+                        stats: {
+                            ...p.stats,
+                            saved_count: isCurrentlySaved ? currentSaved + 1 : Math.max(0, currentSaved - 1)
+                        }
+                    };
+                }
+                return p;
+            }));
+            showToast("Không thể thực hiện. Vui lòng thử lại!", "error");
+        }
     };
+
+    // Loading state
+    if (loading && posts.length === 0) {
+        return (
+            <Layout>
+                <div style={{ textAlign: "center", padding: "60px 20px" }}>
+                    <div style={{ 
+                        width: "40px", 
+                        height: "40px", 
+                        border: "3px solid #f3f3f3", 
+                        borderTop: "3px solid #2e7d32", 
+                        borderRadius: "50%", 
+                        animation: "spin 1s linear infinite",
+                        margin: "0 auto 20px"
+                    }}></div>
+                    <p>Đang tải bài viết...</p>
+                    <style>{`
+                        @keyframes spin {
+                            0% { transform: rotate(0deg); }
+                            100% { transform: rotate(360deg); }
+                        }
+                    `}</style>
+                </div>
+            </Layout>
+        );
+    }
 
     return (
         <Layout>
             <div style={{ display: "flex", gap: "10px", marginBottom: "20px", alignItems: "center" }}>
                 <div style={{ display: "flex", flex: 1, gap: "10px" }}>
-                    {/* Diễn Đàn - Có thể click */}
                     <div 
                         onClick={goToForum}
                         style={{ 
@@ -728,16 +770,13 @@ const loadMoreComments = async () => {
             </div>
 
             {posts.map((post) => (
-                <div  key={post._id} style={{ background: "white", borderRadius: "12px", padding: "20px", marginBottom: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
-                    {/* Phần nội dung bài viết giữ nguyên */}
+                <div key={post._id} id={`post-${post._id}`} style={{ background: "white", borderRadius: "12px", padding: "20px", marginBottom: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "15px", position: "relative" }}>
-                        {/* Phần hiển thị thông tin người đăng bài */}
                         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
                             <div style={{ width: "40px", height: "40px", background: "#ddd", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
                                 {post.author_avatar ? <img src={post.author_avatar} alt="avatar" style={{width:"100%", height:"100%", objectFit:"cover"}}/> : "👤"}
                             </div>
                             <div>
-                                {/* Thêm cursor: pointer và onClick để click vào tên */}
                                 <h4 
                                     style={{ 
                                         margin: 0, 
@@ -747,7 +786,6 @@ const loadMoreComments = async () => {
                                         transition: "color 0.2s"
                                     }}
                                     onClick={() => goToUserProfile(post.author_id)}
-                                    
                                 >
                                     {post.author_name}
                                 </h4>
@@ -881,6 +919,13 @@ const loadMoreComments = async () => {
                             ))}
                         </div>
                     )}
+                    
+                    {post.post_type === 'share' && post.shared_post && (
+                        <SharedPostCard 
+                            sharedPost={post.shared_post}
+                            onClick={() => openPostModal(post.shared_post)}
+                        />
+                    )}
 
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", fontSize: "14px", color: "#65676B" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
@@ -907,18 +952,16 @@ const loadMoreComments = async () => {
                             💬 Đánh giá
                         </div>
                         <div 
-                            onClick={() => handleSharePost(post._id)}
+                            onClick={() => handleOpenShare(post)}
                             style={{ display: "flex", alignItems: "center", gap: "5px", cursor: "pointer", flex: 1, justifyContent: "center" }}
                         >
                             ↗️ Chia sẻ
                         </div>
-                    </div>
-
-                    
-                    
+                    </div>    
                 </div>
             ))}
             
+            {/* Modal tạo bài viết */}
             {isCreateModalOpen && (
                 <div style={{
                     position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
@@ -930,7 +973,6 @@ const loadMoreComments = async () => {
                         background: "white", width: "600px", maxWidth: "90%", maxHeight: "90vh",
                         borderRadius: "12px", display: "flex", flexDirection: "column", overflow: "hidden"
                     }}>
-                        {/* Header Modal */}
                         <div style={{ position: "relative", padding: "15px", borderBottom: "1px solid #e4e6eb", textAlign: "center" }}>
                             <h3 style={{ margin: 0, fontSize: "20px", fontWeight: "bold" }}>{editingPost ? "Sửa bài viết" : "Tạo bài viết mới"}</h3>
                             <button 
@@ -941,7 +983,6 @@ const loadMoreComments = async () => {
                             </button>
                         </div>
 
-                        {/* Thông tin User */}
                         <div style={{ padding: "15px", display: "flex", alignItems: "center", gap: "10px" }}>
                             <div style={{ width: "40px", height: "40px", background: "#e4e6eb", borderRadius: "50%", overflow: "hidden" }}>
                                 {currentUser?.avatar_url ? <img src={currentUser.avatar_url} alt="avatar" style={{width: "100%", height:"100%", objectFit:"cover"}}/> : <div style={{width:"100%", height:"100%", display:"flex", alignItems:"center", justifyContent:"center"}}>👤</div>}
@@ -962,7 +1003,6 @@ const loadMoreComments = async () => {
                             </div>
                         </div>
 
-                        {/* Nội dung bài viết */}
                         <div style={{ padding: "0 15px", flex: 1, overflowY: "auto" }}>
                             <textarea
                                 placeholder="Bạn đang nghĩ gì?"
@@ -973,7 +1013,6 @@ const loadMoreComments = async () => {
                                 style={{ width: "100%", border: "none", outline: "none", resize: "none", fontSize: "16px", fontFamily: "inherit" }}
                             />
                             
-                            {/* Tags */}
                             <input
                                 type="text"
                                 placeholder="Thêm tag (cách nhau bằng dấu phẩy, VD: cafe, bạn bè)"
@@ -982,7 +1021,6 @@ const loadMoreComments = async () => {
                                 style={{ width: "100%", padding: "8px 12px", border: "1px solid #ddd", borderRadius: "8px", marginBottom: "10px", fontSize: "14px" }}
                             />
                             
-                            {/* Location */}
                             <input
                                 type="text"
                                 placeholder="Thêm địa điểm"
@@ -991,7 +1029,6 @@ const loadMoreComments = async () => {
                                 style={{ width: "100%", padding: "8px 12px", border: "1px solid #ddd", borderRadius: "8px", marginBottom: "10px", fontSize: "14px" }}
                             />
                             
-                            {/* Loại bài viết & Danh mục */}
                             <div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
                                 <select 
                                     value={newPost.post_type}
@@ -1015,7 +1052,6 @@ const loadMoreComments = async () => {
                                 </select>
                             </div>
                             
-                            {/* Upload ảnh */}
                             <div style={{ marginBottom: "10px" }}>
                                 <label style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "8px 16px", background: "#f0f2f5", borderRadius: "8px", cursor: "pointer" }}>
                                     <span>📷</span> Thêm ảnh
@@ -1024,7 +1060,6 @@ const loadMoreComments = async () => {
                                 {uploadingImages && <span style={{ marginLeft: "10px", fontSize: "12px", color: "#666" }}>Đang upload...</span>}
                             </div>
                             
-                            {/* Hiển thị ảnh đã chọn */}
                             {imageUrls.length > 0 && (
                                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px", marginBottom: "10px" }}>
                                     {imageUrls.map((url, idx) => (
@@ -1041,7 +1076,6 @@ const loadMoreComments = async () => {
                                 </div>
                             )}
                             
-                            {/* Tùy chọn */}
                             <div style={{ display: "flex", gap: "20px", marginBottom: "15px" }}>
                                 <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", cursor: "pointer" }}>
                                     <input type="checkbox" checked={newPost.allow_comment} onChange={(e) => setNewPost(prev => ({ ...prev, allow_comment: e.target.checked }))} />
@@ -1054,7 +1088,6 @@ const loadMoreComments = async () => {
                             </div>
                         </div>
 
-                        {/* Nút Đăng */}
                         <div style={{ padding: "15px", borderTop: "1px solid #eee" }}>
                             <button 
                                 onClick={handleSubmitPost}
@@ -1067,6 +1100,7 @@ const loadMoreComments = async () => {
                     </div>
                 </div>
             )}
+            
             {/* Modal xem chi tiết bài viết */}
             {isPostModalOpen && selectedPost && (
                 <div style={{
@@ -1094,7 +1128,6 @@ const loadMoreComments = async () => {
                         position: "relative"
                     }} onClick={(e) => e.stopPropagation()}>
                         
-                        {/* Header modal */}
                         <div style={{
                             padding: "12px 16px",
                             borderBottom: "1px solid #e4e6eb",
@@ -1121,9 +1154,7 @@ const loadMoreComments = async () => {
                             >✕</button>
                         </div>
 
-                        {/* Nội dung bài viết (có thể scroll) */}
                         <div style={{ flex: 1, overflowY: "auto", padding: "16px" }}>
-                            {/* Thông tin người đăng - SỬA LỖI AVATAR */}
                             <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "15px" }}>
                                 <div style={{ 
                                     width: "48px", 
@@ -1148,7 +1179,6 @@ const loadMoreComments = async () => {
                                 </div>
                             </div>
 
-                            {/* Nội dung */}
                             <div style={{ marginBottom: "15px" }}>
                                 {selectedPost.content && <p style={{ margin: "5px 0", fontSize: "15px", whiteSpace: "pre-wrap" }}>{selectedPost.content}</p>}
                                 {selectedPost.location && (
@@ -1163,7 +1193,6 @@ const loadMoreComments = async () => {
                                 )}
                             </div>
 
-                            {/* Ảnh */}
                             {selectedPost.images && selectedPost.images.length > 0 && (
                                 <div style={{
                                     display: "grid",
@@ -1177,13 +1206,11 @@ const loadMoreComments = async () => {
                                 </div>
                             )}
 
-                            {/* Thống kê like, comment */}
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", fontSize: "14px", color: "#65676B" }}>
                                 <div>👍 {selectedPost.stats?.like_count || 0} lượt thích</div>
                                 <div>{selectedPost.stats?.comment_count || 0} bình luận</div>
                             </div>
 
-                            {/* Thanh tương tác */}
                             <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #eee", borderBottom: "1px solid #eee", padding: "8px 0", marginBottom: "15px" }}>
                                 <div
                                     onClick={async () => {
@@ -1215,11 +1242,9 @@ const loadMoreComments = async () => {
                                 >↗️ Chia sẻ</div>
                             </div>
 
-                            {/* Danh sách bình luận - CẢI THIỆN */}
                             <div style={{ marginTop: "15px" }}>
                                 <h4 style={{ fontSize: "15px", marginBottom: "12px" }}>Bình luận</h4>
                                 
-                                {/* Form trả lời bình luận */}
                                 {replyingTo && (
                                     <div style={{ 
                                         background: "#f0f2f5", 
@@ -1273,7 +1298,6 @@ const loadMoreComments = async () => {
                                     <>
                                         {modalComments.map(cmt => (
                                             <div key={cmt._id} style={{ marginBottom: "20px" }}>
-                                                {/* Bình luận chính */}
                                                 <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
                                                     <div style={{ 
                                                         width: "40px", 
@@ -1311,7 +1335,6 @@ const loadMoreComments = async () => {
                                                     </div>
                                                 </div>
 
-                                                {/* Các reply - hiển thị nhỏ hơn, lùi vào bên trong */}
                                                 {cmt.replies && cmt.replies.length > 0 && (
                                                     <div style={{ marginLeft: "52px", marginTop: "12px", paddingLeft: "12px", borderLeft: "2px solid #e4e6eb" }}>
                                                         {cmt.replies.map(reply => (
@@ -1351,7 +1374,6 @@ const loadMoreComments = async () => {
                                             </div>
                                         ))}
 
-                                        {/* Nút xem thêm bình luận */}
                                         {modalComments.length < totalComments && totalComments > commentLimit && (
                                             <div style={{ textAlign: "center", marginTop: "16px" }}>
                                                 <button
@@ -1385,7 +1407,6 @@ const loadMoreComments = async () => {
                             </div>
                         </div>
 
-                        {/* Input bình luận */}
                         <div style={{ padding: "12px 16px", borderTop: "1px solid #e4e6eb", display: "flex", gap: "10px", alignItems: "center", flexShrink: 0 }}>
                             <div style={{ 
                                 width: "32px", 
@@ -1430,6 +1451,23 @@ const loadMoreComments = async () => {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {showShareModal && sharePost && (
+                <ShareModal
+                    post={sharePost}
+                    onClose={() => {
+                        setShowShareModal(false);
+                        setSharePost(null);
+                    }}
+                    onShareSuccess={() => {
+                        setPosts(prevPosts => prevPosts.map(p => 
+                            p._id === sharePost._id 
+                                ? { ...p, stats: { ...p.stats, share_count: (p.stats?.share_count || 0) + 1 } }
+                                : p
+                        ));
+                    }}
+                />
             )}
         </Layout>
     );

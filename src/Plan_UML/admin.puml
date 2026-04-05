@@ -1,0 +1,47 @@
+@startuml systerm
+left to right direction
+
+' Tinh chỉnh giao diện và màu sắc chung
+skinparam {
+    BackgroundColor #F0F2F5
+    ArrowColor #2C3E50
+    ArrowThickness 1.5
+    
+    ActorBorderColor #1A5276
+    ActorBackgroundColor #AED6F1
+    
+    RectangleBorderColor #2C3E50
+    RectangleBackgroundColor #FFFFFF
+    RectangleFontSize 16
+    RectangleFontStyle bold
+    
+    UsecaseFontSize 13
+    UsecaseBorderThickness 1.5
+}
+
+actor "Admin" as Admin #3498DB
+
+rectangle "Admin System" #F8F9F9 {
+  ' Luồng đăng nhập & Dashboard (Màu xanh dương)
+  usecase "Đăng nhập" as Login #D6EAF8
+  usecase "Tổng quan" as Dashboard #85C1E9
+  
+  ' Các chức năng quản trị (Màu xanh lá)
+  usecase "Quản lý cửa hàng" as ShopManage #D5F5E3
+  usecase "Quản lý người dùng" as UserManage #D5F5E3
+  usecase "Quản lý bài viết" as PostManage #D5F5E3
+  
+  ' Cài đặt (Màu xám/tím nhẹ)
+  usecase "Cài đặt hệ thống" as Setting #EBDEF0
+}
+
+' Kết nối với màu sắc tương ứng
+Admin -[#2E86C1]-> Login
+Login -[#2E86C1]-> Dashboard
+
+Dashboard -[#28B463]-> ShopManage
+Dashboard -[#28B463]-> UserManage
+Dashboard -[#28B463]-> PostManage
+Dashboard -[#8E44AD]-> Setting
+
+@enduml

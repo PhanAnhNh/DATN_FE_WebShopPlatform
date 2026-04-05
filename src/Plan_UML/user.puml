@@ -1,0 +1,93 @@
+@startuml systerm
+' Bỏ left to right để tránh bị dàn ngang quá dài gây mờ chữ
+
+skinparam {
+    BackgroundColor #F8F9FA
+    ArrowColor #444444
+    ActorBorderColor #2C3E50
+    ActorBackgroundColor #AED6F1
+    RectangleBorderColor #34495E
+    RectangleBackgroundColor #FFFFFF
+    RectangleFontSize 17
+    RectangleFontStyle bold
+    UsecaseBorderThickness 1.5
+    UsecaseFontSize 12
+    ' Tăng độ phân giải cho chữ sắc nét hơn
+    Dpi 150 
+}
+
+actor "User" as User #3498DB
+
+rectangle "User System Interface" {
+  
+  package "Hệ thống chính" #D6EAF8 {
+    usecase "Đăng nhập" as Login
+    usecase "Header" as Headers
+    usecase "Diễn đàn" as Home
+  }
+
+  package "Tương tác Bài viết" #D5F5E3 {
+    usecase "Giao diện xem bài viết" as ViewPost
+    usecase "Đăng bài viết" as Post
+    usecase "Sửa bài viết" as EditPost
+    usecase "Xóa bài viết" as DeletePost
+    usecase "Bình luận bài viết" as Comment
+    usecase "Chia sẻ bài viết" as SharePost
+    usecase "Đánh dấu bài viết" as MarkPost
+    usecase "Lưu bài viết" as SavePost
+    usecase "Lọc các bài viết" as Filter
+  }
+
+  package "Cá nhân & Tiện ích" #F5EEF8 {
+    usecase "Giao diện profile" as Profile
+    usecase "Edit profile" as EditProfile
+    usecase "Giao diện chat" as ChatInterface
+    usecase "Thông báo" as Notification
+  }
+
+  package "Thương mại điện tử" #FEF9E7 {
+    usecase "Giao diện cửa hàng" as ShopInterface
+    usecase "Chi tiết cửa hàng" as StoreDetail
+    usecase "Chi tiết sản phẩm" as ProductDetail
+    usecase "Giao diện giỏ hàng" as CartInterface
+    usecase "Giao diện mua hàng" as PurchaseInterface
+    usecase "Giao diện Checkout" as CheckoutInterface
+  }
+}
+
+' --- Ép bố cục bằng liên kết ẩn để gọn hơn ---
+Login -[hidden]down- Home
+Home -[hidden]down- ViewPost
+Headers -[hidden]right- Home
+
+' --- Kết nối logic ---
+User --> Login
+
+Login --> Home
+Login --> ShopInterface
+Home --> ViewPost
+Home --> Filter
+Home --> Headers
+
+Headers --> ChatInterface
+Headers --> Notification
+Headers --> CartInterface
+Headers --> Profile
+
+ViewPost --> Comment
+ViewPost --> SavePost
+ViewPost --> MarkPost
+ViewPost --> SharePost
+
+Profile --> Post
+Profile --> EditPost
+Profile --> DeletePost
+Profile --> EditProfile
+
+ShopInterface --> StoreDetail
+StoreDetail --> ProductDetail
+ProductDetail --> CartInterface
+CartInterface --> PurchaseInterface
+PurchaseInterface --> CheckoutInterface
+
+@enduml

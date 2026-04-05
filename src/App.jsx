@@ -36,6 +36,7 @@ import AdminProfile from "./pages/admin/Admin_profile.jsx";
 import AdminSettings from "./pages/admin/Setting.jsx";
 import ShippingVouchers from "./pages/shop_manager/ShippingVouchers.jsx";
 import SavedPosts from "./pages/user/SavedPosts.jsx";
+import PostDetailPage from "./pages/user/PostDetailPage.jsx";
 
 function App() {
   return (
@@ -58,6 +59,7 @@ function App() {
             <Route path="/profile/:userId" element={<UserProfile />} />
             <Route path="/user/returns" element={<ProductReturns />} />
             <Route path="/user/saved-posts" element={<SavedPosts  />} />
+            <Route path="/post/:postId" element={<PostDetailPage />} />
             
             {/* Admin Routes */}
             <Route 
