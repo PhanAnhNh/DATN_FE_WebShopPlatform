@@ -4,11 +4,14 @@ import api from "../../api/api";
 import Layout from "../../components/layout/Layout";
 import ShareModal from "./ShareModal";
 import SharedPostCard from "./SharedPostCard";
+import ReportModal from "../admin/reportModal";
 
 function Home() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const category = searchParams.get("category") || "general";
+    const [showReportModal, setShowReportModal] = useState(false);
+    const [selectedReportPost, setSelectedReportPost] = useState(null);
     
     // State với cache initialization
     const [posts, setPosts] = useState(() => {
@@ -230,19 +233,6 @@ function Home() {
         navigate('/use/shop');
     };
 
-    const handleToggleComments = async (postId) => {
-        const isCurrentlyShown = showComments[postId];
-        setShowComments(prev => ({ ...prev, [postId]: !isCurrentlyShown }));
-
-        if (!isCurrentlyShown && !postComments[postId]) {
-            try {
-                const res = await api.get(`/api/v1/comments/${postId}`);
-                setPostComments(prev => ({ ...prev, [postId]: res.data }));
-            } catch (error) {
-                console.error("Lỗi khi tải bình luận:", error);
-            }
-        }
-    };
 
     const handlePostComment = async (postId) => {
         const text = commentInputs[postId];
@@ -268,6 +258,16 @@ function Home() {
             console.error("Lỗi đăng bình luận:", error);
             alert("Không thể đăng bình luận. Hãy kiểm tra lại kết nối!");
         }
+    };
+
+    const handleOpenReport = (post) => {
+        setSelectedReportPost(post);
+        setShowReportModal(true);
+        setActivePostMenu(null);
+    };
+
+    const handleReportSuccess = () => {
+        showToast("Đã gửi báo cáo thành công. Cảm ơn bạn đã đóng góp!", "success");
     };
 
     const handleImageUpload = async (e) => {
@@ -727,14 +727,14 @@ function Home() {
                         onClick={goToForum}
                         style={{ 
                             flex: 1, 
-                            background: category === "general" ? "white" : "#f0f2f5", 
+                            background: location.pathname === "/" ? "white" : "#f0f2f5", 
                             padding: "12px", 
                             textAlign: "center", 
                             borderRadius: "10px", 
                             fontWeight: "bold", 
-                            color: category === "general" ? "#2e7d32" : "#666", 
-                            borderBottom: category === "general" ? "3px solid #2e7d32" : "none",
-                            boxShadow: "0 1px 3px rgba(0,0,0,0.1)", 
+                            color: location.pathname === "/" ? "#2e7d32" : "#666", 
+                            borderBottom: location.pathname === "/" ? "3px solid #2e7d32" : "none",
+                            boxShadow: location.pathname === "/" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
                             cursor: "pointer",
                             transition: "all 0.2s"
                         }}
@@ -746,13 +746,14 @@ function Home() {
                         onClick={goToShop}
                         style={{ 
                             flex: 1, 
-                            background: "#f0f2f5", 
+                            background: location.pathname === "/user/shop" ? "white" : "#f0f2f5", 
                             padding: "12px", 
                             textAlign: "center", 
                             borderRadius: "10px", 
                             fontWeight: "bold", 
-                            color: "#666", 
-                            boxShadow: "0 1px 3px rgba(0,0,0,0.1)", 
+                            color: location.pathname === "/user/shop" ? "#2e7d32" : "#666", 
+                            borderBottom: location.pathname === "/user/shop" ? "3px solid #2e7d32" : "none",
+                            boxShadow: location.pathname === "/user/shop" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
                             cursor: "pointer",
                             transition: "all 0.2s"
                         }}
@@ -761,6 +762,7 @@ function Home() {
                     </div>
                 </div>
 
+                {/* Dark mode toggle - keep as is */}
                 <div style={{ background: "white", padding: "10px 15px", borderRadius: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)", display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", border: "1px solid #eee" }}>
                     <span style={{ fontWeight: "bold", fontSize: "12px", color: "#333" }}>Chế độ tối</span>
                     <div style={{ width: "38px", height: "24px", background: "#333", borderRadius: "15px", position: "relative" }}>
@@ -868,7 +870,7 @@ function Home() {
                                                     👁️‍🗨️ Ẩn bài viết
                                                 </button>
                                                 <button 
-                                                    onClick={() => alert("Đã báo cáo bài viết")}
+                                                    onClick={() => handleOpenReport(post)}
                                                     style={{ ...menuButtonStyle, color: "#dc3545" }}
                                                     onMouseOver={(e) => e.target.style.background = "#f0f2f5"}
                                                     onMouseOut={(e) => e.target.style.background = "white"}
@@ -1467,6 +1469,17 @@ function Home() {
                                 : p
                         ));
                     }}
+                />
+            )}
+
+            {showReportModal && selectedReportPost && (
+                <ReportModal
+                    post={selectedReportPost}
+                    onClose={() => {
+                        setShowReportModal(false);
+                        setSelectedReportPost(null);
+                    }}
+                    onReportSuccess={handleReportSuccess}
                 />
             )}
         </Layout>

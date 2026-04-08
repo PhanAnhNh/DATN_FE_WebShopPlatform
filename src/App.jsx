@@ -37,6 +37,7 @@ import AdminSettings from "./pages/admin/Setting.jsx";
 import ShippingVouchers from "./pages/shop_manager/ShippingVouchers.jsx";
 import SavedPosts from "./pages/user/SavedPosts.jsx";
 import PostDetailPage from "./pages/user/PostDetailPage.jsx";
+import ReportsManagement from "./pages/admin/ReportsManagement.jsx";
 
 function App() {
   return (
@@ -108,6 +109,15 @@ function App() {
               element={
                 <AdminLayout>
                   <AdminSettings />
+                </AdminLayout>
+              } 
+            />
+
+            <Route 
+              path="/admin/reports" 
+              element={
+                <AdminLayout>
+                  <ReportsManagement />
                 </AdminLayout>
               } 
             />

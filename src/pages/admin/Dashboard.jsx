@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Users, ShoppingBag, FileText, AlertOctagon, Download } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { adminApi } from '../../api/api';
+import { useNavigate } from 'react-router-dom';
 
 const defaultPostStats = [
   { name: 'Nông Sản', value: 45, color: '#4ade80' },
@@ -22,7 +23,7 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [visitData, setVisitData] = useState([]);
-
+  const navigate = useNavigate();
 
   // Đồng bộ theme
   useEffect(() => {
@@ -180,7 +181,9 @@ const Dashboard = () => {
         <StatCard icon={<Users size={24} />} label="Người Dùng" value={formatNumber(stats.users)} iconClass="green" />
         <StatCard icon={<ShoppingBag size={24} />} label="Cửa Hàng" value={formatNumber(stats.shops)} iconClass="orange" />
         <StatCard icon={<FileText size={24} />} label="Bài Viết" value={formatNumber(stats.posts)} iconClass="blue" />
-        <StatCard icon={<AlertOctagon size={24} />} label="Báo Cáo" value={formatNumber(stats.reports)} iconClass="red" />
+        <div onClick={() => navigate('/admin/reports')} style={{ cursor: 'pointer' }}>
+                    <StatCard icon={<AlertOctagon size={24} />} label="Báo Cáo" value={formatNumber(stats.reports)} iconClass="red" />
+                </div>
       </div>
 
       {/* Charts Grid */}

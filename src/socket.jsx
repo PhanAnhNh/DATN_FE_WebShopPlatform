@@ -8,4 +8,4 @@ const socket = io('http://localhost:8000', {
     reconnectionAttempts: 5,
 });
 
-export default socket;
+export default socket;             

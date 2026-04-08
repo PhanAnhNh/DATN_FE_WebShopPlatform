@@ -240,7 +240,7 @@ const ShopPage = () => {
 
     return (
         <Layout>
-            <div className="shop-page" style={{ maxWidth: "1200px", margin: "0 auto", padding: "20px" }}>
+            <div className="shop-page" style={{ maxWidth: "1200px", margin: "0 auto" }}>
                 {/* Header với các tab Diễn Đàn / Cửa Hàng */}
                 <div style={{ display: "flex", gap: "10px", marginBottom: "20px", alignItems: "center" }}>
                     <div style={{ display: "flex", flex: 1, gap: "10px" }}>

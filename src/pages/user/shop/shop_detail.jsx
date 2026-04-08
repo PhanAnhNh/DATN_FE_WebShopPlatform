@@ -15,7 +15,7 @@ const ShopDetailPage = () => {
     const { shop_id } = useParams();
     const navigate = useNavigate();
     
-    // State với cache initialization - sử dụng ref để tránh vấn đề async
+    // State với cache initialization
     const [activeTab, setActiveTab] = useState("products");
     const [shop, setShop] = useState(null);
     const [products, setProducts] = useState([]);
@@ -33,6 +33,14 @@ const ShopDetailPage = () => {
     const [newRating, setNewRating] = useState(5);
     const [showRatingSelector, setShowRatingSelector] = useState(false);
     const [isCacheLoaded, setIsCacheLoaded] = useState(false);
+
+    // Lọc sản phẩm theo từ khóa tìm kiếm
+    const filteredProducts = products.filter(product => {
+        if (!searchTerm.trim()) return true;
+        const searchLower = searchTerm.toLowerCase().trim();
+        const productName = (product.name || "").toLowerCase();
+        return productName.includes(searchLower);
+    });
 
     // Hàm đọc cache
     const loadFromCache = (id) => {
@@ -126,7 +134,7 @@ const ShopDetailPage = () => {
             fetchShopData();
         }
         
-        // Kiểm tra follow status từ API (không cache vì có thể thay đổi)
+        // Kiểm tra follow status từ API
         checkFollowStatus();
         
         // Cleanup function
@@ -160,16 +168,33 @@ const ShopDetailPage = () => {
                     id: product.id || product._id || product.product_id || String(product.id || Math.random())
                 }));
                 setProducts(normalizedProducts);
+                
+                // Cập nhật số lượng sản phẩm trong shop từ dữ liệu thực tế
+                if (shopRes.data && normalizedProducts.length !== shopRes.data.products_count) {
+                    setShop(prev => ({
+                        ...prev,
+                        products_count: normalizedProducts.length
+                    }));
+                }
             } catch (productsError) {
                 console.log("Products API not available, using mock data");
-                setProducts([
+                const mockProducts = [
                     { id: 1, name: "Táo đỏ tươi", price: 60000, image_url: "https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=400", sold_count: 150, rating: 4.8 },
                     { id: 2, name: "Bưởi da xanh", price: 45000, image_url: "https://images.unsplash.com/photo-1579542089558-9e5fc3a01708?w=400", sold_count: 234, rating: 4.9 },
                     { id: 3, name: "Cam sành", price: 35000, image_url: "https://images.unsplash.com/photo-1557800636-894a64c1696f?w=400", sold_count: 178, rating: 4.7 },
                     { id: 4, name: "Chuối già", price: 25000, image_url: "https://images.unsplash.com/photo-1603833665858-e61d17a86224?w=400", sold_count: 98, rating: 4.6 },
                     { id: 5, name: "Dừa xiêm", price: 11000, image_url: "https://images.unsplash.com/photo-1584308666744-00d6d8b9f8f8?w=400", sold_count: 45, rating: 4.5 },
                     { id: 6, name: "Măng cụt", price: 55000, image_url: "https://images.unsplash.com/photo-1584345604476-8ec5e12e42dd?w=400", sold_count: 67, rating: 4.9 }
-                ]);
+                ];
+                setProducts(mockProducts);
+                
+                // Cập nhật số lượng sản phẩm cho mock data
+                if (shopRes.data) {
+                    setShop(prev => ({
+                        ...prev,
+                        products_count: mockProducts.length
+                    }));
+                }
             }
 
             try {
@@ -189,13 +214,13 @@ const ShopDetailPage = () => {
             }
         } catch (error) {
             console.error("Error fetching shop data:", error);
-            setShop({
+            const mockShop = {
                 id: shop_id,
                 name: "Đặc Sản Quê Tôi",
                 logo_url: "https://via.placeholder.com/120",
                 banner_url: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1200&h=400&fit=crop",
                 description: "Chuyên cung cấp các sản phẩm đặc sản vùng miền chất lượng cao, tươi ngon mỗi ngày. Cam kết nguồn gốc rõ ràng, an toàn vệ sinh thực phẩm.",
-                products_count: 137,
+                products_count: 6,
                 followers_count: 13700,
                 rating: 4.9,
                 total_reviews: 2000,
@@ -204,13 +229,20 @@ const ShopDetailPage = () => {
                 address: "Hà Nội, Việt Nam",
                 phone: "0987654321",
                 email: "dacsanquetoi@gmail.com"
-            });
+            };
+            setShop(mockShop);
+            setProducts([
+                { id: 1, name: "Táo đỏ tươi", price: 60000, image_url: "https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=400", sold_count: 150, rating: 4.8 },
+                { id: 2, name: "Bưởi da xanh", price: 45000, image_url: "https://images.unsplash.com/photo-1579542089558-9e5fc3a01708?w=400", sold_count: 234, rating: 4.9 },
+                { id: 3, name: "Cam sành", price: 35000, image_url: "https://images.unsplash.com/photo-1557800636-894a64c1696f?w=400", sold_count: 178, rating: 4.7 },
+                { id: 4, name: "Chuối già", price: 25000, image_url: "https://images.unsplash.com/photo-1603833665858-e61d17a86224?w=400", sold_count: 98, rating: 4.6 },
+                { id: 5, name: "Dừa xiêm", price: 11000, image_url: "https://images.unsplash.com/photo-1584308666744-00d6d8b9f8f8?w=400", sold_count: 45, rating: 4.5 },
+                { id: 6, name: "Măng cụt", price: 55000, image_url: "https://images.unsplash.com/photo-1584345604476-8ec5e12e42dd?w=400", sold_count: 67, rating: 4.9 }
+            ]);
         } finally {
             setLoading(false);
         }
     };
-
-    // ... (giữ nguyên các hàm formatNumber, formatCurrency, formatDate, renderStars, handleFollow, handleSendMessage, handleProductClick, handleSubmitComment, handleLikeReview)
 
     const formatNumber = (num) => {
         if (num >= 1000) {
@@ -311,6 +343,9 @@ const ShopDetailPage = () => {
     const ratingOptions = [{ value: 5, label: "5 sao" }, { value: 4, label: "4 sao" }, { value: 3, label: "3 sao" }, { value: 2, label: "2 sao" }, { value: 1, label: "1 sao" }];
     const chatResponseRate = shop?.chat_response_rate !== undefined && shop?.chat_response_rate !== null ? shop.chat_response_rate : 0;
 
+    // Lấy số lượng sản phẩm hiển thị - ưu tiên từ products array nếu có
+    const displayProductsCount = products.length > 0 ? products.length : (shop?.products_count || 0);
+
     // Loading state
     if (loading && !shop && !isCacheLoaded) return (
         <ShopDetailLayout shop={null}>
@@ -332,11 +367,7 @@ const ShopDetailPage = () => {
 
     return (
         <ShopDetailLayout shop={shop}>
-
             <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
-                {/* Phần còn lại giữ nguyên - Hero Section, Shop Info, Tabs, etc. */}
-                {/* ... (giữ nguyên toàn bộ phần render từ Hero Section đến hết) ... */}
-                
                 {/* Hero Section */}
                 <div style={{ position: "relative", marginBottom: "60px" }}>
                     <div style={{
@@ -382,9 +413,9 @@ const ShopDetailPage = () => {
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "20px", marginBottom: "30px" }}>
                         <div style={{ display: "flex", gap: "48px", flexWrap: "wrap" }}>
                             {[
-                                { value: shop?.products_count, label: "Sản phẩm", icon: <FaBox /> },
+                                { value: displayProductsCount, label: "Sản phẩm", icon: <FaBox /> },
                                 { value: formatNumber(shop?.followers_count), label: "Người theo dõi", icon: <FaUsers /> },
-                                { value: `${chatResponseRate}%`, label: "Phản hồi chat", icon: <FaCommentDots /> }  // Đã sửa lỗi undefined
+                                { value: `${chatResponseRate}%`, label: "Phản hồi chat", icon: <FaCommentDots /> }
                             ].map((stat, idx) => (
                                 <div key={idx} style={{ textAlign: "center", transition: "transform 0.3s", cursor: "pointer" }}
                                     onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-4px)"}
@@ -448,11 +479,32 @@ const ShopDetailPage = () => {
                     <div style={{ marginBottom: "30px" }}>
                         <div style={{ position: "relative", maxWidth: "500px" }}>
                             <FaSearch style={{ position: "absolute", left: "18px", top: "50%", transform: "translateY(-50%)", color: "#999" }} />
-                            <input type="text" placeholder="Tìm kiếm bài viết, sản phẩm, Q&A..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} style={{
-                                width: "100%", padding: "14px 20px 14px 48px", border: "1px solid #e0e0e0", borderRadius: "40px", fontSize: "14px", outline: "none", transition: "all 0.3s ease", background: "#f8f9fa"
-                            }}
-                            onFocus={(e) => { e.currentTarget.style.borderColor = "#2e7d32"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(46,125,50,0.1)"; e.currentTarget.style.background = "white"; }}
-                            onBlur={(e) => { e.currentTarget.style.borderColor = "#e0e0e0"; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.background = "#f8f9fa"; }} />
+                            <input 
+                                type="text" 
+                                placeholder="Tìm kiếm sản phẩm trong shop..." 
+                                value={searchTerm} 
+                                onChange={(e) => setSearchTerm(e.target.value)} 
+                                style={{
+                                    width: "100%", padding: "14px 20px 14px 48px", border: "1px solid #e0e0e0", borderRadius: "40px", fontSize: "14px", outline: "none", transition: "all 0.3s ease", background: "#f8f9fa"
+                                }}
+                                onFocus={(e) => { e.currentTarget.style.borderColor = "#2e7d32"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(46,125,50,0.1)"; e.currentTarget.style.background = "white"; }}
+                                onBlur={(e) => { e.currentTarget.style.borderColor = "#e0e0e0"; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.background = "#f8f9fa"; }} 
+                            />
+                            {searchTerm && (
+                                <div style={{ 
+                                    position: "absolute", 
+                                    right: "18px", 
+                                    top: "50%", 
+                                    transform: "translateY(-50%)", 
+                                    fontSize: "12px", 
+                                    color: "#999",
+                                    background: "#f0f0f0",
+                                    padding: "2px 8px",
+                                    borderRadius: "20px"
+                                }}>
+                                    {filteredProducts.length} kết quả
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -532,60 +584,104 @@ const ShopDetailPage = () => {
                         </div>
                     )}
 
-                    {/* Products Tab - Sửa lỗi hover */}
+                    {/* Products Tab */}
                     {activeTab === "products" && (
                         <div>
-                            <h3 style={{ marginBottom: "24px", fontSize: "20px", fontWeight: "600" }}>Danh sách sản phẩm</h3>
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "24px" }}>
-                                {products.length > 0 ? products.map(product => {
-                                    const isHovered = hoveredProductId === product.id;
-                                    return (
-                                        <div 
-                                            key={product.id} 
-                                            onClick={() => handleProductClick(product.id)} 
-                                            onMouseEnter={() => setHoveredProductId(product.id)}
-                                            onMouseLeave={() => setHoveredProductId(null)}
-                                            style={{
-                                                background: "white", 
-                                                borderRadius: "20px", 
-                                                overflow: "hidden", 
-                                                cursor: "pointer",
-                                                transition: "all 0.3s ease-in-out", 
-                                                boxShadow: isHovered ? "0 20px 40px rgba(0,0,0,0.15)" : "0 2px 12px rgba(0,0,0,0.05)",
-                                                transform: isHovered ? "translateY(-6px) scale(1.02)" : "translateY(0) scale(1)",
-                                                willChange: "transform, box-shadow"
-                                            }}>
-                                            <div style={{ height: "220px", backgroundImage: `url(${product.image_url})`, backgroundSize: "cover", backgroundPosition: "center", position: "relative" }}>
-                                                {product.sold_count > 0 && (
-                                                    <span style={{ position: "absolute", top: "12px", right: "12px", background: "#ff4444", color: "white", padding: "4px 10px", borderRadius: "30px", fontSize: "12px", fontWeight: "500" }}>
-                                                        🔥 Đã bán {product.sold_count}
-                                                    </span>
-                                                )}
-                                                {isHovered && (
-                                                    <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(2px)" }}>
-                                                        <span style={{ background: "white", padding: "10px 24px", borderRadius: "40px", fontSize: "14px", fontWeight: "600", color: "#2e7d32", boxShadow: "0 4px 12px rgba(0,0,0,0.2)" }}>
-                                                            <FaEye style={{ marginRight: "8px" }} /> Xem chi tiết
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <div style={{ padding: "20px" }}>
-                                                <h4 style={{ fontSize: "18px", marginBottom: "8px", fontWeight: "600", color: "#333" }}>{product.name}</h4>
-                                                <div style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "10px" }}>{renderStars(product.rating || 4.5)}</div>
-                                                <div style={{ fontSize: "22px", fontWeight: "bold", color: "#d32f2f", marginBottom: "12px" }}>{formatCurrency(product.price)}</div>
-                                                <button style={{ 
-                                                    width: "100%", padding: "12px", background: isHovered ? "#2e7d32" : "#f5f5f5", 
-                                                    color: isHovered ? "white" : "#2e7d32", border: "none", borderRadius: "40px", 
-                                                    cursor: "pointer", fontWeight: "600", display: "flex", alignItems: "center", 
-                                                    justifyContent: "center", gap: "8px", transition: "all 0.3s ease"
-                                                }}>
-                                                    <FaShoppingCart /> Mua ngay
-                                                </button>
-                                            </div>
-                                        </div>
-                                    );
-                                }) : <div style={{ textAlign: "center", padding: "60px", background: "white", borderRadius: "20px" }}>Chưa có sản phẩm nào</div>}
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px", flexWrap: "wrap", gap: "12px" }}>
+                                <h3 style={{ fontSize: "20px", fontWeight: "600", margin: 0 }}>
+                                    Danh sách sản phẩm
+                                    {searchTerm && <span style={{ fontSize: "14px", fontWeight: "normal", color: "#666", marginLeft: "12px" }}>({filteredProducts.length} kết quả)</span>}
+                                </h3>
+                                {searchTerm && filteredProducts.length === 0 && (
+                                    <button 
+                                        onClick={() => setSearchTerm("")}
+                                        style={{
+                                            padding: "6px 16px",
+                                            background: "#f0f0f0",
+                                            border: "none",
+                                            borderRadius: "20px",
+                                            cursor: "pointer",
+                                            fontSize: "13px",
+                                            color: "#666"
+                                        }}
+                                    >
+                                        Xóa tìm kiếm
+                                    </button>
+                                )}
                             </div>
+                            
+                            {searchTerm && filteredProducts.length === 0 ? (
+                                <div style={{ textAlign: "center", padding: "60px", background: "white", borderRadius: "20px" }}>
+                                    <FaSearch style={{ fontSize: "48px", color: "#ccc", marginBottom: "16px" }} />
+                                    <h4 style={{ color: "#666", marginBottom: "8px" }}>Không tìm thấy sản phẩm "{searchTerm}"</h4>
+                                    <p style={{ color: "#999", fontSize: "14px" }}>Vui lòng thử lại với từ khóa khác</p>
+                                    <button 
+                                        onClick={() => setSearchTerm("")}
+                                        style={{
+                                            marginTop: "16px",
+                                            padding: "8px 20px",
+                                            background: "#2e7d32",
+                                            color: "white",
+                                            border: "none",
+                                            borderRadius: "20px",
+                                            cursor: "pointer"
+                                        }}
+                                    >
+                                        Xem tất cả sản phẩm
+                                    </button>
+                                </div>
+                            ) : (
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "24px" }}>
+                                    {filteredProducts.map(product => {
+                                        const isHovered = hoveredProductId === product.id;
+                                        return (
+                                            <div 
+                                                key={product.id} 
+                                                onClick={() => handleProductClick(product.id)} 
+                                                onMouseEnter={() => setHoveredProductId(product.id)}
+                                                onMouseLeave={() => setHoveredProductId(null)}
+                                                style={{
+                                                    background: "white", 
+                                                    borderRadius: "20px", 
+                                                    overflow: "hidden", 
+                                                    cursor: "pointer",
+                                                    transition: "all 0.3s ease-in-out", 
+                                                    boxShadow: isHovered ? "0 20px 40px rgba(0,0,0,0.15)" : "0 2px 12px rgba(0,0,0,0.05)",
+                                                    transform: isHovered ? "translateY(-6px) scale(1.02)" : "translateY(0) scale(1)",
+                                                    willChange: "transform, box-shadow"
+                                                }}>
+                                                <div style={{ height: "220px", backgroundImage: `url(${product.image_url})`, backgroundSize: "cover", backgroundPosition: "center", position: "relative" }}>
+                                                    {product.sold_count > 0 && (
+                                                        <span style={{ position: "absolute", top: "12px", right: "12px", background: "#ff4444", color: "white", padding: "4px 10px", borderRadius: "30px", fontSize: "12px", fontWeight: "500" }}>
+                                                            🔥 Đã bán {product.sold_count}
+                                                        </span>
+                                                    )}
+                                                    {isHovered && (
+                                                        <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(2px)" }}>
+                                                            <span style={{ background: "white", padding: "10px 24px", borderRadius: "40px", fontSize: "14px", fontWeight: "600", color: "#2e7d32", boxShadow: "0 4px 12px rgba(0,0,0,0.2)" }}>
+                                                                <FaEye style={{ marginRight: "8px" }} /> Xem chi tiết
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div style={{ padding: "20px" }}>
+                                                    <h4 style={{ fontSize: "18px", marginBottom: "8px", fontWeight: "600", color: "#333" }}>{product.name}</h4>
+                                                    <div style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "10px" }}>{renderStars(product.rating || 4.5)}</div>
+                                                    <div style={{ fontSize: "22px", fontWeight: "bold", color: "#d32f2f", marginBottom: "12px" }}>{formatCurrency(product.price)}</div>
+                                                    <button style={{ 
+                                                        width: "100%", padding: "12px", background: isHovered ? "#2e7d32" : "#f5f5f5", 
+                                                        color: isHovered ? "white" : "#2e7d32", border: "none", borderRadius: "40px", 
+                                                        cursor: "pointer", fontWeight: "600", display: "flex", alignItems: "center", 
+                                                        justifyContent: "center", gap: "8px", transition: "all 0.3s ease"
+                                                    }}>
+                                                        <FaShoppingCart /> Mua ngay
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -705,7 +801,6 @@ const ShopDetailPage = () => {
                             </div>
 
                             {/* Add Comment */}
-                            
                             <div style={{
                                 background: "white",
                                 borderRadius: "24px",
@@ -716,7 +811,6 @@ const ShopDetailPage = () => {
                                     <FaEdit /> Viết bình luận
                                 </h3>
                                 
-                                {/* Thêm phần chọn số sao */}
                                 <div style={{ marginBottom: "16px" }}>
                                     <label style={{ fontWeight: "500", marginBottom: "8px", display: "block", color: "#555" }}>Đánh giá của bạn:</label>
                                     <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>

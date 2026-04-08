@@ -566,20 +566,6 @@ function Header() {
                                 )}
                             </div>
 
-                            {/* Cài đặt */}
-                            <div 
-                                style={menuItemStyle}
-                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f0f2f5"}
-                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
-                                onClick={() => {
-                                    navigate("/settings");
-                                    setIsMenuOpen(false);
-                                }}
-                            >
-                                <FaCog size={18} color="#2e7d32" />
-                                <span>Cài đặt</span>
-                            </div>
-
                             {/* Đăng xuất */}
                             <div 
                                 style={menuItemStyle}
