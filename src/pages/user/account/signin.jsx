@@ -154,7 +154,12 @@ function Login() {
                 </div>
 
                 <div style={{ textAlign: "right", marginTop: "8px" }}>
-                  <span style={{ fontSize: "12px", color: "#555", cursor: "pointer" }}>Quên mật khẩu</span>
+                  <span 
+                    style={{ fontSize: "12px", color: "#555", cursor: "pointer" }}
+                    onClick={() => navigate("/forgot-password")}
+                  >
+                    Quên mật khẩu?
+                  </span>
                 </div>
               </div>
 

@@ -13,23 +13,14 @@ function Home() {
     const [showReportModal, setShowReportModal] = useState(false);
     const [selectedReportPost, setSelectedReportPost] = useState(null);
     
-    // State với cache initialization
-    const [posts, setPosts] = useState(() => {
-        const cached = sessionStorage.getItem(`home_posts_${category}`);
-        if (cached) {
-            try {
-                const parsed = JSON.parse(cached);
-                const cacheTime = sessionStorage.getItem(`home_cache_time_${category}`);
-                if (cacheTime && (Date.now() - parseInt(cacheTime) < 300000)) {
-                    console.log("Using cached posts for category:", category);
-                    return parsed;
-                }
-            } catch (e) {
-                console.error("Error parsing cached posts:", e);
-            }
-        }
-        return [];
-    });
+    const [posts, setPosts] = useState([]);
+
+    // Thay thế useState likedPosts:
+    const [likedPosts, setLikedPosts] = useState({});
+
+    // loading ban đầu có thể set true (sẽ được useEffect xử lý)
+    const [loading, setLoading] = useState(true);
+    
     
     const [currentUser, setCurrentUser] = useState(() => {
         const storedUserData = localStorage.getItem("user_data");
@@ -45,10 +36,7 @@ function Home() {
     const [showComments, setShowComments] = useState({});
     const [postComments, setPostComments] = useState({});
     const [commentInputs, setCommentInputs] = useState({});
-    const [likedPosts, setLikedPosts] = useState(() => {
-        const cached = sessionStorage.getItem(`home_liked_${category}`);
-        return cached ? JSON.parse(cached) : {};
-    });
+    
     const [activePostMenu, setActivePostMenu] = useState(null);
     const [editingPost, setEditingPost] = useState(null);
     const [newPostContent, setNewPostContent] = useState("");
@@ -69,14 +57,11 @@ function Home() {
     const [replyInput, setReplyInput] = useState("");
     const [sharePost, setSharePost] = useState(null);
     const [showShareModal, setShowShareModal] = useState(false);
-    const [loading, setLoading] = useState(() => {
-        const cached = sessionStorage.getItem(`home_posts_${category}`);
-        const cacheTime = sessionStorage.getItem(`home_cache_time_${category}`);
-        if (cached && cacheTime && (Date.now() - parseInt(cacheTime) < 300000)) {
-            return false;
-        }
-        return true;
-    });
+    const clearCache = () => {
+        sessionStorage.removeItem(`home_posts_${category}`);
+        sessionStorage.removeItem(`home_cache_time_${category}`);
+        sessionStorage.removeItem(`home_liked_${category}`);
+    };
 
     const [newPost, setNewPost] = useState({
         content: "",
@@ -95,7 +80,7 @@ function Home() {
     const [uploadingImages, setUploadingImages] = useState(false);
     const [savedPosts, setSavedPosts] = useState({});
     const [toastConfig, setToastConfig] = useState({ show: false, message: '', type: 'success' });
-    
+    const [lastLoadedCategory, setLastLoadedCategory] = useState(category);
     const showToast = (message, type = 'success') => {
         setToastConfig({ show: true, message, type });
         setTimeout(() => setToastConfig({ show: false, message: '', type: 'success' }), 3000);
@@ -116,71 +101,75 @@ function Home() {
         }
     }, [likedPosts, category]);
 
+    // Sửa useEffect loadPosts
     useEffect(() => {
-        console.log("=== DEBUG AUTH ===");
-        console.log("user_token:", localStorage.getItem("user_token")?.substring(0, 20) + "...");
-        console.log("user_data:", localStorage.getItem("user_data"));
-        console.log("user:", localStorage.getItem("user"));
-        document.title = "Đặc sản quê tôi - Trang chủ";
-
-        const handleClickOutside = (event) => {
-            if (!event.target.closest('.menu-trigger') && !event.target.closest('.popup-menu')) {
-                setActivePostMenu(null);
-                setActiveCommentMenu(null);
+        const loadPosts = async () => {
+            setLoading(true);
+            
+            // QUAN TRỌNG: Force clear cache khi category thay đổi
+            // Xóa cache của category hiện tại để đảm bảo load dữ liệu mới
+            sessionStorage.removeItem(`home_posts_${category}`);
+            sessionStorage.removeItem(`home_cache_time_${category}`);
+            sessionStorage.removeItem(`home_liked_${category}`);
+            
+            const cachedPosts = sessionStorage.getItem(`home_posts_${category}`);
+            const cacheTime = sessionStorage.getItem(`home_cache_time_${category}`);
+            
+            // KHÔNG dùng cache nữa khi category thay đổi
+            // Hoặc chỉ dùng cache trong 1 phút
+            const isCacheValid = cachedPosts && cacheTime && (Date.now() - parseInt(cacheTime) < 60000);
+            
+            if (isCacheValid && category === lastLoadedCategory) {
+                try {
+                    const parsedPosts = JSON.parse(cachedPosts);
+                    setPosts(parsedPosts);
+                    const cachedLiked = sessionStorage.getItem(`home_liked_${category}`);
+                    if (cachedLiked) setLikedPosts(JSON.parse(cachedLiked));
+                    setLoading(false);
+                    return;
+                } catch(e) { console.error("Lỗi parse cache", e); }
             }
-        };
-        document.addEventListener("mousedown", handleClickOutside);
-        
-        // Kiểm tra cache
-        const cachedPosts = sessionStorage.getItem(`home_posts_${category}`);
-        const cacheTime = sessionStorage.getItem(`home_cache_time_${category}`);
-        const isCacheValid = cachedPosts && cacheTime && (Date.now() - parseInt(cacheTime) < 300000);
-        
-        if (!isCacheValid || posts.length === 0) {
-            fetchFeedAndLikes();
-        } else {
+            
+            // Gọi API mới
+            await fetchFeedAndLikes();
+            setLastLoadedCategory(category); // Lưu category đã load
             setLoading(false);
-        }
-        
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
         };
+        
+        loadPosts();
     }, [category]);
+
 
     const fetchFeedAndLikes = async () => {
         try {
-            setLoading(true);
             let url = "/api/v1/posts/feed";
-            if (category !== "general") {
-                url += `?category=${category}`;
-            }
+            if (category !== "general") url += `?category=${category}`;
 
             const token = localStorage.getItem("user_token");
             if (!token) {
-                console.log("Không tìm thấy token, chuyển hướng đến login");
                 window.location.href = "/login";
                 return;
             }
 
             const res = await api.get(url);
-            console.log("Feed response:", res.data);
             const fetchedPosts = res.data;
-            
             setPosts(fetchedPosts);
 
-            const likeChecks = fetchedPosts.map(post => 
+            // Lưu cache
+            sessionStorage.setItem(`home_posts_${category}`, JSON.stringify(fetchedPosts));
+            sessionStorage.setItem(`home_cache_time_${category}`, Date.now().toString());
+
+            // Like checks
+            const likeChecks = fetchedPosts.map(post =>
                 api.get(`/api/v1/likes/check/${post._id}`)
                     .then(res => ({ id: post._id, isLiked: res.data.liked }))
                     .catch(() => ({ id: post._id, isLiked: false }))
             );
-
             const likeResults = await Promise.all(likeChecks);
-            
             const likeMap = {};
-            likeResults.forEach(result => {
-                likeMap[result.id] = result.isLiked;
-            });
+            likeResults.forEach(result => { likeMap[result.id] = result.isLiked; });
             setLikedPosts(likeMap);
+            sessionStorage.setItem(`home_liked_${category}`, JSON.stringify(likeMap));
 
         } catch (err) {
             console.error("Lỗi khi tải Feed:", err);
@@ -194,8 +183,6 @@ function Home() {
             setLoading(false);
         }
     };
-
-
 
     useEffect(() => {
         const checkSavedStatus = async () => {

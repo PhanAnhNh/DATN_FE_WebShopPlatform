@@ -131,7 +131,24 @@ function SidebarLeft({ userProfile = null }) {
         : (user.username ? user.username.charAt(0).toUpperCase() : "U");
 
     const handleCategoryClick = (categoryType) => {
-        categoryType === "general" ? navigate("/") : navigate(`/?category=${categoryType}`);
+        // Clear cache trước khi chuyển category
+        clearCategoryCache();
+        
+        if (categoryType === "general") {
+            navigate("/");
+        } else {
+            navigate(`/?category=${categoryType}`);
+        }
+    };
+
+    const clearCategoryCache = () => {
+        // Xóa cache của tất cả categories
+        const categories = ["general", "agriculture", "seafood", "specialty"];
+        categories.forEach(cat => {
+            sessionStorage.removeItem(`home_posts_${cat}`);
+            sessionStorage.removeItem(`home_cache_time_${cat}`);
+            sessionStorage.removeItem(`home_liked_${cat}`);
+        });
     };
 
     // Styles nội bộ
