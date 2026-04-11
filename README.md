@@ -2,6 +2,7 @@ BÁO CÁO TIẾN ĐỘ TUẦN 5 FE:
 Họ tên: Phan Anh Nhất
 
 Dự án: Nền tảng mua bán trao đổi sản phẩm địa phương
+
 Nội dung lý thuyết đã hoàn thành: 
   + Đặt vấn đề
   + Mục tiêu yêu cầu
