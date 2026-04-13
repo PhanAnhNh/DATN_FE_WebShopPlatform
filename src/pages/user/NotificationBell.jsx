@@ -141,10 +141,6 @@ const NotificationBell = ({ userType = 'user' }) => {
     }
   };
 
-  // Xử lý click vào thông báo
-  // src/pages/user/NotificationBell.jsx (hoặc nơi bạn đặt component này)
-// Sửa lại hàm handleNotificationClick
-
 const handleNotificationClick = (notification) => {
     // Đánh dấu đã đọc
     if (!notification.is_read) {

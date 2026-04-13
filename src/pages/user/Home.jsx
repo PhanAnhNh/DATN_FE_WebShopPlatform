@@ -5,6 +5,7 @@ import Layout from "../../components/layout/Layout";
 import ShareModal from "./ShareModal";
 import SharedPostCard from "./SharedPostCard";
 import ReportModal from "../admin/reportModal";
+import Toast from "../../components/common/Toast";
 
 function Home() {
     const navigate = useNavigate();
@@ -12,16 +13,9 @@ function Home() {
     const category = searchParams.get("category") || "general";
     const [showReportModal, setShowReportModal] = useState(false);
     const [selectedReportPost, setSelectedReportPost] = useState(null);
-    
     const [posts, setPosts] = useState([]);
-
-    // Thay thế useState likedPosts:
     const [likedPosts, setLikedPosts] = useState({});
-
-    // loading ban đầu có thể set true (sẽ được useEffect xử lý)
     const [loading, setLoading] = useState(true);
-    
-    
     const [currentUser, setCurrentUser] = useState(() => {
         const storedUserData = localStorage.getItem("user_data");
         const storedUserLegacy = localStorage.getItem("user");
@@ -32,14 +26,9 @@ function Home() {
         }
         return null;
     });
-    
     const [showComments, setShowComments] = useState({});
-    const [postComments, setPostComments] = useState({});
-    const [commentInputs, setCommentInputs] = useState({});
-    
     const [activePostMenu, setActivePostMenu] = useState(null);
     const [editingPost, setEditingPost] = useState(null);
-    const [newPostContent, setNewPostContent] = useState("");
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [activeCommentMenu, setActiveCommentMenu] = useState(null);
@@ -220,30 +209,63 @@ function Home() {
         navigate('/use/shop');
     };
 
+    const handleEditModalComment = (comment) => {
+        setEditingCommentId(comment._id);
+        setEditCommentContent(comment.content);
+        setActiveCommentMenu(null);
+    };
 
-    const handlePostComment = async (postId) => {
-        const text = commentInputs[postId];
-        if (!text || text.trim() === "") return;
-
+    const handleSaveModalComment = async (postId, commentId) => {
+        if (!editCommentContent.trim()) return;
         try {
-            await api.post("/api/v1/comments/", {
-                post_id: postId,
-                content: text
-            });
-
-            const res = await api.get(`/api/v1/comments/${postId}`);
-            setPostComments(prev => ({ ...prev, [postId]: res.data }));
-            setCommentInputs(prev => ({ ...prev, [postId]: "" }));
-
-            setPosts(prevPosts => prevPosts.map(p => 
-                p._id === postId 
-                    ? { ...p, stats: { ...p.stats, comment_count: (p.stats.comment_count || 0) + 1 } }
-                    : p
-            ));
-
+            await api.put(`/api/v1/comments/${commentId}`, { content: editCommentContent });
+            
+            // Cập nhật lại comments trong modal
+            await fetchModalComments(postId, 1);
+            setCommentPage(1);
+            
+            // Cập nhật số lượng comment trong selectedPost (không thay đổi số lượng)
+            
+            // Reset editing state
+            setEditingCommentId(null);
+            setEditCommentContent("");
+            
+            showToast("Đã sửa bình luận thành công", "success");
         } catch (error) {
-            console.error("Lỗi đăng bình luận:", error);
-            alert("Không thể đăng bình luận. Hãy kiểm tra lại kết nối!");
+            console.error("Lỗi khi sửa bình luận:", error);
+            showToast("Không thể sửa bình luận. Vui lòng thử lại!", "error");
+        }
+    };
+
+
+    const handleDeleteModalComment = async (postId, commentId) => {
+        if (window.confirm("Bạn có chắc chắn muốn xóa bình luận này không?")) {
+            try {
+                await api.delete(`/api/v1/comments/${commentId}`);
+                
+                // Cập nhật lại comments trong modal
+                await fetchModalComments(postId, 1);
+                setCommentPage(1);
+                
+                // Cập nhật số lượng comment trong selectedPost
+                setSelectedPost(prev => ({
+                    ...prev,
+                    stats: { ...prev.stats, comment_count: Math.max(0, (prev.stats?.comment_count || 1) - 1) }
+                }));
+                
+                // Cập nhật số lượng comment trong posts list
+                setPosts(prevPosts => prevPosts.map(p => 
+                    p._id === postId 
+                        ? { ...p, stats: { ...p.stats, comment_count: Math.max(0, (p.stats?.comment_count || 1) - 1) } }
+                        : p
+                ));
+                
+                setActiveCommentMenu(null);
+                showToast("Đã xóa bình luận thành công", "success");
+            } catch (error) {
+                console.error("Lỗi khi xóa bình luận:", error);
+                showToast("Không thể xóa bình luận!", "error");
+            }
         }
     };
 
@@ -280,7 +302,7 @@ function Home() {
             }));
         } catch (error) {
             console.error('Lỗi upload ảnh:', error);
-            alert('Không thể upload ảnh. Vui lòng thử lại!');
+            showToast('Không thể upload ảnh. Vui lòng thử lại!', "error");
         } finally {
             setUploadingImages(false);
         }
@@ -323,7 +345,7 @@ function Home() {
                 }
                 return p;
             }));
-            alert("Không thể thực hiện. Vui lòng thử lại!");
+            showToast("Không thể thực hiện. Vui lòng thử lại!", "error");
         }
     };
 
@@ -455,14 +477,8 @@ function Home() {
             }));
         } catch(err) {
             console.error(err);
-            alert("Không thể đăng bình luận");
+            showToast("Không thể đăng bình luận", "error");
         }
-    };
-
-    const handleEditComment = (comment) => {
-        setEditingCommentId(comment._id);      
-        setEditCommentContent(comment.content); 
-        setActiveCommentMenu(null);            
     };
 
     const handleEditPost = (post) => {
@@ -486,7 +502,7 @@ function Home() {
 
     const handleSubmitPost = async () => {
         if (!newPost.content.trim() && newPost.images.length === 0 && newPost.videos.length === 0) {
-            alert("Vui lòng nhập nội dung hoặc thêm ảnh/video");
+            showToast("Vui lòng nhập nội dung hoặc thêm ảnh/video", "error");
             return;
         }
         
@@ -534,7 +550,7 @@ function Home() {
             setEditingPost(null);
         } catch (error) {
             console.error("Lỗi khi đăng/sửa bài:", error);
-            alert("Không thể lưu bài viết. Hãy kiểm tra lại!");
+            showToast("Không thể lưu bài viết. Hãy kiểm tra lại!", "error");
         } finally {
             setIsSubmitting(false);
         }
@@ -549,51 +565,7 @@ function Home() {
                 setActivePostMenu(null);
             } catch (error) {
                 console.error("Lỗi khi xóa bài:", error);
-                alert("Không thể xóa bài viết. Vui lòng thử lại!");
-            }
-        }
-    };
-
-    const handleSaveEditComment = async (postId, commentId) => {
-        if (!editCommentContent.trim()) return;
-        try {
-            await api.put(`/api/v1/comments/${commentId}`, { content: editCommentContent });
-            
-            setPostComments(prev => ({
-                ...prev,
-                [postId]: prev[postId].map(cmt => 
-                    cmt._id === commentId ? { ...cmt, content: editCommentContent } : cmt
-                )
-            }));
-            
-            setEditingCommentId(null);
-            setEditCommentContent("");
-        } catch (error) {
-            console.error("Lỗi khi sửa bình luận:", error);
-            alert("Không thể sửa bình luận. Vui lòng thử lại!");
-        }
-    };
-
-    const handleDeleteComment = async (postId, commentId) => {
-        if (window.confirm("Bạn có chắc chắn muốn xóa bình luận này?")) {
-            try {
-                await api.delete(`/api/v1/comments/${commentId}`);
-                
-                setPostComments(prev => ({
-                    ...prev,
-                    [postId]: prev[postId].filter(cmt => cmt._id !== commentId)
-                }));
-
-                setPosts(prevPosts => prevPosts.map(p => 
-                    p._id === postId 
-                        ? { ...p, stats: { ...p.stats, comment_count: Math.max(0, (p.stats?.comment_count || 1) - 1) } }
-                        : p
-                ));
-
-                setActiveCommentMenu(null);
-            } catch (error) {
-                console.error("Lỗi khi xóa bình luận:", error);
-                alert("Không thể xóa bình luận!");
+                showToast("Không thể xóa bài viết. Vui lòng thử lại!", "error");
             }
         }
     };
@@ -610,11 +582,6 @@ function Home() {
         const tagsString = e.target.value;
         const tagsArray = tagsString.split(',').map(tag => tag.trim()).filter(tag => tag);
         setNewPost(prev => ({ ...prev, tags: tagsArray }));
-    };
-
-    const handleReportHideComment = (action) => {
-        alert(`Đã thực hiện: ${action}. (Chức năng này cần API backend hỗ trợ thêm)`);
-        setActiveCommentMenu(null);
     };
 
     const goToUserProfile = (userId) => {
@@ -679,7 +646,6 @@ function Home() {
             showToast("Không thể thực hiện. Vui lòng thử lại!", "error");
         }
     };
-
     // Loading state
     if (loading && posts.length === 0) {
         return (
@@ -849,7 +815,7 @@ function Home() {
                                                     {savedPosts[post._id] ? "📌 Đã lưu" : "🔖 Lưu bài viết"}
                                                 </button>
                                                 <button 
-                                                    onClick={() => alert("Đã ẩn bài viết này")}
+                                                    onClick={() => showToast("Đã ẩn bài viết này", "info")}
                                                     style={menuButtonStyle}
                                                     onMouseOver={(e) => e.target.style.background = "#f0f2f5"}
                                                     onMouseOut={(e) => e.target.style.background = "white"}
@@ -1225,9 +1191,8 @@ function Home() {
                                 </div>
                                 <div style={{ flex: 1, textAlign: "center", color: "#555", fontWeight: "500", padding: "6px 0" }}>💬 Bình luận</div>
                                 <div style={{ flex: 1, textAlign: "center", cursor: "pointer", color: "#555", fontWeight: "500", padding: "6px 0", borderRadius: "6px" }}
-                                    onClick={async () => {
-                                        alert("Tính năng chia sẻ đang phát triển");
-                                    }}
+                                    onClick={() => handleOpenShare(post)}
+                                    
                                 >↗️ Chia sẻ</div>
                             </div>
 
@@ -1284,84 +1249,322 @@ function Home() {
                                 {modalComments.length === 0 ? (
                                     <div style={{ textAlign: "center", color: "#888", padding: "20px 0" }}>Chưa có bình luận nào.</div>
                                 ) : (
-                                    <>
-                                        {modalComments.map(cmt => (
-                                            <div key={cmt._id} style={{ marginBottom: "20px" }}>
-                                                <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
-                                                    <div style={{ 
-                                                        width: "40px", 
-                                                        height: "40px", 
-                                                        background: "#2e7d32", 
-                                                        borderRadius: "50%", 
-                                                        display: "flex", 
-                                                        alignItems: "center", 
-                                                        justifyContent: "center", 
-                                                        color: "white", 
-                                                        fontSize: "16px", 
-                                                        fontWeight: "bold", 
-                                                        flexShrink: 0 
-                                                    }}>
-                                                        {cmt.author_name ? cmt.author_name.charAt(0).toUpperCase() : "U"}
-                                                    </div>
-                                                    <div style={{ flex: 1 }}>
-                                                        <div style={{ background: "#f0f2f5", padding: "10px 14px", borderRadius: "18px" }}>
-                                                            <strong style={{ fontSize: "14px", display: "block", marginBottom: "4px", color: "#1c1e21" }}>
-                                                                {cmt.author_name}
-                                                            </strong>
-                                                            <span style={{ fontSize: "14px", color: "#1c1e21", wordBreak: "break-word" }}>
-                                                                {cmt.content}
-                                                            </span>
-                                                        </div>
-                                                        <div style={{ display: "flex", gap: "16px", marginTop: "6px", marginLeft: "8px", fontSize: "12px", color: "#65676B" }}>
-                                                            <span>{new Date(cmt.created_at).toLocaleString()}</span>
-                                                            <button 
-                                                                onClick={() => setReplyingTo(cmt)}
-                                                                style={{ border: "none", background: "transparent", color: "#2e7d32", cursor: "pointer", fontSize: "12px", fontWeight: "500" }}
-                                                            >
-                                                                Trả lời
-                                                            </button>
-                                                        </div>
-                                                    </div>
+                                    <>                                        
+                                        {modalComments.map(cmt => {
+    // Kiểm tra xem currentUser có phải chủ comment không
+    const isCommentOwner = currentUser && String(currentUser._id || currentUser.id) === String(cmt.author_id);
+    
+    return (
+        <div key={cmt._id} style={{ marginBottom: "20px" }}>
+            <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+                <div style={{ 
+                    width: "40px", 
+                    height: "40px", 
+                    background: "#2e7d32", 
+                    borderRadius: "50%", 
+                    display: "flex", 
+                    alignItems: "center", 
+                    justifyContent: "center", 
+                    color: "white", 
+                    fontSize: "16px", 
+                    fontWeight: "bold", 
+                    flexShrink: 0 
+                }}>
+                    {cmt.author_name ? cmt.author_name.charAt(0).toUpperCase() : "U"}
+                </div>
+                <div style={{ flex: 1 }}>
+                    {editingCommentId === cmt._id ? (
+                        // Form sửa comment
+                        <div style={{ background: "#f0f2f5", padding: "10px 14px", borderRadius: "18px" }}>
+                            <input
+                                type="text"
+                                value={editCommentContent}
+                                onChange={(e) => setEditCommentContent(e.target.value)}
+                                style={{
+                                    width: "100%",
+                                    padding: "8px 12px",
+                                    borderRadius: "8px",
+                                    border: "1px solid #2e7d32",
+                                    outline: "none",
+                                    fontSize: "14px",
+                                    background: "white"
+                                }}
+                                autoFocus
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                        handleSaveModalComment(selectedPost._id, cmt._id);
+                                    }
+                                }}
+                            />
+                            <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+                                <button
+                                    onClick={() => handleSaveModalComment(selectedPost._id, cmt._id)}
+                                    style={{
+                                        padding: "4px 12px",
+                                        background: "#2e7d32",
+                                        color: "white",
+                                        border: "none",
+                                        borderRadius: "6px",
+                                        cursor: "pointer",
+                                        fontSize: "12px"
+                                    }}
+                                >
+                                    Lưu
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setEditingCommentId(null);
+                                        setEditCommentContent("");
+                                    }}
+                                    style={{
+                                        padding: "4px 12px",
+                                        background: "#e4e6eb",
+                                        color: "#333",
+                                        border: "none",
+                                        borderRadius: "6px",
+                                        cursor: "pointer",
+                                        fontSize: "12px"
+                                    }}
+                                >
+                                    Hủy
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <>
+                            <div style={{ background: "#f0f2f5", padding: "10px 14px", borderRadius: "18px", position: "relative" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                    <strong style={{ fontSize: "14px", display: "block", marginBottom: "4px", color: "#1c1e21" }}>
+                                        {cmt.author_name}
+                                    </strong>
+                                    {/* Menu 3 chấm cho comment chính */}
+                                    {isCommentOwner && (
+                                        <div style={{ position: "relative" }}>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setActiveCommentMenu(activeCommentMenu === cmt._id ? null : cmt._id);
+                                                }}
+                                                style={{
+                                                    background: "transparent",
+                                                    border: "none",
+                                                    cursor: "pointer",
+                                                    color: "#65676B",
+                                                    fontSize: "18px",
+                                                    padding: "0 8px",
+                                                    fontWeight: "bold"
+                                                }}
+                                            >
+                                                •••
+                                            </button>
+                                            {activeCommentMenu === cmt._id && (
+                                                <div style={{
+                                                    position: "absolute",
+                                                    top: "24px",
+                                                    right: "0",
+                                                    background: "white",
+                                                    border: "1px solid #ddd",
+                                                    borderRadius: "8px",
+                                                    boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
+                                                    width: "120px",
+                                                    zIndex: 20,
+                                                    overflow: "hidden"
+                                                }}>
+                                                    <button
+                                                        onClick={() => handleEditModalComment(cmt)}
+                                                        style={{
+                                                            padding: "10px 12px",
+                                                            border: "none",
+                                                            background: "white",
+                                                            textAlign: "left",
+                                                            cursor: "pointer",
+                                                            fontSize: "13px",
+                                                            width: "100%",
+                                                            borderBottom: "1px solid #eee"
+                                                        }}
+                                                        onMouseOver={(e) => e.target.style.background = "#f0f2f5"}
+                                                        onMouseOut={(e) => e.target.style.background = "white"}
+                                                    >
+                                                        ✏️ Sửa
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteModalComment(selectedPost._id, cmt._id)}
+                                                        style={{
+                                                            padding: "10px 12px",
+                                                            border: "none",
+                                                            background: "white",
+                                                            textAlign: "left",
+                                                            cursor: "pointer",
+                                                            fontSize: "13px",
+                                                            color: "#dc3545",
+                                                            width: "100%"
+                                                        }}
+                                                        onMouseOver={(e) => e.target.style.background = "#f0f2f5"}
+                                                        onMouseOut={(e) => e.target.style.background = "white"}
+                                                    >
+                                                        🗑️ Xóa
+                                                    </button>
                                                 </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                                <span style={{ fontSize: "14px", color: "#1c1e21", wordBreak: "break-word" }}>
+                                    {cmt.content}
+                                </span>
+                            </div>
+                            <div style={{ display: "flex", gap: "16px", marginTop: "6px", marginLeft: "8px", fontSize: "12px", color: "#65676B" }}>
+                                <span>{new Date(cmt.created_at).toLocaleString()}</span>
+                                <button 
+                                    onClick={() => setReplyingTo(cmt)}
+                                    style={{ border: "none", background: "transparent", color: "#2e7d32", cursor: "pointer", fontSize: "12px", fontWeight: "500" }}
+                                >
+                                    Trả lời
+                                </button>
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
 
-                                                {cmt.replies && cmt.replies.length > 0 && (
-                                                    <div style={{ marginLeft: "52px", marginTop: "12px", paddingLeft: "12px", borderLeft: "2px solid #e4e6eb" }}>
-                                                        {cmt.replies.map(reply => (
-                                                            <div key={reply._id} style={{ display: "flex", gap: "10px", marginBottom: "12px", alignItems: "flex-start" }}>
-                                                                <div style={{ 
-                                                                    width: "32px", 
-                                                                    height: "32px", 
-                                                                    background: "#e4e6eb", 
-                                                                    borderRadius: "50%", 
-                                                                    display: "flex", 
-                                                                    alignItems: "center", 
-                                                                    justifyContent: "center", 
-                                                                    fontSize: "12px", 
-                                                                    fontWeight: "bold",
-                                                                    flexShrink: 0,
-                                                                    color: "#333"
-                                                                }}>
-                                                                    {reply.author_name ? reply.author_name.charAt(0).toUpperCase() : "U"}
-                                                                </div>
-                                                                <div style={{ flex: 1 }}>
-                                                                    <div style={{ background: "#f0f2f5", padding: "8px 12px", borderRadius: "16px" }}>
-                                                                        <strong style={{ fontSize: "12px", display: "block", marginBottom: "2px", color: "#1c1e21" }}>
-                                                                            {reply.author_name}
-                                                                        </strong>
-                                                                        <span style={{ fontSize: "13px", color: "#1c1e21", wordBreak: "break-word" }}>
-                                                                            {reply.content}
-                                                                        </span>
-                                                                    </div>
-                                                                    <div style={{ marginTop: "4px", marginLeft: "8px", fontSize: "11px", color: "#65676B" }}>
-                                                                        {new Date(reply.created_at).toLocaleString()}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
+            {/* Phần replies */}
+            {cmt.replies && cmt.replies.length > 0 && (
+                <div style={{ marginLeft: "52px", marginTop: "12px", paddingLeft: "12px", borderLeft: "2px solid #e4e6eb" }}>
+                    {cmt.replies.map(reply => {
+                        const isReplyOwner = currentUser && String(currentUser._id || currentUser.id) === String(reply.author_id);
+                        
+                        return (
+                            <div key={reply._id} style={{ display: "flex", gap: "10px", marginBottom: "12px", alignItems: "flex-start" }}>
+                                <div style={{ 
+                                    width: "32px", 
+                                    height: "32px", 
+                                    background: "#e4e6eb", 
+                                    borderRadius: "50%", 
+                                    display: "flex", 
+                                    alignItems: "center", 
+                                    justifyContent: "center", 
+                                    fontSize: "12px", 
+                                    fontWeight: "bold",
+                                    flexShrink: 0,
+                                    color: "#333"
+                                }}>
+                                    {reply.author_name ? reply.author_name.charAt(0).toUpperCase() : "U"}
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                    {editingCommentId === reply._id ? (
+                                        <div style={{ background: "#f0f2f5", padding: "8px 12px", borderRadius: "16px" }}>
+                                            <input
+                                                type="text"
+                                                value={editCommentContent}
+                                                onChange={(e) => setEditCommentContent(e.target.value)}
+                                                style={{
+                                                    width: "100%",
+                                                    padding: "6px 10px",
+                                                    borderRadius: "6px",
+                                                    border: "1px solid #2e7d32",
+                                                    outline: "none",
+                                                    fontSize: "13px"
+                                                }}
+                                                autoFocus
+                                                onKeyDown={(e) => e.key === "Enter" && handleSaveModalComment(selectedPost._id, reply._id)}
+                                            />
+                                            <div style={{ display: "flex", gap: "6px", marginTop: "6px" }}>
+                                                <button onClick={() => handleSaveModalComment(selectedPost._id, reply._id)} style={{ padding: "2px 10px", background: "#2e7d32", color: "white", border: "none", borderRadius: "4px", cursor: "pointer", fontSize: "11px" }}>Lưu</button>
+                                                <button onClick={() => { setEditingCommentId(null); setEditCommentContent(""); }} style={{ padding: "2px 10px", background: "#e4e6eb", border: "none", borderRadius: "4px", cursor: "pointer", fontSize: "11px" }}>Hủy</button>
                                             </div>
-                                        ))}
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div style={{ background: "#f0f2f5", padding: "8px 12px", borderRadius: "16px", position: "relative" }}>
+                                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                                    <strong style={{ fontSize: "12px", display: "block", marginBottom: "2px", color: "#1c1e21" }}>
+                                                        {reply.author_name}
+                                                    </strong>
+                                                    {/* Menu 3 chấm cho reply */}
+                                                    {isReplyOwner && (
+                                                        <div style={{ position: "relative" }}>
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setActiveCommentMenu(activeCommentMenu === reply._id ? null : reply._id);
+                                                                }}
+                                                                style={{ 
+                                                                    background: "transparent", 
+                                                                    border: "none", 
+                                                                    cursor: "pointer", 
+                                                                    color: "#65676B", 
+                                                                    fontSize: "16px",
+                                                                    padding: "0 4px"
+                                                                }}
+                                                            >
+                                                                •••
+                                                            </button>
+                                                            {activeCommentMenu === reply._id && (
+                                                                <div style={{
+                                                                    position: "absolute",
+                                                                    top: "20px",
+                                                                    right: "0",
+                                                                    background: "white",
+                                                                    border: "1px solid #ddd",
+                                                                    borderRadius: "8px",
+                                                                    boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
+                                                                    width: "100px",
+                                                                    zIndex: 20,
+                                                                    overflow: "hidden"
+                                                                }}>
+                                                                    <button 
+                                                                        onClick={() => handleEditModalComment(reply)} 
+                                                                        style={{ 
+                                                                            padding: "8px 12px", 
+                                                                            border: "none", 
+                                                                            background: "white", 
+                                                                            textAlign: "left", 
+                                                                            cursor: "pointer", 
+                                                                            fontSize: "12px", 
+                                                                            width: "100%",
+                                                                            borderBottom: "1px solid #eee"
+                                                                        }}
+                                                                    >
+                                                                        ✏️ Sửa
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={() => handleDeleteModalComment(selectedPost._id, reply._id)} 
+                                                                        style={{ 
+                                                                            padding: "8px 12px", 
+                                                                            border: "none", 
+                                                                            background: "white", 
+                                                                            textAlign: "left", 
+                                                                            cursor: "pointer", 
+                                                                            fontSize: "12px", 
+                                                                            color: "#dc3545", 
+                                                                            width: "100%" 
+                                                                        }}
+                                                                    >
+                                                                        🗑️ Xóa
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <span style={{ fontSize: "13px", color: "#1c1e21", wordBreak: "break-word" }}>
+                                                    {reply.content}
+                                                </span>
+                                            </div>
+                                            <div style={{ marginTop: "4px", marginLeft: "8px", fontSize: "11px", color: "#65676B" }}>
+                                                {new Date(reply.created_at).toLocaleString()}
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+})}
 
                                         {modalComments.length < totalComments && totalComments > commentLimit && (
                                             <div style={{ textAlign: "center", marginTop: "16px" }}>

@@ -411,7 +411,8 @@
           border-top: 1px solid #eee;
         }
         
-        .cancel-btn {
+        /* Sửa lại phần cancel-btn */
+        .cancel-section .cancel-btn {
           width: 100%;
           padding: 12px;
           background: #dc3545;
@@ -424,10 +425,54 @@
           justify-content: center;
           gap: 8px;
           font-weight: 500;
+          transition: all 0.3s ease;
         }
-        
-        .cancel-btn:hover {
-          background: #c82333;
+
+        .cancel-section .cancel-btn:hover {
+          background: #b91c2c; /* Màu đỏ đậm hơn */
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+        }
+
+        .cancel-section .cancel-btn:active {
+          transform: translateY(0);
+        }
+
+        /* Modal footer buttons */
+        .modal-footer .cancel-btn {
+          background: #6c757d;
+          color: white;
+          border: none;
+          padding: 8px 20px;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: all 0.3s ease;
+        }
+
+        .modal-footer .cancel-btn:hover {
+          background: #5a6268;
+          transform: translateY(-1px);
+        }
+
+        .modal-footer .confirm-btn {
+          background: #dc3545;
+          color: white;
+          border: none;
+          padding: 8px 20px;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: all 0.3s ease;
+        }
+
+        .modal-footer .confirm-btn:hover:not(:disabled) {
+          background: #b91c2c;
+          transform: translateY(-1px);
+          box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3);
+        }
+
+        .modal-footer .confirm-btn:disabled {
+          opacity: 0.7;
+          cursor: not-allowed;
         }
         
         .cancel-note {
@@ -565,93 +610,93 @@
         }
         /* Thêm vào file orderDetail.css */
 
-/* Return Info Banner */
-.return-info-banner {
-  display: flex;
-  align-items: flex-start;
-  gap: 20px;
-  background: #fff3e0;
-  border-left: 5px solid #ff9800;
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 24px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-}
+    /* Return Info Banner */
+    .return-info-banner {
+      display: flex;
+      align-items: flex-start;
+      gap: 20px;
+      background: #fff3e0;
+      border-left: 5px solid #ff9800;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
 
-.return-icon {
-  flex-shrink: 0;
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: white;
-  border-radius: 50%;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
+    .return-icon {
+      flex-shrink: 0;
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: white;
+      border-radius: 50%;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
 
-.return-content {
-  flex: 1;
-}
+    .return-content {
+      flex: 1;
+    }
 
-.return-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 8px;
-}
+    .return-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 8px;
+    }
 
-.return-status {
-  font-size: 14px;
-  font-weight: 500;
-  margin-bottom: 8px;
-}
+    .return-status {
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
 
-.return-message {
-  font-size: 14px;
-  color: #666;
-  margin-bottom: 8px;
-}
+    .return-message {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 8px;
+    }
 
-.return-amount {
-  font-size: 14px;
-  color: #2e7d32;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px dashed #e0e0e0;
-}
+    .return-amount {
+      font-size: 14px;
+      color: #2e7d32;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px dashed #e0e0e0;
+    }
 
-.return-amount strong {
-  font-size: 16px;
-  font-weight: 700;
-}
+    .return-amount strong {
+      font-size: 16px;
+      font-weight: 700;
+    }
 
-.return-date {
-  font-size: 12px;
-  color: #999;
-  margin-top: 6px;
-}
+    .return-date {
+      font-size: 12px;
+      color: #999;
+      margin-top: 6px;
+    }
 
-/* Responsive */
-@media (max-width: 768px) {
-  .return-info-banner {
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-  }
-  
-  .return-icon {
-    width: 40px;
-    height: 40px;
-  }
-  
-  .return-title {
-    font-size: 16px;
-  }
-}
-        
- @media print {
-          .back-btn, .print-btn, .reorder-btn, .cancel-section, .support-card, .order-header-right {
-            display: none;
-          }
-        }
+    /* Responsive */
+    @media (max-width: 768px) {
+      .return-info-banner {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+      }
+      
+      .return-icon {
+        width: 40px;
+        height: 40px;
+      }
+      
+      .return-title {
+        font-size: 16px;
+      }
+    }
+            
+    @media print {
+              .back-btn, .print-btn, .reorder-btn, .cancel-section, .support-card, .order-header-right {
+                display: none;
+              }
+            }

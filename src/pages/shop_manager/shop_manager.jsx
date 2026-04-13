@@ -1,4 +1,3 @@
-// src/pages/shop_manager/shop_manager.jsx (hoặc ShopCustomers.jsx)
 import React, { useState, useEffect } from 'react';
 import { 
   FaSearch, 
@@ -20,7 +19,7 @@ import {
   FaAngleDoubleRight,
   FaSpinner
 } from 'react-icons/fa';
-import { shopApi } from '../../api/api'; // SỬA: import shopApi
+import { shopApi } from '../../api/api';
 import '../../css/ShopCustomers.css';
 
 const ShopCustomers = () => {

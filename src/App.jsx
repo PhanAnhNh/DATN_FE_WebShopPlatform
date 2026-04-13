@@ -41,6 +41,8 @@ import ReportsManagement from "./pages/admin/ReportsManagement.jsx";
 import ForgotPassword from "./pages/user/account/forgot-password.jsx";
 import VerifyOTP from "./pages/user/account/sent_otp.jsx";
 import ResetPassword from "./pages/user/account/reset-password.jsx";
+import ProvinceDetail from "./pages/user/shop/ProvinceDetail.jsx";
+import AdminLocations from "./pages/admin/AdminShopLocations.jsx";
 
 function App() {
   return (
@@ -67,6 +69,8 @@ function App() {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/verify-otp" element={<VerifyOTP />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/province/:provinceId" element={<ProvinceDetail />} />
+
 
             {/* Admin Routes */}
             <Route 
@@ -124,6 +128,15 @@ function App() {
               element={
                 <AdminLayout>
                   <ReportsManagement />
+                </AdminLayout>
+              } 
+            />
+
+            <Route 
+              path="/admin/map-locations" 
+              element={
+                <AdminLayout>
+                  <AdminLocations />
                 </AdminLayout>
               } 
             />

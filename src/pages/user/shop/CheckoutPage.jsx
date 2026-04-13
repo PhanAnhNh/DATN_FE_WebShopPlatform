@@ -23,7 +23,8 @@ import {
   FaRoad,
   FaCity,
   FaGlobe,
-  FaShoppingCart
+  FaShoppingCart,
+  FaMobileAlt
 } from 'react-icons/fa';
 import ShopDetailLayout from "../../../components/layout/ShopDetailLayout";
 
@@ -59,6 +60,8 @@ const CheckoutPage = () => {
     });
     // Thêm state để lưu shop_id
     const [currentShopId, setCurrentShopId] = useState(null);
+    const [shopSettings, setShopSettings] = useState(null);
+    const [paymentMethods, setPaymentMethods] = useState([]);
 
     const showToast = (message, type = 'success') => {
         const id = Date.now();
@@ -168,6 +171,89 @@ const CheckoutPage = () => {
             setPaymentProcessing(false);
         }
     };
+
+    const fetchShopSettings = async (shopId) => {
+    try {
+        const response = await api.get(`/api/v1/shop/settings/public/${shopId}`);
+        const settings = response.data;
+        setShopSettings(settings);
+        
+        // Xây dựng danh sách phương thức thanh toán dựa trên settings
+        const methods = [];
+        
+        if (settings.payment?.cod === true) {
+            methods.push({
+                id: 'cod',
+                name: 'Thanh toán khi nhận hàng (COD)',
+                icon: <FaMoneyBillWave color="#2e7d32" />,
+                description: 'Thanh toán bằng tiền mặt khi nhận hàng'
+            });
+        }
+        
+        if (settings.payment?.bank_transfer === true && settings.payment?.bank_accounts?.length > 0) {
+            methods.push({
+                id: 'bank',
+                name: 'Chuyển khoản ngân hàng',
+                icon: <FaUniversity color="#2e7d32" />,
+                description: 'Chuyển khoản qua tài khoản ngân hàng'
+            });
+        }
+        
+        if (settings.payment?.momo === true) {
+            methods.push({
+                id: 'momo',
+                name: 'Ví MoMo',
+                icon: <FaMobileAlt color="#2e7d32" />,
+                description: 'Thanh toán qua ví MoMo'
+            });
+        }
+        
+        if (settings.payment?.vnpay === true) {
+            methods.push({
+                id: 'vnpay',
+                name: 'VNPay',
+                icon: <FaCreditCard color="#2e7d32" />,
+                description: 'Thanh toán qua cổng VNPay'
+            });
+        }
+        
+        if (settings.payment?.zalopay === true) {
+            methods.push({
+                id: 'zalopay',
+                name: 'ZaloPay',
+                icon: <FaMobileAlt color="#2e7d32" />,
+                description: 'Thanh toán qua ví ZaloPay'
+            });
+        }
+        
+        setPaymentMethods(methods);
+        
+        // Nếu phương thức thanh toán hiện tại không có trong danh sách, chọn phương thức đầu tiên
+        if (methods.length > 0 && !methods.find(m => m.id === paymentMethod)) {
+            setPaymentMethod(methods[0].id);
+        }
+        
+    } catch (error) {
+        console.error('Error fetching shop settings:', error);
+        // Fallback: hiển thị các phương thức mặc định
+        setPaymentMethods([
+            { id: 'cod', name: 'Thanh toán khi nhận hàng (COD)', icon: <FaMoneyBillWave color="#2e7d32" /> },
+            { id: 'bank', name: 'Chuyển khoản ngân hàng', icon: <FaUniversity color="#2e7d32" /> }
+        ]);
+    }
+};
+
+// Cập nhật useEffect để gọi fetchShopSettings khi có shopId
+useEffect(() => {
+    if (selectedItems.length > 0) {
+        const shopId = selectedItems[0]?.shop_id;
+        if (shopId) {
+            setCurrentShopId(shopId);
+            fetchAvailableVouchers(shopId);
+            fetchShopSettings(shopId); // Thêm dòng này
+        }
+    }
+}, [selectedItems]);
 
     const fetchAvailableVouchers = async (shopId) => {
         setVoucherLoading(true);
@@ -490,27 +576,41 @@ const CheckoutPage = () => {
             localStorage.removeItem('selectedVoucher');
             localStorage.removeItem('finalTotal');
             
-            // Lưu thông tin đơn hàng để hiển thị trong modal
+            // Lưu thông tin đơn hàng
             setOrderSuccess({
                 orderId: order.id || order._id,
                 totalAmount: finalTotal,
-                paymentMethod: paymentMethod
+                paymentMethod: paymentMethod,
+                shopId: selectedItems[0]?.shop_id  // Lưu shop_id để lấy thông tin thanh toán
             });
             
             // Xử lý theo phương thức thanh toán
             if (paymentMethod === 'cod') {
-                setShowSuccessModal(true);
-                setSubmitting(false);
-            } else if (paymentMethod === 'bank') {
-                setShowSuccessModal(true);
-                setSubmitting(false);
-            } else if (paymentMethod === 'momo' || paymentMethod === 'vnpay' || paymentMethod === 'zalopay') {
-                await handlePayment(order.id || order._id, finalTotal, paymentMethod);
-            } else if (paymentMethod === 'paypal') {
-                await handlePayment(order.id || order._id, finalTotal, 'paypal');
-            } else if (paymentMethod === 'card') {
-                await handlePayment(order.id || order._id, finalTotal, 'vnpay');
-            }
+    setShowSuccessModal(true);
+    setSubmitting(false);
+} 
+else if (paymentMethod === 'bank') {
+    setShowSuccessModal(false);
+    navigate(`/payment/instructions/${order.id || order._id}`, {
+    state: { 
+        shopId: selectedItems[0]?.shop_id,
+        orderTotal: finalTotal 
+    }
+});
+    setSubmitting(false);
+}
+else if (paymentMethod === 'momo') {
+    await handlePayment(order.id || order._id, finalTotal, 'momo');
+}
+else if (paymentMethod === 'vnpay') {
+    await handlePayment(order.id || order._id, finalTotal, 'vnpay');
+}
+else if (paymentMethod === 'zalopay') {
+    await handlePayment(order.id || order._id, finalTotal, 'zalopay');
+}
+else if (paymentMethod === 'paypal') {
+    await handlePayment(order.id || order._id, finalTotal, 'paypal');
+}
             
         } catch (error) {
             console.error("Error placing order:", error);
@@ -1189,60 +1289,54 @@ const CheckoutPage = () => {
                                     </div>
                                 </div>
 
-                                {/* Phương thức thanh toán */}
-                                <div style={{ marginBottom: "24px" }}>
-                                    <h3 style={{ fontSize: "16px", fontWeight: "600", marginBottom: "12px" }}>Phương thức thanh toán</h3>
-                                    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                                        <label style={{ display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", padding: "8px", borderRadius: "8px", background: paymentMethod === "cod" ? "#f5f5f5" : "transparent" }}>
-                                            <input
-                                                type="radio"
-                                                name="payment"
-                                                value="cod"
-                                                checked={paymentMethod === "cod"}
-                                                onChange={(e) => setPaymentMethod(e.target.value)}
-                                                style={{ cursor: "pointer" }}
-                                            />
-                                            <FaMoneyBillWave color="#2e7d32" />
-                                            <span>Thanh toán khi nhận hàng (COD)</span>
-                                        </label>
-                                        <label style={{ display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", padding: "8px", borderRadius: "8px", background: paymentMethod === "bank" ? "#f5f5f5" : "transparent" }}>
-                                            <input
-                                                type="radio"
-                                                name="payment"
-                                                value="bank"
-                                                checked={paymentMethod === "bank"}
-                                                onChange={(e) => setPaymentMethod(e.target.value)}
-                                                style={{ cursor: "pointer" }}
-                                            />
-                                            <FaUniversity color="#2e7d32" />
-                                            <span>Chuyển khoản ngân hàng</span>
-                                        </label>
-                                        <label style={{ display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", padding: "8px", borderRadius: "8px", background: paymentMethod === "card" ? "#f5f5f5" : "transparent" }}>
-                                            <input
-                                                type="radio"
-                                                name="payment"
-                                                value="card"
-                                                checked={paymentMethod === "card"}
-                                                onChange={(e) => setPaymentMethod(e.target.value)}
-                                                style={{ cursor: "pointer" }}
-                                            />
-                                            <FaCreditCard color="#2e7d32" />
-                                            <span>Thẻ tín dụng / Ghi nợ</span>
-                                        </label>
-                                        <label style={{ display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", padding: "8px", borderRadius: "8px", background: paymentMethod === "paypal" ? "#f5f5f5" : "transparent" }}>
-                                            <input
-                                                type="radio"
-                                                name="payment"
-                                                value="paypal"
-                                                checked={paymentMethod === "paypal"}
-                                                onChange={(e) => setPaymentMethod(e.target.value)}
-                                                style={{ cursor: "pointer" }}
-                                            />
-                                            <FaPaypal color="#2e7d32" />
-                                            <span>PayPal</span>
-                                        </label>
-                                    </div>
-                                </div>
+                               {/* Phương thức thanh toán - HIỂN THỊ THEO CÀI ĐẶT SHOP */}
+<div style={{ marginBottom: "24px" }}>
+    <h3 style={{ fontSize: "16px", fontWeight: "600", marginBottom: "12px" }}>Phương thức thanh toán</h3>
+    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+        {paymentMethods.length === 0 ? (
+            <div style={{ padding: "12px", color: "#999", textAlign: "center" }}>
+                Đang tải phương thức thanh toán...
+            </div>
+        ) : (
+            paymentMethods.map((method) => (
+                <label 
+                    key={method.id}
+                    style={{ 
+                        display: "flex", 
+                        alignItems: "center", 
+                        gap: "12px", 
+                        cursor: "pointer", 
+                        padding: "12px", 
+                        borderRadius: "12px", 
+                        background: paymentMethod === method.id ? "#e8f5e9" : "#f8f9fa",
+                        border: paymentMethod === method.id ? "1px solid #2e7d32" : "1px solid #e0e0e0",
+                        transition: "all 0.2s"
+                    }}
+                >
+                    <input
+                        type="radio"
+                        name="payment"
+                        value={method.id}
+                        checked={paymentMethod === method.id}
+                        onChange={(e) => setPaymentMethod(e.target.value)}
+                        style={{ cursor: "pointer" }}
+                    />
+                    {method.icon}
+                    <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: "500", fontSize: "14px" }}>{method.name}</div>
+                        {method.description && (
+                            <div style={{ fontSize: "12px", color: "#666" }}>{method.description}</div>
+                        )}
+                    </div>
+                    {paymentMethod === method.id && (
+                        <FaCheckCircle color="#2e7d32" size={18} />
+                    )}
+                </label>
+            ))
+        )}
+    </div>
+</div>
+                               
 
                                 {/* Nút đặt hàng */}
                                 <button 

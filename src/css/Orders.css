@@ -430,7 +430,7 @@
 .order-actions {
   display: flex;
   gap: 12px;
-  flex-wrap: wrap; /* Cho phép wrap trên màn hình nhỏ */
+  flex-wrap: wrap;
 }
 .action-btn {
   padding: 10px 20px; /* Tăng padding từ 8px 16px lên 10px 20px */
@@ -473,6 +473,7 @@
   background: #2e7d32;
   color: white;
   border: none;
+  width: 200px;
 }
 
 .action-btn.reorder:hover {

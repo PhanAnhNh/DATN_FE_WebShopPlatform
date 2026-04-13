@@ -24,11 +24,13 @@ import {
   FaShoppingBag,
   FaStar,
   FaRegStar,
-  FaUndo  // Thêm FaUndo
+  FaUndo,
+  FaExclamationTriangle
 } from 'react-icons/fa';
 import api from '../../api/api';
 import '../../css/Orders.css';
 import ShopDetailLayout from '../../components/layout/ShopDetailLayout';
+import Toast from '../../components/common/Toast';
 
 const Orders = () => {
   const navigate = useNavigate();
@@ -49,6 +51,18 @@ const Orders = () => {
     total_pages: 1
   });
   
+  // Toast state
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+  
+  // Confirm Dialog state
+  const [confirmDialog, setConfirmDialog] = useState({
+    show: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+    orderId: null
+  });
+  
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -66,7 +80,7 @@ const Orders = () => {
 
   // Return modal states
   const [showReturnModal, setShowReturnModal] = useState(false);
-  const [selectedOrderForReturn, setSelectedOrderForReturn] = useState(null); // Thay đổi: lưu order cụ thể
+  const [selectedOrderForReturn, setSelectedOrderForReturn] = useState(null);
   const [returnItems, setReturnItems] = useState([]);
   const [returnReason, setReturnReason] = useState('');
   const [returnNote, setReturnNote] = useState('');
@@ -74,7 +88,23 @@ const Orders = () => {
   const [submittingReturn, setSubmittingReturn] = useState(false);
   const [bankInfo, setBankInfo] = useState({ name: '', account: '', holder: '' });
   const [hasReturnRequest, setHasReturnRequest] = useState({}); 
-   const [cancelling, setCancelling] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+
+  // Helper function to show toast
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+  };
+
+  // Helper function to show confirm dialog
+  const showConfirm = (title, message, onConfirm, orderId = null) => {
+    setConfirmDialog({
+      show: true,
+      title,
+      message,
+      onConfirm: () => onConfirm(orderId),
+      orderId
+    });
+  };
 
   // Status configurations
   const statusConfig = {
@@ -126,40 +156,35 @@ const Orders = () => {
 
   // Kiểm tra có thể yêu cầu hoàn trả không
   const canRequestReturn = (order) => {
-  if (!order) return false;
-  
-  if (order.status !== 'completed') return false;
-  
-  // Kiểm tra ngày hoàn thành
-  const completedDate = new Date(order.completed_at || order.created_at);
-  const daysDiff = Math.floor((new Date() - completedDate) / (1000 * 60 * 60 * 24));
-  if (daysDiff > 7) return false;
-  
-  // Kiểm tra đã có yêu cầu hoàn trả chưa
-  if (hasReturnRequest[order._id] === true) return false;
-  
-  return true;
-};
+    if (!order) return false;
+    if (order.status !== 'completed') return false;
+    
+    const completedDate = new Date(order.completed_at || order.created_at);
+    const daysDiff = Math.floor((new Date() - completedDate) / (1000 * 60 * 60 * 24));
+    if (daysDiff > 7) return false;
+    if (hasReturnRequest[order._id] === true) return false;
+    
+    return true;
+  };
 
   // Kiểm tra đã có yêu cầu hoàn trả chưa
-const checkReturnRequest = async (orderId) => {
-  try {
-    const response = await api.get(`/api/v1/returns/my?order_id=${orderId}`);
-    const returns = response.data.data || [];
-    
-    // Kiểm tra xem có yêu cầu nào đang pending, approved, hoặc completed không
-    const hasActiveReturn = returns.some(ret => 
-      ret.status === 'pending' || 
-      ret.status === 'approved' || 
-      ret.status === 'completed'
-    );
-    
-    setHasReturnRequest(prev => ({ ...prev, [orderId]: hasActiveReturn }));
-  } catch (error) {
-    console.error('Error checking return request:', error);
-    setHasReturnRequest(prev => ({ ...prev, [orderId]: false }));
-  }
-};
+  const checkReturnRequest = async (orderId) => {
+    try {
+      const response = await api.get(`/api/v1/returns/my?order_id=${orderId}`);
+      const returns = response.data.data || [];
+      
+      const hasActiveReturn = returns.some(ret => 
+        ret.status === 'pending' || 
+        ret.status === 'approved' || 
+        ret.status === 'completed'
+      );
+      
+      setHasReturnRequest(prev => ({ ...prev, [orderId]: hasActiveReturn }));
+    } catch (error) {
+      console.error('Error checking return request:', error);
+      setHasReturnRequest(prev => ({ ...prev, [orderId]: false }));
+    }
+  };
 
   // Debounce search
   useEffect(() => {
@@ -193,8 +218,6 @@ const checkReturnRequest = async (orderId) => {
         }
       });
       
-      console.log('Orders response:', response.data);
-      
       let ordersData = [];
       let paginationData = pagination;
       
@@ -213,26 +236,22 @@ const checkReturnRequest = async (orderId) => {
         ordersData = [];
       }
       
-      // src/pages/Orders.jsx - Trong fetchOrders
-    const processedOrders = ordersData.map(order => ({
+      const processedOrders = ordersData.map(order => ({
         ...order,
         total_price: order.total_amount || order.total_price || 0,
         items: order.items.map(item => ({
-            ...item,
-            _id: item._id || `item_${Math.random()}`, // Đảm bảo có _id
-            product_id: item.product_id,
-            product_name: item.product_name,
-            price: item.price,
-            quantity: item.quantity
+          ...item,
+          _id: item._id || `item_${Math.random()}`,
+          product_id: item.product_id,
+          product_name: item.product_name,
+          price: item.price,
+          quantity: item.quantity
         }))
-    }));
-
-console.log('Processed orders with items:', processedOrders);
+      }));
       
       setOrders(processedOrders);
       setPagination(paginationData);
       
-      // Kiểm tra trạng thái hoàn trả cho từng order đã hoàn thành
       processedOrders.forEach(order => {
         if (order.status === 'completed') {
           checkReturnRequest(order._id);
@@ -246,8 +265,6 @@ console.log('Processed orders with items:', processedOrders);
         navigate('/login');
         return;
       }
-      
-      setOrders(mockOrders);
     } finally {
       setLoading(false);
     }
@@ -260,158 +277,133 @@ console.log('Processed orders with items:', processedOrders);
     } catch (error) {
       console.error('Error fetching stats:', error);
       setStats({
-        total: 15,
-        pending: 3,
-        paid: 2,
-        shipped: 4,
-        completed: 5,
-        cancelled: 1
+        total: 0,
+        pending: 0,
+        paid: 0,
+        shipped: 0,
+        completed: 0,
+        cancelled: 0
       });
     }
   };
 
-// src/pages/Orders.jsx - Sửa handleReturnRequest
-const handleReturnRequest = async () => {
+  const handleReturnRequest = async () => {
     if (!selectedOrderForReturn) return;
     
-    // Kiểm tra chọn ít nhất 1 sản phẩm
     const selectedItems = returnItems.filter(item => item.selected);
     if (selectedItems.length === 0) {
-        alert('Vui lòng chọn ít nhất 1 sản phẩm để yêu cầu hoàn trả');
-        return;
+      showToast('Vui lòng chọn ít nhất 1 sản phẩm để yêu cầu hoàn trả', 'error');
+      return;
     }
     
     if (!returnReason) {
-        alert('Vui lòng chọn lý do hoàn trả');
-        return;
+      showToast('Vui lòng chọn lý do hoàn trả', 'error');
+      return;
     }
     
     try {
-        setSubmittingReturn(true);
-        
-        // Debug: In ra dữ liệu trước khi gửi
-        console.log('=== SENDING RETURN REQUEST ===');
-        console.log('Selected Order:', selectedOrderForReturn);
-        console.log('Selected Order ID:', selectedOrderForReturn._id);
-        console.log('Selected Items:', selectedItems);
-        
-        // Đảm bảo các trường có giá trị đúng
-        const returnData = {
-            order_id: selectedOrderForReturn._id,
-            items: selectedItems.map(item => ({
-                order_item_id: String(item.order_item_id), // Đảm bảo là string
-                product_id: String(item.product_id), // Đảm bảo là string
-                product_name: String(item.product_name),
-                variant_id: item.variant_id ? String(item.variant_id) : null,
-                variant_name: item.variant_name || null,
-                quantity: Number(item.quantity), // Đảm bảo là number
-                price: Number(item.price), // Đảm bảo là number
-                reason: String(returnReason), // Đảm bảo là string
-                reason_note: returnNote || null,
-                images: Array.isArray(returnImages) ? returnImages : [] // Đảm bảo là array
-            })),
-            notes: returnNote || null,
-            bank_name: bankInfo.name || null,
-            bank_account: bankInfo.account || null,
-            bank_holder: bankInfo.holder || null
-        };
-        
-        console.log('Return Data:', JSON.stringify(returnData, null, 2));
-        
-        const response = await api.post('/api/v1/returns/request', returnData);
-        console.log('Response:', response.data);
-        
-        alert('Yêu cầu hoàn trả đã được gửi. Vui lòng chờ shop xử lý.');
-        setShowReturnModal(false);
-        setSelectedOrderForReturn(null);
-        setReturnItems([]);
-        setReturnReason('');
-        setReturnNote('');
-        setReturnImages([]);
-        setBankInfo({ name: '', account: '', holder: '' });
-        
-        // Cập nhật lại trạng thái
-        if (selectedOrderForReturn) {
-            await checkReturnRequest(selectedOrderForReturn._id);
-        }
-        
+      setSubmittingReturn(true);
+      
+      const returnData = {
+        order_id: selectedOrderForReturn._id,
+        items: selectedItems.map(item => ({
+          order_item_id: String(item.order_item_id),
+          product_id: String(item.product_id),
+          product_name: String(item.product_name),
+          variant_id: item.variant_id ? String(item.variant_id) : null,
+          variant_name: item.variant_name || null,
+          quantity: Number(item.quantity),
+          price: Number(item.price),
+          reason: String(returnReason),
+          reason_note: returnNote || null,
+          images: Array.isArray(returnImages) ? returnImages : []
+        })),
+        notes: returnNote || null,
+        bank_name: bankInfo.name || null,
+        bank_account: bankInfo.account || null,
+        bank_holder: bankInfo.holder || null
+      };
+      
+      await api.post('/api/v1/returns/request', returnData);
+      
+      showToast('Yêu cầu hoàn trả đã được gửi. Vui lòng chờ shop xử lý.', 'success');
+      setShowReturnModal(false);
+      setSelectedOrderForReturn(null);
+      setReturnItems([]);
+      setReturnReason('');
+      setReturnNote('');
+      setReturnImages([]);
+      setBankInfo({ name: '', account: '', holder: '' });
+      
+      if (selectedOrderForReturn) {
+        await checkReturnRequest(selectedOrderForReturn._id);
+      }
+      
     } catch (error) {
-        console.error('Error creating return request:', error);
-        if (error.response) {
-            console.error('Response data:', error.response.data);
-            console.error('Response status:', error.response.status);
-            
-            // Hiển thị chi tiết lỗi validation
-            if (error.response.data?.detail) {
-                const details = error.response.data.detail;
-                if (Array.isArray(details)) {
-                    const errorMessages = details.map(err => {
-                        if (err.loc) {
-                            const field = err.loc.slice(1).join('.');
-                            return `${field}: ${err.msg}`;
-                        }
-                        return err.msg;
-                    }).join('\n');
-                    alert(`Lỗi dữ liệu:\n${errorMessages}`);
-                } else {
-                    alert(details);
-                }
-            } else {
-                alert('Có lỗi xảy ra, vui lòng thử lại sau');
+      console.error('Error creating return request:', error);
+      if (error.response?.data?.detail) {
+        const details = error.response.data.detail;
+        if (Array.isArray(details)) {
+          const errorMessages = details.map(err => {
+            if (err.loc) {
+              const field = err.loc.slice(1).join('.');
+              return `${field}: ${err.msg}`;
             }
+            return err.msg;
+          }).join('\n');
+          showToast(errorMessages, 'error');
         } else {
-            alert('Có lỗi xảy ra, vui lòng thử lại sau');
+          showToast(details, 'error');
         }
+      } else {
+        showToast('Có lỗi xảy ra, vui lòng thử lại sau', 'error');
+      }
     } finally {
-        setSubmittingReturn(false);
+      setSubmittingReturn(false);
     }
-};
+  };
 
-const handleCancelOrder = async (orderId) => {
-  if (!window.confirm('Bạn có chắc chắn muốn hủy đơn hàng này?')) return;
-  
-  try {
-    setCancelling(true);
-    await api.post(`/api/v1/orders/${orderId}/cancel`);
-    alert('Đơn hàng đã được hủy thành công!');
-    fetchOrders(); // Refresh danh sách
-    fetchStats(); // Refresh thống kê
-  } catch (error) {
-    console.error('Error cancelling order:', error);
-    alert(error.response?.data?.detail || 'Không thể hủy đơn hàng này');
-  } finally {
-    setCancelling(false);
-  }
-};
+  // SỬA: Hàm xử lý hủy đơn - không dùng window.confirm nữa
+  const handleCancelOrder = async (orderId) => {
+    try {
+      setCancelling(true);
+      await api.post(`/api/v1/orders/${orderId}/cancel`);
+      showToast('Đơn hàng đã được hủy thành công!', 'success');
+      fetchOrders();
+      fetchStats();
+    } catch (error) {
+      console.error('Error cancelling order:', error);
+      showToast(error.response?.data?.detail || 'Không thể hủy đơn hàng này', 'error');
+    } finally {
+      setCancelling(false);
+      setConfirmDialog({ show: false, title: '', message: '', onConfirm: null, orderId: null });
+    }
+  };
 
+  // Hàm mở confirm dialog trước khi hủy
+  const openCancelConfirm = (orderId, orderCode) => {
+    showConfirm(
+      'Xác nhận hủy đơn hàng',
+      `Bạn có chắc chắn muốn hủy đơn hàng #${orderCode}? Hành động này không thể hoàn tác.`,
+      handleCancelOrder,
+      orderId
+    );
+  };
 
-// src/pages/Orders.jsx
-const openReturnModal = (order) => {
-    console.log('Opening return modal for order:', order);
-    console.log('Order items:', order.items);
-    
+  const openReturnModal = (order) => {
     setSelectedOrderForReturn(order);
-    // Khởi tạo returnItems với các sản phẩm chưa được chọn
     const initialItems = order.items.map((item, index) => {
-        // Đảm bảo có order_item_id
-        const orderItemId = item._id || item.id || `item_${index}`;
-        console.log(`Item ${index}:`, { 
-            original: item, 
-            orderItemId,
-            product_id: item.product_id,
-            product_name: item.product_name
-        });
-        
-        return {
-            order_item_id: String(orderItemId),
-            product_id: String(item.product_id),
-            product_name: String(item.product_name),
-            variant_id: item.variant_id ? String(item.variant_id) : null,
-            variant_name: item.variant_name || null,
-            quantity: Number(item.quantity),
-            price: Number(item.price),
-            selected: false
-        };
+      const orderItemId = item._id || item.id || `item_${index}`;
+      return {
+        order_item_id: String(orderItemId),
+        product_id: String(item.product_id),
+        product_name: String(item.product_name),
+        variant_id: item.variant_id ? String(item.variant_id) : null,
+        variant_name: item.variant_name || null,
+        quantity: Number(item.quantity),
+        price: Number(item.price),
+        selected: false
+      };
     });
     
     setReturnItems(initialItems);
@@ -420,8 +412,7 @@ const openReturnModal = (order) => {
     setReturnImages([]);
     setBankInfo({ name: '', account: '', holder: '' });
     setShowReturnModal(true);
-};
-
+  };
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -506,31 +497,66 @@ const openReturnModal = (order) => {
         rating: reviewRating,
         comment: reviewComment
       });
-      alert('Cảm ơn bạn đã đánh giá!');
+      showToast('Cảm ơn bạn đã đánh giá!', 'success');
       setShowReviewModal(false);
     } catch (error) {
       console.error('Error submitting review:', error);
-      alert('Có lỗi xảy ra, vui lòng thử lại sau');
+      showToast('Có lỗi xảy ra, vui lòng thử lại sau', 'error');
     } finally {
       setSubmittingReview(false);
     }
   };
 
-  const renderStars = (rating) => {
-    const stars = [];
-    for (let i = 1; i <= 5; i++) {
-      if (i <= rating) {
-        stars.push(<FaStar key={i} className="star-filled" />);
-      } else {
-        stars.push(<FaRegStar key={i} className="star-empty" />);
-      }
-    }
-    return stars;
-  };
-
   return (
     <ShopDetailLayout>
       <div className="orders-page">
+        {/* Toast Component */}
+        {toast.show && (
+          <div className="toast-container">
+            <Toast 
+              message={toast.message}
+              type={toast.type}
+              onClose={() => setToast({ show: false, message: '', type: 'success' })}
+            />
+          </div>
+        )}
+
+        {/* Confirm Dialog Component */}
+        {confirmDialog.show && (
+          <div className="modal-overlay" onClick={() => setConfirmDialog({ show: false, title: '', message: '', onConfirm: null, orderId: null })}>
+            <div className="modal-content confirm-modal" onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>
+                  <FaExclamationTriangle style={{ color: '#ff9800', marginRight: '8px' }} />
+                  {confirmDialog.title}
+                </h2>
+                <button className="close-btn" onClick={() => setConfirmDialog({ show: false, title: '', message: '', onConfirm: null, orderId: null })}>
+                  <FaTimes />
+                </button>
+              </div>
+              <div className="modal-body">
+                <p>{confirmDialog.message}</p>
+                <p className="warning">⚠️ Hành động này không thể hoàn tác!</p>
+              </div>
+              <div className="modal-footer">
+                <button 
+                  className="cancel-btn" 
+                  onClick={() => setConfirmDialog({ show: false, title: '', message: '', onConfirm: null, orderId: null })}
+                >
+                  Hủy
+                </button>
+                <button 
+                  className="confirm-btn" 
+                  onClick={() => confirmDialog.onConfirm && confirmDialog.onConfirm(confirmDialog.orderId)}
+                  style={{ background: '#dc3545' }}
+                >
+                  Xác nhận hủy
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="orders-container">
           {/* Header */}
           <div className="orders-header">
@@ -667,15 +693,14 @@ const openReturnModal = (order) => {
           ) : (
             <div className="orders-list">
               {orders.map((order) => {
-                const statusConfigItem = statusConfig[order.status];
-                const StatusIcon = statusConfigItem?.icon || FaClock;
+                const orderCode = order._id.slice(-8).toUpperCase();
                 
                 return (
                   <div key={order._id} className="order-card">
                     <div className="order-header">
                       <div className="order-info-left">
                         <div className="order-number">
-                          Mã đơn hàng: <strong>#{order._id.slice(-8).toUpperCase()}</strong>
+                          Mã đơn hàng: <strong>#{orderCode}</strong>
                         </div>
                         <div className="order-date">
                           <FaCalendarAlt />
@@ -721,7 +746,6 @@ const openReturnModal = (order) => {
                           <FaEye /> Xem chi tiết
                         </Link>
                         
-                        {/* Nút đánh giá - chỉ hiện khi đã giao */}
                         {order.status === 'completed' && (
                           <button 
                             className="action-btn review"
@@ -731,7 +755,6 @@ const openReturnModal = (order) => {
                           </button>
                         )}
                         
-                        {/* Nút đặt lại - không hiện khi đã hủy */}
                         {order.status !== 'cancelled' && (
                           <button 
                             className="action-btn reorder"
@@ -741,18 +764,17 @@ const openReturnModal = (order) => {
                           </button>
                         )}
                         
-                        {/* Nút hủy đơn - chỉ hiện khi đơn hàng đang chờ xử lý hoặc đã thanh toán */}
+                        {/* SỬA: Dùng confirm dialog thay vì window.confirm */}
                         {(order.status === 'pending' || order.status === 'paid') && (
                           <button 
                             className="action-btn cancel"
-                            onClick={() => handleCancelOrder(order._id)}
+                            onClick={() => openCancelConfirm(order._id, orderCode)}
                             disabled={cancelling}
                           >
                             <FaBan /> Hủy đơn
                           </button>
                         )}
                         
-                        {/* Nút yêu cầu hoàn trả - chỉ hiện khi đủ điều kiện */}
                         {canRequestReturn(order) && (
                           <button 
                             className="action-btn return"
@@ -762,7 +784,6 @@ const openReturnModal = (order) => {
                           </button>
                         )}
                         
-                        {/* Link xem yêu cầu hoàn trả - chỉ hiện khi đã có yêu cầu */}
                         {hasReturnRequest[order._id] && (
                           <Link to={`/returns/${order._id}`} className="action-btn view-return">
                             <FaEye /> Xem hoàn trả
@@ -905,6 +926,7 @@ const openReturnModal = (order) => {
               </button>
             </div>
             <div className="modal-body">
+              {/* Modal body content - giữ nguyên */}
               <div className="return-items-selection">
                 <h4>Chọn sản phẩm muốn trả</h4>
                 {selectedOrderForReturn.items.map((item, idx) => (
@@ -1054,6 +1076,73 @@ const openReturnModal = (order) => {
         }
         .spinning {
           animation: spin 1s linear infinite;
+        }
+        
+        .toast-container {
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          z-index: 10000;
+          animation: slideInRight 0.3s ease;
+        }
+        
+        @keyframes slideInRight {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        
+        .confirm-modal {
+          max-width: 450px;
+        }
+        
+        .confirm-modal .warning {
+          color: #dc3545;
+          font-size: 13px;
+          margin-top: 12px;
+          padding-top: 8px;
+          border-top: 1px solid #eee;
+        }
+        
+        .confirm-modal .modal-footer {
+          display: flex;
+          justify-content: flex-end;
+          gap: 12px;
+        }
+        
+        .confirm-modal .confirm-btn {
+          background: #dc3545;
+          color: white;
+          border: none;
+          padding: 8px 20px;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: all 0.3s;
+        }
+        
+        .confirm-modal .confirm-btn:hover {
+          background: #c82333;
+          transform: translateY(-1px);
+        }
+        
+        .confirm-modal .cancel-btn {
+          background: #6c757d;
+          color: white;
+          border: none;
+          padding: 8px 20px;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: all 0.3s;
+        }
+        
+        .confirm-modal .cancel-btn:hover {
+          background: #5a6268;
+          transform: translateY(-1px);
         }
       `}</style>
     </ShopDetailLayout>

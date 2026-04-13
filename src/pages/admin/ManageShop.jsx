@@ -5,7 +5,7 @@ import {
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   X, Save, AlertCircle, CheckCircle, Store, MapPin, Link as LinkIcon
 } from 'lucide-react';
-import {adminApi} from '../../api/api';
+import {adminApi,} from '../../api/api';
 import '../../css/AdminManageLayout.css';
 import Toast from '../../components/common/Toast';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
@@ -222,7 +222,7 @@ const ShopsManagement = () => {
         };
         
         console.log('Sending combined data:', combinedData);
-        response = await api.post('/shops/with-owner', combinedData);
+        response = await adminApi.post('/api/v1/shops/with-owner', combinedData);
       } else {
 
         showToast('Vui lòng chọn "Tạo tài khoản chủ shop" hoặc thêm chức năng chọn owner', 'error');

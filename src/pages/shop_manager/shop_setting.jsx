@@ -3,12 +3,13 @@ import React, { useState, useEffect } from 'react';
 import { 
   FaCog, FaBell, FaCreditCard, FaTruck, FaFilePdf, 
   FaLock, FaFacebook, FaGlobe, FaSave, FaSpinner,
-  FaCheck, FaExclamationTriangle, FaTimes, FaPlus, FaTrash
+  FaCheck, FaExclamationTriangle
 } from 'react-icons/fa';
 import { shopApi } from '../../api/api';
 import { useAppContext } from '../../components/common/AppContext';
 import LanguageSelector from '../../components/common/LanguageSelector';
 import CurrencySelector from '../../components/common/CurrencySelector';
+import PaymentManagement from '../../pages/shop_manager/PaymentManagement';
 import '../../css/ShopSettings.css';
 
 const ShopSettings = () => {
@@ -19,6 +20,17 @@ const ShopSettings = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [settings, setSettings] = useState(null);
+
+  // Định nghĩa hàm showToast
+  const showToast = (message, type = 'success') => {
+    if (type === 'success') {
+      setSuccessMessage(message);
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } else {
+      setErrorMessage(message);
+      setTimeout(() => setErrorMessage(''), 3000);
+    }
+  };
 
   useEffect(() => {
     fetchSettings();
@@ -96,7 +108,6 @@ const ShopSettings = () => {
         localStorage.setItem('shop_info', JSON.stringify(updatedShopInfo));
         window.dispatchEvent(new CustomEvent('shopInfoUpdate', { detail: updatedShopInfo }));
         
-        // Cập nhật ngôn ngữ và tiền tệ
         if (data.language) changeLanguage(data.language);
         if (data.currency) changeCurrency(data.currency);
       }
@@ -339,10 +350,8 @@ const ShopSettings = () => {
                     <option value="USD">{t('usd', 'shop')}</option>
                   </select>
                 </div>
-                
               </div>
 
-              {/* Preview currency format */}
               <div className="preview-section">
                 <h4>Preview {t('currency', 'shop')}</h4>
                 <div className="currency-preview">
@@ -486,6 +495,137 @@ const ShopSettings = () => {
               </div>
             </div>
           )}
+
+          {/* Tab: Thanh toán */}
+          {activeTab === 'payment' && (
+            <div className="settings-panel">
+              <h2>Cài đặt thanh toán</h2>
+              
+              {/* Các phương thức thanh toán */}
+              <div className="settings-section">
+                <h3>Phương thức thanh toán</h3>
+                <div className="toggle-group">
+                  <label className="toggle-label">
+                    <input
+                      type="checkbox"
+                      checked={settings.payment.cod}
+                      onChange={(e) => updateSettings('payment', { cod: e.target.checked })}
+                    />
+                    <span className="toggle-text">Thanh toán khi nhận hàng (COD)</span>
+                  </label>
+                  <label className="toggle-label">
+                    <input
+                      type="checkbox"
+                      checked={settings.payment.bank_transfer}
+                      onChange={(e) => updateSettings('payment', { bank_transfer: e.target.checked })}
+                    />
+                    <span className="toggle-text">Chuyển khoản ngân hàng</span>
+                  </label>
+                  <label className="toggle-label">
+                    <input
+                      type="checkbox"
+                      checked={settings.payment.momo}
+                      onChange={(e) => updateSettings('payment', { momo: e.target.checked })}
+                    />
+                    <span className="toggle-text">Ví MoMo</span>
+                  </label>
+                  <label className="toggle-label">
+                    <input
+                      type="checkbox"
+                      checked={settings.payment.vnpay}
+                      onChange={(e) => updateSettings('payment', { vnpay: e.target.checked })}
+                    />
+                    <span className="toggle-text">VNPay</span>
+                  </label>
+                  <label className="toggle-label">
+                    <input
+                      type="checkbox"
+                      checked={settings.payment.zalopay}
+                      onChange={(e) => updateSettings('payment', { zalopay: e.target.checked })}
+                    />
+                    <span className="toggle-text">ZaloPay</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Component quản lý tài khoản ngân hàng */}
+              {settings.payment.bank_transfer && (
+                <div className="settings-section">
+                  <PaymentManagement 
+                    settings={settings}
+                    updateSettings={updateSettings}
+                    showToast={showToast}
+                  />
+                </div>
+              )}
+
+              {/* Cài đặt tự động xác nhận */}
+              <div className="settings-section">
+                <h3>Cài đặt nâng cao</h3>
+                <div className="toggle-group">
+                  <label className="toggle-label">
+                    <input
+                      type="checkbox"
+                      checked={settings.payment.auto_confirm_payment}
+                      onChange={(e) => updateSettings('payment', { auto_confirm_payment: e.target.checked })}
+                    />
+                    <span className="toggle-text">Tự động xác nhận thanh toán</span>
+                  </label>
+                </div>
+                <div className="form-group">
+                  <label>Thời gian chờ thanh toán (giờ)</label>
+                  <input
+                    type="number"
+                    value={settings.payment.payment_timeout}
+                    onChange={(e) => updateSettings('payment', { payment_timeout: parseInt(e.target.value) })}
+                    min="1"
+                    max="72"
+                  />
+                  <small>Thời gian cho phép khách hàng thanh toán sau khi đặt hàng</small>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Tab: Vận chuyển */}
+          {activeTab === 'shipping' && (
+            <div className="settings-panel">
+              <h2>Cài đặt vận chuyển</h2>
+              <p>Đang phát triển...</p>
+            </div>
+          )}
+
+          {/* Tab: Hóa đơn */}
+          {activeTab === 'invoice' && (
+            <div className="settings-panel">
+              <h2>Cài đặt hóa đơn</h2>
+              <p>Đang phát triển...</p>
+            </div>
+          )}
+
+          {/* Tab: Bảo mật */}
+          {activeTab === 'security' && (
+            <div className="settings-panel">
+              <h2>Cài đặt bảo mật</h2>
+              <p>Đang phát triển...</p>
+            </div>
+          )}
+
+          {/* Tab: Mạng xã hội */}
+          {activeTab === 'social' && (
+            <div className="settings-panel">
+              <h2>Cài đặt mạng xã hội</h2>
+              <p>Đang phát triển...</p>
+            </div>
+          )}
+
+          {/* Tab: SEO */}
+          {activeTab === 'seo' && (
+            <div className="settings-panel">
+              <h2>Cài đặt SEO</h2>
+              <p>Đang phát triển...</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -541,6 +681,50 @@ const ShopSettings = () => {
         .preview-value {
           font-weight: 600;
           color: #2e7d32;
+        }
+
+        .toggle-group {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          margin-bottom: 20px;
+        }
+
+        .toggle-label {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          cursor: pointer;
+          padding: 8px;
+          border-radius: 8px;
+          transition: background 0.2s;
+        }
+
+        .toggle-label:hover {
+          background: #f5f5f5;
+        }
+
+        .toggle-label input {
+          width: 18px;
+          height: 18px;
+          cursor: pointer;
+        }
+
+        .toggle-text {
+          font-size: 14px;
+          color: #333;
+        }
+
+        .settings-section {
+          margin-bottom: 32px;
+          padding-bottom: 24px;
+          border-bottom: 1px solid #eee;
+        }
+
+        .settings-section h3 {
+          margin-bottom: 16px;
+          font-size: 16px;
+          color: #555;
         }
         
         @keyframes spin {

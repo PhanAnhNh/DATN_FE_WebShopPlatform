@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../../../components/layout/Layout";
 import api from "../../../api/api";
+import locationApi from "../../../api/locationApi";
 
 const ShopPage = () => {
     const navigate = useNavigate();
@@ -10,15 +11,27 @@ const ShopPage = () => {
     const [priceRange, setPriceRange] = useState({ from: "", to: "" });
     const [featuredProducts, setFeaturedProducts] = useState([]);
     const [featuredShops, setFeaturedShops] = useState([]);
+    const [provinces, setProvinces] = useState([]);
     const [loading, setLoading] = useState(true);
     const [imageErrors, setImageErrors] = useState({});
 
-    // Khu vực nổi bật với hình ảnh thực tế
-    const featuredRegions = [
-        { id: 1, name: "Đà Lạt", icon: "🍏", imageUrl: "https://booking.muongthanh.com/upload_images/images/H%60/thanh-pho-da-lat.jpg"},
-        { id: 2, name: "Đắk Lắk", icon: "🍎", imageUrl: "data:image/jpeg;base64,..." },
-        { id: 3, name: "Nha Trang", icon: "🍊", imageUrl: "data:image/jpeg;base64,..." }
-    ];
+    // Fetch provinces from API
+    useEffect(() => {
+        fetchProvinces();
+    }, []);
+
+    const fetchProvinces = async () => {
+        try {
+            const res = await locationApi.getAllProvinces('active');
+            const provincesWithId = (res.data || []).map(province => ({
+                ...province,
+                id: province.id || province._id
+            }));
+            setProvinces(provincesWithId);
+        } catch (error) {
+            console.error('Error fetching provinces:', error);
+        }
+    };
 
     // Hàm đọc cache khi component mount
     const loadFromCache = () => {
@@ -94,11 +107,10 @@ const ShopPage = () => {
             console.log("No valid cache, fetching from API");
             fetchData();
         }
-    }, []); // Chỉ chạy 1 lần khi mount
+    }, []);
 
     // Effect để fetch khi filters thay đổi
     useEffect(() => {
-        // Không fetch lần đầu tiên khi component vừa mount
         const isFirstRender = featuredProducts.length === 0 && featuredShops.length === 0;
         if (!isFirstRender) {
             console.log("Filters changed, fetching new data");
@@ -109,7 +121,6 @@ const ShopPage = () => {
     const fetchData = async () => {
         setLoading(true);
         try {
-            // Gọi API lấy sản phẩm nổi bật
             const productsRes = await api.get("/api/v1/products", {
                 params: {
                     category: activeCategory !== "all" ? activeCategory : undefined,
@@ -119,7 +130,6 @@ const ShopPage = () => {
             const products = productsRes.data || [];
             setFeaturedProducts(products);
 
-            // Gọi API lấy shop nổi bật
             const shopsRes = await api.get("/api/v1/shops");
             
             const mappedShops = (shopsRes.data || []).map(shop => ({
@@ -132,13 +142,10 @@ const ShopPage = () => {
             }));
             
             setFeaturedShops(mappedShops);
-            
-            // Lưu cache timestamp
             sessionStorage.setItem('shop_cache_timestamp', Date.now().toString());
             
         } catch (error) {
             console.error("Error fetching data:", error);
-            // Dùng dữ liệu mẫu nếu có lỗi
             const fallbackProducts = [
                 { id: 1, name: "Táo đỏ tươi", price: 60000, unit: "kg", shop_name: "Shop rau củ Đà Lạt", image: "🍎", fallbackIcon: "🍎" },
                 { id: 2, name: "Chuối thiên nhiên", price: 20000, unit: "kg", shop_name: "Nông sản sạch", image: "🍌", fallbackIcon: "🍌" }
@@ -168,6 +175,10 @@ const ShopPage = () => {
         }
     };
 
+    const handleProvinceClick = (provinceId) => {
+        navigate(`/province/${provinceId}`);
+    };
+
     const formatCurrency = (amount) => {
         return new Intl.NumberFormat('vi-VN', {
             style: 'currency',
@@ -181,10 +192,6 @@ const ShopPage = () => {
 
     const goToShop = () => {
         navigate('/shop');
-    };
-
-    const handleApplyFilters = () => {
-        fetchData();
     };
 
     const handleShopClick = (shopId) => {
@@ -202,7 +209,6 @@ const ShopPage = () => {
         }));
     };
 
-    // Component Product Image với fallback
     const ProductImage = ({ product }) => {
         const hasError = imageErrors[`product-${product.id}`];
         
@@ -282,9 +288,6 @@ const ShopPage = () => {
                         </div>
                     </div>
 
-                    {/* Nút làm mới cache */}
-                    
-
                     <div style={{ background: "white", padding: "10px 15px", borderRadius: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)", display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", border: "1px solid #eee" }}>
                         <span style={{ fontWeight: "bold", fontSize: "12px", color: "#333" }}>Chế độ tối</span>
                         <div style={{ width: "38px", height: "24px", background: "#333", borderRadius: "15px", position: "relative" }}>
@@ -293,7 +296,7 @@ const ShopPage = () => {
                     </div>
                 </div>
 
-                {/* Khu vực nổi bật với hình ảnh */}
+                {/* Khu vực tỉnh thành nổi bật - Lấy từ database */}
                 <div style={{
                     background: "white",
                     borderRadius: "16px",
@@ -301,43 +304,67 @@ const ShopPage = () => {
                     marginBottom: "20px",
                     boxShadow: "0 2px 8px rgba(0,0,0,0.05)"
                 }}>
-                    <h3 style={{ marginBottom: "15px" }}>Khu Vực Nổi Bật</h3>
-                    <div style={{ display: "flex", gap: "15px" }}>
-                        {featuredRegions.map(region => (
-                            <div
-                                key={region.id}
-                                style={{
-                                    flex: 1,
-                                    height: "120px",
-                                    borderRadius: "12px",
-                                    backgroundImage: `url(${region.imageUrl})`,
-                                    backgroundSize: "cover",
-                                    backgroundPosition: "center",
-                                    display: "flex",
-                                    alignItems: "flex-end",
-                                    justifyContent: "center",
-                                    fontWeight: "bold",
-                                    fontSize: "16px",
-                                    color: "white",
-                                    cursor: "pointer",
-                                    position: "relative",
-                                    overflow: "hidden"
-                                }}
-                            >
-                                <div style={{
-                                    position: "absolute",
-                                    bottom: 0,
-                                    left: 0,
-                                    right: 0,
-                                    background: "linear-gradient(transparent, rgba(0,0,0,0.7))",
-                                    padding: "10px",
-                                    textAlign: "center"
-                                }}>
-                                    {region.name}
+                    <h3 style={{ marginBottom: "15px" }}>Khám phá các tỉnh thành</h3>
+                    {provinces.length === 0 ? (
+                        <div style={{ textAlign: "center", padding: "40px", color: "#999" }}>
+                            Đang tải danh sách tỉnh thành...
+                        </div>
+                    ) : (
+                        <div style={{ 
+                            display: "grid", 
+                            gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", 
+                            gap: "20px" 
+                        }}>
+                            {provinces.map(province => (
+                                <div
+                                    key={province.id}
+                                    onClick={() => handleProvinceClick(province.id)}
+                                    style={{
+                                        height: "160px",
+                                        borderRadius: "12px",
+                                        backgroundImage: `url(${province.image_url || 'https://via.placeholder.com/400x200?text=No+Image'})`,
+                                        backgroundSize: "cover",
+                                        backgroundPosition: "center",
+                                        display: "flex",
+                                        alignItems: "flex-end",
+                                        justifyContent: "center",
+                                        fontWeight: "bold",
+                                        fontSize: "18px",
+                                        color: "white",
+                                        cursor: "pointer",
+                                        position: "relative",
+                                        overflow: "hidden",
+                                        transition: "transform 0.3s ease, box-shadow 0.3s ease"
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.transform = "scale(1.02)";
+                                        e.currentTarget.style.boxShadow = "0 8px 25px rgba(0,0,0,0.15)";
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.transform = "scale(1)";
+                                        e.currentTarget.style.boxShadow = "none";
+                                    }}
+                                >
+                                    <div style={{
+                                        position: "absolute",
+                                        bottom: 0,
+                                        left: 0,
+                                        right: 0,
+                                        background: "linear-gradient(transparent, rgba(0,0,0,0.8))",
+                                        padding: "15px",
+                                        textAlign: "center"
+                                    }}>
+                                        <div style={{ fontWeight: "bold", fontSize: "16px" }}>{province.name}</div>
+                                        {province.description && (
+                                            <div style={{ fontSize: "12px", marginTop: "5px", opacity: 0.9 }}>
+                                                {province.description.length > 50 ? province.description.substring(0, 50) + "..." : province.description}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
-                    </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 <div style={{ display: "flex", gap: "20px" }}>
