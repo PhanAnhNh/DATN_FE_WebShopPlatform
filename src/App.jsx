@@ -43,6 +43,8 @@ import VerifyOTP from "./pages/user/account/sent_otp.jsx";
 import ResetPassword from "./pages/user/account/reset-password.jsx";
 import ProvinceDetail from "./pages/user/shop/ProvinceDetail.jsx";
 import AdminLocations from "./pages/admin/AdminShopLocations.jsx";
+import ProductTracePage from "./pages/user/ProductTracePage.jsx";
+import FavoriteProductsPage from "./pages/user/FavoriteProductsPage.jsx";
 
 function App() {
   return (
@@ -70,7 +72,8 @@ function App() {
             <Route path="/verify-otp" element={<VerifyOTP />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/province/:provinceId" element={<ProvinceDetail />} />
-
+            <Route path="/product/:product_id/trace" element={<ProductTracePage />} />
+            <Route path="/products/favorites" element={<FavoriteProductsPage />} />
 
             {/* Admin Routes */}
             <Route 

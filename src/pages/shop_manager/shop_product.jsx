@@ -26,11 +26,14 @@ import {
 } from 'react-icons/fa';
 import { shopApi } from '../../api/api';
 import '../../css/ShopProducts.css';
+import ProductTraceability from '../shop_manager/ProductTraceability';
 
 const ShopProducts = () => {
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [showTraceModal, setShowTraceModal] = useState(false);
+  const [selectedProductForTrace, setSelectedProductForTrace] = useState(null);
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 10,
@@ -52,13 +55,12 @@ const ShopProducts = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   
-  // Form states
+  // Form states - ĐÃ XÓA certification
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     category_id: '',
     origin: '',
-    certification: '',
     price: '',
     stock: '',
     image_url: ''
@@ -279,8 +281,7 @@ const ShopProducts = () => {
         name: formData.name,
         description: formData.description,
         category_id: formData.category_id,
-        origin: formData.origin,
-        certification: formData.certification,
+        origin: formData.origin || null,
         image_url: formData.image_url || null,
         variants: variants.map(v => ({
           name: v.name,
@@ -328,7 +329,6 @@ const ShopProducts = () => {
       description: product.description || '',
       category_id: product.category_id,
       origin: product.origin || '',
-      certification: product.certification || '',
       price: product.price,
       stock: product.stock,
       image_url: product.image_url || ''
@@ -351,8 +351,7 @@ const ShopProducts = () => {
         name: formData.name,
         description: formData.description,
         category_id: formData.category_id,
-        origin: formData.origin,
-        certification: formData.certification,
+        origin: formData.origin || null,
         price: parseFloat(formData.price),
         stock: parseInt(formData.stock),
         image_url: formData.image_url || null
@@ -440,7 +439,6 @@ const ShopProducts = () => {
       description: '',
       category_id: '',
       origin: '',
-      certification: '',
       price: '',
       stock: '',
       image_url: ''
@@ -691,6 +689,16 @@ const ShopProducts = () => {
                         >
                           <FaTrash />
                         </button>
+                        <button 
+                          className="action-btn trace"
+                          onClick={() => {
+                            setSelectedProductForTrace(product);
+                            setShowTraceModal(true);
+                          }}
+                          title="Truy xuất nguồn gốc"
+                        >
+                          <FaQrcode />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -840,18 +848,7 @@ const ShopProducts = () => {
                     name="origin"
                     value={formData.origin}
                     onChange={handleInputChange}
-                    placeholder="Nhập xuất xứ"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Chứng nhận</label>
-                  <input
-                    type="text"
-                    name="certification"
-                    value={formData.certification}
-                    onChange={handleInputChange}
-                    placeholder="Nhập chứng nhận"
+                    placeholder="Nhập xuất xứ (VD: Đà Lạt, Lâm Đồng)"
                   />
                 </div>
 
@@ -880,7 +877,7 @@ const ShopProducts = () => {
                       <div className="variant-row">
                         <input
                           type="text"
-                          placeholder="Tên biến thể (VD: Size M)"
+                          placeholder="Tên biến thể (VD: 1kg, Size M)"
                           value={variant.name}
                           onChange={(e) => handleVariantChange(index, 'name', e.target.value)}
                         />
@@ -1014,18 +1011,7 @@ const ShopProducts = () => {
                     name="origin"
                     value={formData.origin}
                     onChange={handleInputChange}
-                    placeholder="Nhập xuất xứ"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Chứng nhận</label>
-                  <input
-                    type="text"
-                    name="certification"
-                    value={formData.certification}
-                    onChange={handleInputChange}
-                    placeholder="Nhập chứng nhận"
+                    placeholder="Nhập xuất xứ (VD: Đà Lạt, Lâm Đồng)"
                   />
                 </div>
 
@@ -1108,10 +1094,6 @@ const ShopProducts = () => {
                       <p>{selectedProduct.origin || 'Chưa có'}</p>
                     </div>
                     <div className="detail-item">
-                      <label>Chứng nhận:</label>
-                      <p>{selectedProduct.certification || 'Chưa có'}</p>
-                    </div>
-                    <div className="detail-item">
                       <label>Ngày tạo:</label>
                       <p>{formatDate(selectedProduct.created_at)}</p>
                     </div>
@@ -1148,7 +1130,7 @@ const ShopProducts = () => {
                             </tr>
                           ))}
                         </tbody>
-                       </table>
+                      </table>
                     </div>
                   </div>
                 )}
@@ -1191,6 +1173,23 @@ const ShopProducts = () => {
                 Xóa sản phẩm
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Traceability Modal */}
+      {showTraceModal && selectedProductForTrace && (
+        <div className="modal-overlay" onClick={() => setShowTraceModal(false)}>
+          <div className="modal-content trace-modal" onClick={e => e.stopPropagation()}>
+            <ProductTraceability
+              productId={selectedProductForTrace.id}
+              productName={selectedProductForTrace.name}
+              onClose={() => setShowTraceModal(false)}
+              onSave={() => {
+                setShowTraceModal(false);
+                fetchProducts();
+              }}
+            />
           </div>
         </div>
       )}

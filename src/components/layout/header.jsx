@@ -5,10 +5,12 @@ import { FaShoppingCart, FaBell, FaUser, FaBook, FaCog, FaSignOutAlt, FaComment,
 import api from "../../api/api";
 import NotificationBell from "../../pages/user/NotificationBell";
 import ChatModal from "../Chat/ChatModal";
+import { GrFavorite } from "react-icons/gr";
 
 function Header() {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [cartCount, setCartCount] = useState(0);
+    const [favoriteCount, setFavoriteCount] = useState(0);
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
     const [searchKeyword, setSearchKeyword] = useState("");
@@ -21,7 +23,7 @@ function Header() {
     const navigate = useNavigate();
     const location = useLocation();
 
-    // Định nghĩa hàm fetchCartCount ở ngoài useEffect để có thể tái sử dụng
+    // Fetch cart count
     const fetchCartCount = async () => {
         try {
             const token = localStorage.getItem("user_token");
@@ -39,7 +41,24 @@ function Header() {
         }
     };
 
-    // Hàm tìm kiếm
+    // Fetch favorite count
+    const fetchFavoriteCount = async () => {
+    try {
+        const token = localStorage.getItem("user_token");
+        if (!token) {
+            setFavoriteCount(0);
+            return;
+        }
+        
+        const response = await api.get('/api/v1/favorites/my-favorites?limit=1');
+        setFavoriteCount(response.data.total || 0);
+    } catch (error) {
+        console.error("Error fetching favorite count:", error);
+        setFavoriteCount(0);
+    }
+};
+
+    // Search function
     const handleSearch = async (keyword) => {
         if (!keyword.trim()) {
             setSearchResults([]);
@@ -66,7 +85,7 @@ function Header() {
         }
     };
 
-    // Debounce tìm kiếm
+    // Debounce search
     useEffect(() => {
         const delayDebounce = setTimeout(() => {
             if (searchKeyword) {
@@ -80,7 +99,7 @@ function Header() {
         return () => clearTimeout(delayDebounce);
     }, [searchKeyword]);
 
-    // Đóng kết quả tìm kiếm khi click ra ngoài
+    // Close search results when clicking outside
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (searchRef.current && !searchRef.current.contains(event.target)) {
@@ -91,25 +110,35 @@ function Header() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // Effect đầu tiên: fetch khi component mount và set interval
+    // Initial fetch and intervals
     useEffect(() => {
         fetchCartCount();
+        fetchFavoriteCount();
         
-        // Có thể thêm interval để cập nhật số lượng giỏ hàng định kỳ
-        const interval = setInterval(fetchCartCount, 30000); // 30 giây
+        const interval = setInterval(() => {
+            fetchCartCount();
+            fetchFavoriteCount();
+        }, 30000);
+        
         return () => clearInterval(interval);
     }, []);
 
-    // Effect thứ hai: lắng nghe custom event
+    // Listen for custom events
     useEffect(() => {
         const handleCartUpdate = () => {
             fetchCartCount(); 
         };
         
+        const handleFavoriteUpdate = () => {
+            fetchFavoriteCount();
+        };
+        
         window.addEventListener('cartUpdated', handleCartUpdate);
+        window.addEventListener('favoriteUpdated', handleFavoriteUpdate);
         
         return () => {
             window.removeEventListener('cartUpdated', handleCartUpdate);
+            window.removeEventListener('favoriteUpdated', handleFavoriteUpdate);
         };
     }, []);
 
@@ -128,6 +157,7 @@ function Header() {
         localStorage.removeItem("user");
         setIsMenuOpen(false);
         setCartCount(0);
+        setFavoriteCount(0);
         navigate("/");
     };
 
@@ -136,26 +166,25 @@ function Header() {
     };
 
     const handleResultClick = (post) => {
-    setShowSearchResults(false);
-    setSearchKeyword("");
-    if (post.author_id) {
-        navigate(`/profile/${post.author_id}`);
-    } else {
-        // Fallback: scroll đến bài viết nếu không có author_id
-        if (location.pathname === "/") {
-            const element = document.getElementById(`post-${post._id}`);
-            if (element) {
-                element.scrollIntoView({ behavior: "smooth" });
-                element.style.backgroundColor = "#fff3cd";
-                setTimeout(() => {
-                    element.style.backgroundColor = "";
-                }, 2000);
-            }
+        setShowSearchResults(false);
+        setSearchKeyword("");
+        if (post.author_id) {
+            navigate(`/profile/${post.author_id}`);
         } else {
-            navigate(`/?postId=${post._id}`);
+            if (location.pathname === "/") {
+                const element = document.getElementById(`post-${post._id}`);
+                if (element) {
+                    element.scrollIntoView({ behavior: "smooth" });
+                    element.style.backgroundColor = "#fff3cd";
+                    setTimeout(() => {
+                        element.style.backgroundColor = "";
+                    }, 2000);
+                }
+            } else {
+                navigate(`/?postId=${post._id}`);
+            }
         }
-    }
-};
+    };
 
     const menuItemStyle = {
         display: "flex",
@@ -187,7 +216,7 @@ function Header() {
                 <h2 style={{ color: "#2e7d32", margin: 0 }}>Đặc Sản Quê Tôi</h2>
             </div>
 
-            {/* Thanh tìm kiếm */}
+            {/* Search Bar */}
             <div style={{ flex: 1, display: "flex", justifyContent: "center", position: "relative" }} ref={searchRef}>
                 <div style={{ position: "relative", width: "100%", maxWidth: "500px" }}>
                     <input
@@ -227,128 +256,121 @@ function Header() {
                         onClick={() => handleSearch(searchKeyword)}
                     />
 
-                    
                     {showSearchResults && (
-    <div style={{
-        position: "absolute",
-        top: "100%",
-        left: 0,
-        right: 0,
-        marginTop: "8px",
-        backgroundColor: "white",
-        borderRadius: "12px",
-        boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
-        maxHeight: "400px",
-        overflowY: "auto",
-        zIndex: 1001
-    }}>
-        {isSearching ? (
-            <div style={{ padding: "20px", textAlign: "center", color: "#666" }}>
-                Đang tìm kiếm...
-            </div>
-        ) : searchResults.length === 0 ? (
-            <div style={{ padding: "20px", textAlign: "center", color: "#666" }}>
-                Không tìm thấy kết quả nào
-            </div>
-        ) : (
-            <>
-                <div style={{ 
-                    padding: "10px 15px", 
-                    borderBottom: "1px solid #eee",
-                    fontSize: "12px",
-                    color: "#666",
-                    fontWeight: "bold"
-                }}>
-                    Tìm thấy {searchResults.length} kết quả cho "{searchKeyword}"
-                </div>
-                {searchResults.map((post) => (
-                    <div
-                        key={post._id}
-                        onClick={() => handleResultClick(post)}  // Truyền cả post object
-                        style={{
-                            padding: "12px 15px",
-                            borderBottom: "1px solid #f0f0f0",
-                            cursor: "pointer",
-                            transition: "background-color 0.2s"
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f5f5f5"}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "white"}
-                    >
-                        <div style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
-                            <div style={{ 
-                                width: "40px", 
-                                height: "40px", 
-                                background: "#e4e6eb", 
-                                borderRadius: "50%", 
-                                display: "flex", 
-                                alignItems: "center", 
-                                justifyContent: "center",
-                                flexShrink: 0
-                            }}>
-                                {post.author_avatar ? (
-                                    <img src={post.author_avatar} alt="avatar" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }}/>
-                                ) : (
-                                    <span>👤</span>
-                                )}
-                            </div>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                                {/* Hiển thị tên tác giả với highlight */}
-                                <div style={{ fontWeight: "bold", fontSize: "14px", color: "#333", marginBottom: "4px" }}>
-                                    {post.author_name_highlighted ? (
-                                        <span dangerouslySetInnerHTML={{ __html: post.author_name_highlighted }} />
-                                    ) : (
-                                        post.author_name
-                                    )}
+                        <div style={{
+                            position: "absolute",
+                            top: "100%",
+                            left: 0,
+                            right: 0,
+                            marginTop: "8px",
+                            backgroundColor: "white",
+                            borderRadius: "12px",
+                            boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+                            maxHeight: "400px",
+                            overflowY: "auto",
+                            zIndex: 1001
+                        }}>
+                            {isSearching ? (
+                                <div style={{ padding: "20px", textAlign: "center", color: "#666" }}>
+                                    Đang tìm kiếm...
                                 </div>
-                                
-                                {/* Hiển thị nội dung với highlight */}
-                                <div style={{ 
-                                    fontSize: "13px", 
-                                    color: "#666",
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    whiteSpace: "nowrap"
-                                }}>
-                                    {post.content_highlighted ? (
-                                        <span dangerouslySetInnerHTML={{ __html: post.content_highlighted }} />
-                                    ) : (
-                                        post.content || "Không có nội dung"
-                                    )}
+                            ) : searchResults.length === 0 ? (
+                                <div style={{ padding: "20px", textAlign: "center", color: "#666" }}>
+                                    Không tìm thấy kết quả nào
                                 </div>
-                                
-                                {/* Hiển thị tags matching */}
-                                {post.matching_tags && post.matching_tags.length > 0 && (
+                            ) : (
+                                <>
                                     <div style={{ 
-                                        fontSize: "11px", 
-                                        color: "#2e7d32",
-                                        marginTop: "4px",
-                                        overflow: "hidden",
-                                        textOverflow: "ellipsis",
-                                        whiteSpace: "nowrap"
+                                        padding: "10px 15px", 
+                                        borderBottom: "1px solid #eee",
+                                        fontSize: "12px",
+                                        color: "#666",
+                                        fontWeight: "bold"
                                     }}>
-                                        {post.matching_tags.map(tag => `#${tag}`).join(" ")}
+                                        Tìm thấy {searchResults.length} kết quả cho "{searchKeyword}"
                                     </div>
-                                )}
-                                
-                                <div style={{ 
-                                    fontSize: "11px", 
-                                    color: "#999",
-                                    marginTop: "4px"
-                                }}>
-                                    {new Date(post.created_at).toLocaleDateString()} • {post.stats?.like_count || 0} thích • {post.stats?.comment_count || 0} bình luận
-                                </div>
-                            </div>
+                                    {searchResults.map((post) => (
+                                        <div
+                                            key={post._id}
+                                            onClick={() => handleResultClick(post)}
+                                            style={{
+                                                padding: "12px 15px",
+                                                borderBottom: "1px solid #f0f0f0",
+                                                cursor: "pointer",
+                                                transition: "background-color 0.2s"
+                                            }}
+                                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f5f5f5"}
+                                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "white"}
+                                        >
+                                            <div style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+                                                <div style={{ 
+                                                    width: "40px", 
+                                                    height: "40px", 
+                                                    background: "#e4e6eb", 
+                                                    borderRadius: "50%", 
+                                                    display: "flex", 
+                                                    alignItems: "center", 
+                                                    justifyContent: "center",
+                                                    flexShrink: 0
+                                                }}>
+                                                    {post.author_avatar ? (
+                                                        <img src={post.author_avatar} alt="avatar" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }}/>
+                                                    ) : (
+                                                        <span>👤</span>
+                                                    )}
+                                                </div>
+                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                    <div style={{ fontWeight: "bold", fontSize: "14px", color: "#333", marginBottom: "4px" }}>
+                                                        {post.author_name_highlighted ? (
+                                                            <span dangerouslySetInnerHTML={{ __html: post.author_name_highlighted }} />
+                                                        ) : (
+                                                            post.author_name
+                                                        )}
+                                                    </div>
+                                                    <div style={{ 
+                                                        fontSize: "13px", 
+                                                        color: "#666",
+                                                        overflow: "hidden",
+                                                        textOverflow: "ellipsis",
+                                                        whiteSpace: "nowrap"
+                                                    }}>
+                                                        {post.content_highlighted ? (
+                                                            <span dangerouslySetInnerHTML={{ __html: post.content_highlighted }} />
+                                                        ) : (
+                                                            post.content || "Không có nội dung"
+                                                        )}
+                                                    </div>
+                                                    {post.matching_tags && post.matching_tags.length > 0 && (
+                                                        <div style={{ 
+                                                            fontSize: "11px", 
+                                                            color: "#2e7d32",
+                                                            marginTop: "4px",
+                                                            overflow: "hidden",
+                                                            textOverflow: "ellipsis",
+                                                            whiteSpace: "nowrap"
+                                                        }}>
+                                                            {post.matching_tags.map(tag => `#${tag}`).join(" ")}
+                                                        </div>
+                                                    )}
+                                                    <div style={{ 
+                                                        fontSize: "11px", 
+                                                        color: "#999",
+                                                        marginTop: "4px"
+                                                    }}>
+                                                        {new Date(post.created_at).toLocaleDateString()} • {post.stats?.like_count || 0} thích • {post.stats?.comment_count || 0} bình luận
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </>
+                            )}
                         </div>
-                    </div>
-                ))}
-            </>
-        )}
-    </div>
-)}
+                    )}
                 </div>
             </div>
 
-            {/* Cụm Icon */}
+            {/* Icons */}
             <div style={{ 
                 width: "280px", 
                 display: "flex", 
@@ -357,7 +379,7 @@ function Header() {
                 alignItems: "center", 
                 fontSize: "20px" 
             }}>
-                {/* Icon Chat */}
+                {/* Chat Icon */}
                 <div 
                     style={{ position: "relative", cursor: "pointer" }}
                     onClick={() => setIsChatOpen(!isChatOpen)}
@@ -381,7 +403,6 @@ function Header() {
                         <FaComment size={18} color="#2e7d32" />
                     </span>
                     
-                    {/* Badge unread */}
                     {unreadCount > 0 && (
                         <span style={{
                             position: "absolute", top: "-5px", right: "-5px",
@@ -395,7 +416,7 @@ function Header() {
                     )}
                 </div>
                 
-                {/* Icon Giỏ hàng */}
+                {/* Cart Icon */}
                 <div style={{ position: "relative", cursor: "pointer" }} onClick={handleCartClick}>
                     <span style={{ 
                         display: "flex", 
@@ -436,7 +457,7 @@ function Header() {
                     )}
                 </div>
 
-                {/* Icon Thông báo */}
+                {/* Notification Icon */}
                 <span style={{ 
                     cursor: "pointer", 
                     display: "flex", 
@@ -457,10 +478,9 @@ function Header() {
                     <div className="notification-wrapper">
                         <NotificationBell userType="user" />
                     </div>
-                    
                 </span>
 
-                {/* Avatar và Dropdown Menu */}
+                {/* Avatar and Dropdown Menu */}
                 <div style={{ position: "relative" }} ref={menuRef}>
                     <span 
                         onClick={handleAvatarClick}
@@ -501,7 +521,7 @@ function Header() {
                             flexDirection: "column",
                             fontFamily: "Arial, sans-serif"
                         }}>
-                            {/* Xem trang cá nhân */}
+                            {/* View Profile */}
                             <div  
                                 style={{...menuItemStyle, alignItems: "flex-start"}}
                                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f0f2f5"}
@@ -525,7 +545,7 @@ function Header() {
 
                             <hr style={{ border: "none", borderTop: "1px solid #eee", margin: "5px 20px" }} />
 
-                            {/* Lịch sử mua */}
+                            {/* Order History */}
                             <div 
                                 style={menuItemStyle}
                                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f0f2f5"}
@@ -539,7 +559,34 @@ function Header() {
                                 <span>Lịch sử mua</span>
                             </div>
 
-                            {/* Giỏ hàng */}
+                            {/* Favorite Products */}
+                            <div 
+                                style={menuItemStyle}
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f0f2f5"}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                                onClick={() => {
+                                    navigate("/products/favorites");
+                                    setIsMenuOpen(false);
+                                }}
+                            >
+                                <GrFavorite size={18} color="#2e7d32" />
+                                <span>Sản phẩm yêu thích</span>
+                                {favoriteCount > 0 && (
+                                    <span style={{
+                                        marginLeft: "auto",
+                                        background: "#ff4444",
+                                        color: "white",
+                                        borderRadius: "12px",
+                                        padding: "2px 6px",
+                                        fontSize: "12px",
+                                        fontWeight: "bold"
+                                    }}>
+                                        {favoriteCount}
+                                    </span>
+                                )}
+                            </div>
+
+                            {/* Cart */}
                             <div 
                                 style={menuItemStyle}
                                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f0f2f5"}
@@ -566,7 +613,7 @@ function Header() {
                                 )}
                             </div>
 
-                            {/* Đăng xuất */}
+                            {/* Logout */}
                             <div 
                                 style={menuItemStyle}
                                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f0f2f5"}
