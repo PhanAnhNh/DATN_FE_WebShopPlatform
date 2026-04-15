@@ -37,6 +37,7 @@ const ProductDetailPage = () => {
     const navigate = useNavigate();
     const [product, setProduct] = useState(null);
     const [shop, setShop] = useState(null);
+    const [relatedProducts, setRelatedProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedVariant, setSelectedVariant] = useState(null);
     const [quantity, setQuantity] = useState(1);
@@ -59,6 +60,7 @@ const ProductDetailPage = () => {
             });
         }, 2500);
     };
+    
     useEffect(() => {
         if (product_id) {
             fetchProductDetail();
@@ -66,60 +68,46 @@ const ProductDetailPage = () => {
     }, [product_id]);
 
     const fetchProductDetail = async () => {
-    setLoading(true);
-    try {
-        // Lấy chi tiết sản phẩm
-        const productRes = await api.get(`/api/v1/products/${product_id}`);
-        console.log("Product data:", productRes.data);
-        console.log("Product shop_id:", productRes.data.shop_id); // Kiểm tra shop_id
-        
-        setProduct(productRes.data);
-        
-        // Lấy thông tin shop
-        if (productRes.data.shop_id) {
-            const shopRes = await api.get(`/api/v1/shops/${productRes.data.shop_id}`);
-            setShop(shopRes.data);
+        setLoading(true);
+        try {
+            // Lấy chi tiết sản phẩm
+            const productRes = await api.get(`/api/v1/products/${product_id}`);
+            console.log("Product data:", productRes.data);
+            console.log("Product shop_id:", productRes.data.shop_id);
+            
+            setProduct(productRes.data);
+            
+            // Lấy thông tin shop
+            if (productRes.data.shop_id) {
+                const shopRes = await api.get(`/api/v1/shops/${productRes.data.shop_id}`);
+                setShop(shopRes.data);
+                
+                // Lấy sản phẩm tương tự từ cùng shop
+                try {
+                    const shopProductsRes = await api.get(`/api/v1/shops/${productRes.data.shop_id}/products`);
+                    // Lọc bỏ sản phẩm hiện tại và giới hạn 4 sản phẩm
+                    const otherProducts = (shopProductsRes.data || [])
+                        .filter(p => p.id !== product_id && p.id !== productRes.data.id)
+                        .slice(0, 4);
+                    setRelatedProducts(otherProducts);
+                } catch (relatedError) {
+                    console.error("Error fetching related products:", relatedError);
+                    setRelatedProducts([]);
+                }
+            }
+            
+            // Set variant mặc định nếu có
+            if (productRes.data.variants && productRes.data.variants.length > 0) {
+                setSelectedVariant(productRes.data.variants[0]);
+            }
+        } catch (error) {
+            console.error("Error fetching product detail:", error);
+            setProduct(null);
+            setRelatedProducts([]);
+        } finally {
+            setLoading(false);
         }
-        
-        // Set variant mặc định nếu có
-        if (productRes.data.variants && productRes.data.variants.length > 0) {
-            setSelectedVariant(productRes.data.variants[0]);
-        }
-    } catch (error) {
-        console.error("Error fetching product detail:", error);
-        // Mock data - đảm bảo có shop_id
-        setProduct({
-            id: product_id,
-            name: "Táo đỏ tươi",
-            description: "Táo đỏ tươi ngon, được trồng theo tiêu chuẩn VietGAP...",
-            price: 60000,
-            stock: 150,
-            image_url: "https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=600",
-            origin: "Đà Lạt, Lâm Đồng",
-            certification: "VietGAP, Hữu cơ",
-            rating: 4.8,
-            total_reviews: 234,
-            shop_id: "69b9170027a68c9753b5290a", // Thêm shop_id vào mock data
-            variants: [
-                { id: "69becd0a2f6745a41a3aba96", name: "1kg", price: 60000, stock: 100 },
-                { id: "69becd0b2f6745a41a3aba97", name: "2kg", price: 115000, stock: 80 },
-                { id: "69becd0c2f6745a41a3aba98", name: "5kg", price: 280000, stock: 50 }
-            ],
-            created_at: "2026-01-15T00:00:00Z"
-        });
-        setShop({
-            id: "69b9170027a68c9753b5290a",
-            name: "Shop rau củ Đà Lạt",
-            address: "123 Đường Láng, Đống Đa, Hà Nội",
-            phone: "0987654321",
-            email: "shop@dacsan.com",
-            rating: 4.9,
-            followers_count: 12500
-        });
-    } finally {
-        setLoading(false);
-    }
-};
+    };
 
     const formatCurrency = (amount) => {
         return new Intl.NumberFormat('vi-VN', {
@@ -144,45 +132,42 @@ const ProductDetailPage = () => {
         }
         return stars;
     };
-    // pages/user/product/ProductDetailPage.jsx
-    // pages/user/product/ProductDetailPage.jsx
-const handleAddToCart = async () => {
-    setAddingToCart(true);
-    try {
-        // Lấy shop_id từ product data
-        const shopId = product.shop_id;
-        
-        console.log("Adding to cart with shop_id:", shopId);
-        
-        const response = await api.post('/api/v1/cart/add', null, {
-            params: {
-                product_id: product.id,
-                quantity: quantity,
-                variant_id: selectedVariant?.id || null,
-                shop_id: shopId  // Thêm shop_id vào đây
+
+    const handleAddToCart = async () => {
+        setAddingToCart(true);
+        try {
+            const shopId = product.shop_id;
+            
+            console.log("Adding to cart with shop_id:", shopId);
+            
+            const response = await api.post('/api/v1/cart/add', null, {
+                params: {
+                    product_id: product.id,
+                    quantity: quantity,
+                    variant_id: selectedVariant?.id || null,
+                    shop_id: shopId
+                }
+            });
+            
+            const itemName = selectedVariant 
+                ? `${product.name} - ${selectedVariant.name}` 
+                : product.name;
+            
+            showToast(`Đã thêm ${quantity} ${itemName} vào giỏ hàng!`, 'success');
+            
+            window.dispatchEvent(new Event('cartUpdated'));
+            
+        } catch (error) {
+            console.error("Error adding to cart:", error);
+            if (error.response) {
+                showToast(error.response.data.detail || "Có lỗi xảy ra", "error");
+            } else {
+                showToast("Có lỗi xảy ra khi thêm vào giỏ hàng. Vui lòng thử lại!", "error");
             }
-        });
-        
-        const itemName = selectedVariant 
-            ? `${product.name} - ${selectedVariant.name}` 
-            : product.name;
-        
-        showToast(`Đã thêm ${quantity} ${itemName} vào giỏ hàng!`, 'success');
-        
-        // Dispatch event để cập nhật số lượng giỏ hàng
-        window.dispatchEvent(new Event('cartUpdated'));
-        
-    } catch (error) {
-        console.error("Error adding to cart:", error);
-        if (error.response) {
-            showToast(error.response.data.detail || "Có lỗi xảy ra", "error");
-        } else {
-            showToast("Có lỗi xảy ra khi thêm vào giỏ hàng. Vui lòng thử lại!", "error");
+        } finally {
+            setAddingToCart(false);
         }
-    } finally {
-        setAddingToCart(false);
-    }
-};
+    };
 
     const handleBuyNow = () => {
         handleAddToCart();
@@ -193,6 +178,10 @@ const handleAddToCart = async () => {
 
     const handleShopClick = () => {
         navigate(`/shop/${shop?.id}`);
+    };
+
+    const handleProductClick = (productId) => {
+        navigate(`/product/${productId}`);
     };
 
     const handleDownloadQR = () => {
@@ -255,7 +244,6 @@ const handleAddToCart = async () => {
                             backdropFilter: "blur(10px)",
                             backgroundColor: "rgba(255,255,255,0.98)"
                         }}>
-                            {/* Icon dấu tích xanh */}
                             <div style={{
                                 width: "80px",
                                 height: "80px",
@@ -272,7 +260,6 @@ const handleAddToCart = async () => {
                                 </svg>
                             </div>
                             
-                            {/* Nội dung */}
                             <div style={{ fontSize: "20px", fontWeight: "bold", color: "#2e7d32", marginBottom: "8px" }}>
                                 Thành công!
                             </div>
@@ -280,7 +267,6 @@ const handleAddToCart = async () => {
                                 {toast.message}
                             </div>
                             
-                            {/* Đường viền trang trí */}
                             <div style={{
                                 width: "60px",
                                 height: "3px",
@@ -293,7 +279,6 @@ const handleAddToCart = async () => {
                 )}
 
                 {/* Breadcrumb */}
-
                 <div style={{ marginBottom: "24px", fontSize: "14px", color: "#666" }}>
                     <span style={{ cursor: "pointer", color: "#2e7d32" }} onClick={() => navigate('/')}>Trang chủ</span>
                     <span style={{ margin: "0 8px" }}>›</span>
@@ -393,7 +378,6 @@ const handleAddToCart = async () => {
                         <div style={{ marginBottom: "24px" }}>
                             <label style={{ fontWeight: "600", marginBottom: "8px", display: "block" }}>Số lượng:</label>
                             
-                            {/* Thêm thẻ style này để ẩn triệt để mũi tên trên mọi trình duyệt */}
                             <style>
                                 {`
                                     .hide-arrows::-webkit-inner-spin-button, 
@@ -414,7 +398,7 @@ const handleAddToCart = async () => {
                                 >-</button>
                                 <input 
                                     type="number" 
-                                    className="hide-arrows" /* <-- Thêm class này vào */
+                                    className="hide-arrows"
                                     value={quantity} 
                                     onChange={(e) => setQuantity(Math.min(currentStock, Math.max(1, parseInt(e.target.value) || 1)))}
                                     style={{ 
@@ -425,7 +409,6 @@ const handleAddToCart = async () => {
                                         borderRadius: "8px",
                                         fontSize: "16px",
                                         fontWeight: "500"
-                                        /* Đã bỏ các dòng appearance cũ vì đã dùng class ở trên */
                                     }}
                                 />
                                 <button 
@@ -699,22 +682,42 @@ const handleAddToCart = async () => {
                 </div>
 
                 {/* Related Products */}
-                <div>
-                    <h3 style={{ marginBottom: "24px", fontSize: "20px", fontWeight: "600" }}>Sản phẩm tương tự</h3>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "24px" }}>
-                        {[1, 2, 3, 4].map(i => (
-                            <div key={i} style={{ background: "white", borderRadius: "16px", overflow: "hidden", cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,0.08)", transition: "transform 0.3s" }}
-                                onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-4px)"}
-                                onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}>
-                                <img src="https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=300" alt="Product" style={{ width: "100%", height: "180px", objectFit: "cover" }} />
-                                <div style={{ padding: "12px" }}>
-                                    <h4 style={{ fontSize: "14px", marginBottom: "8px" }}>Sản phẩm tương tự {i}</h4>
-                                    <div style={{ fontSize: "16px", fontWeight: "bold", color: "#d32f2f" }}>{formatCurrency(35000)}</div>
+                {relatedProducts.length > 0 && (
+                    <div>
+                        <h3 style={{ marginBottom: "24px", fontSize: "20px", fontWeight: "600" }}>Sản phẩm tương tự</h3>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "24px" }}>
+                            {relatedProducts.map(relatedProduct => (
+                                <div 
+                                    key={relatedProduct.id} 
+                                    onClick={() => handleProductClick(relatedProduct.id)}
+                                    style={{ 
+                                        background: "white", 
+                                        borderRadius: "16px", 
+                                        overflow: "hidden", 
+                                        cursor: "pointer", 
+                                        boxShadow: "0 2px 8px rgba(0,0,0,0.08)", 
+                                        transition: "transform 0.3s" 
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-4px)"}
+                                    onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}
+                                >
+                                    <img 
+                                        src={relatedProduct.image_url || "https://via.placeholder.com/300"} 
+                                        alt={relatedProduct.name}
+                                        style={{ width: "100%", height: "180px", objectFit: "cover" }} 
+                                    />
+                                    <div style={{ padding: "12px" }}>
+                                        <h4 style={{ fontSize: "14px", marginBottom: "8px", fontWeight: "600", color: "#333" }}>{relatedProduct.name}</h4>
+                                        <div style={{ display: "flex", gap: "2px", marginBottom: "8px" }}>
+                                            {renderStars(relatedProduct.rating || 4.5)}
+                                        </div>
+                                        <div style={{ fontSize: "16px", fontWeight: "bold", color: "#d32f2f" }}>{formatCurrency(relatedProduct.price)}</div>
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            ))}
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
 
             {/* QR Code Modal */}
