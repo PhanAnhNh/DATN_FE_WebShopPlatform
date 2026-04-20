@@ -5,7 +5,8 @@ import {
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   X, Save, AlertCircle, CheckCircle, Store, MapPin, Link as LinkIcon
 } from 'lucide-react';
-import {adminApi,} from '../../api/api';
+import { adminApi } from '../../api/api';
+import locationApi from '../../api/locationApi';
 import '../../css/AdminManageLayout.css';
 import Toast from '../../components/common/Toast';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
@@ -18,10 +19,16 @@ const ShopsManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
   const [totalShops, setTotalShops] = useState(0);
+  const [locations, setLocations] = useState([]);
+  const [showLocationSelector, setShowLocationSelector] = useState(false);
+  const [loadingLocations, setLoadingLocations] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState(null);
+  const [searchLocationTerm, setSearchLocationTerm] = useState('');
+  const [locationDetails, setLocationDetails] = useState(null); // ✅ Thêm state lưu chi tiết location
   
   // Modal states
   const [showModal, setShowModal] = useState(false);
-  const [modalMode, setModalMode] = useState('add'); // add, edit, view
+  const [modalMode, setModalMode] = useState('add');
   const [selectedShop, setSelectedShop] = useState(null);
   
   // Dialog states
@@ -54,7 +61,8 @@ const ShopsManagement = () => {
     logo_url: '',
     banner_url: '',
     status: 'active',
-    is_verified: false
+    is_verified: false,
+    location_id: ''
   });
 
   const [createOwnerAccount, setCreateOwnerAccount] = useState(false);
@@ -81,43 +89,89 @@ const ShopsManagement = () => {
   };
 
   const fetchShops = async () => {
-  try {
-    setLoading(true);
-    setError(null);
-    const response = await adminApi.get('/api/v1/admin/shops');
-    console.log('Shops data:', response.data);
-    setShops(response.data);
-    setTotalShops(response.data.length);
-  } catch (err) {
-    console.error('Error fetching shops:', err);
-    setError('Không thể tải danh sách cửa hàng');
-  } finally {
-    setLoading(false);
-  }
-};
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await adminApi.get('/api/v1/admin/shops');
+      console.log('Shops data:', response.data);
+      setShops(response.data);
+      setTotalShops(response.data.length);
+    } catch (err) {
+      console.error('Error fetching shops:', err);
+      setError('Không thể tải danh sách cửa hàng');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ✅ THÊM HÀM fetchLocationById - lấy chi tiết location từ ID
+  const fetchLocationById = async (locationId) => {
+    if (!locationId) return null;
+    try {
+      const response = await locationApi.getLocation(locationId);
+      console.log('Location details:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching location:', error);
+      return null;
+    }
+  };
+
+  const fetchLocations = async () => {
+    setLoadingLocations(true);
+    try {
+      const response = await locationApi.getAllLocations(200);
+      console.log('Fetched locations:', response.data);
+      const locationsData = response.data?.data || response.data || [];
+      setLocations(locationsData);
+    } catch (error) {
+      console.error('Error fetching locations:', error);
+      showToast('Không thể tải danh sách địa điểm', 'error');
+    } finally {
+      setLoadingLocations(false);
+    }
+  };
+
+  const handleSelectLocation = (location) => {
+    setSelectedLocation(location);
+    setFormData(prev => ({
+      ...prev,
+      address: location.address || prev.address,
+      province: location.province_name || prev.province,
+      district: location.district || prev.district,
+      ward: location.ward || prev.ward,
+      location_id: location._id || location.id
+    }));
+    setShowLocationSelector(false);
+    showToast(`Đã chọn địa điểm: ${location.name}`, 'success');
+  };
+
+  const filteredLocations = locations.filter(location => {
+    if (!searchLocationTerm) return true;
+    const searchLower = searchLocationTerm.toLowerCase();
+    return (
+      (location.name || '').toLowerCase().includes(searchLower) ||
+      (location.address || '').toLowerCase().includes(searchLower) ||
+      (location.province_name || '').toLowerCase().includes(searchLower)
+    );
+  });
 
   const handleOwnerInputChange = (e) => {
     const { name, value } = e.target;
     setOwnerFormData(prev => ({ ...prev, [name]: value }));
-    // Xóa lỗi khi người dùng nhập
     if (formErrors[`owner_${name}`]) {
       setFormErrors(prev => ({ ...prev, [`owner_${name}`]: '' }));
     }
   };
 
-  // Filter shops based on search term
   const filteredShops = shops.filter(shop => {
     if (!shop) return false;
-    
     if (!searchTerm) return true;
-    
     const searchLower = searchTerm.toLowerCase();
-    
     const name = shop.name?.toLowerCase() || '';
     const phone = shop.phone?.toString() || '';
     const email = shop.email?.toLowerCase() || '';
     const address = shop.address?.toLowerCase() || '';
-    
     return (
       name.includes(searchLower) ||
       phone.includes(searchTerm) ||
@@ -126,13 +180,11 @@ const ShopsManagement = () => {
     );
   });
 
-  // Pagination
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentShops = filteredShops.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(filteredShops.length / itemsPerPage);
 
-  // Handle form input change
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({
@@ -140,7 +192,6 @@ const ShopsManagement = () => {
       [name]: type === 'checkbox' ? checked : value
     }));
     
-    // Tạo slug tự động từ tên nếu đang thêm mới
     if (name === 'name' && modalMode === 'add') {
       const slug = value
         .toLowerCase()
@@ -154,18 +205,14 @@ const ShopsManagement = () => {
     }
   };
 
-  // SỬA LẠI hàm validateForm
   const validateForm = () => {
     const errors = {};
-    
-    // Validate shop
     if (!formData.name) errors.name = 'Tên cửa hàng không được để trống';
     if (!formData.slug) errors.slug = 'Slug không được để trống';
     if (formData.email && !/\S+@\S+\.\S+/.test(formData.email)) {
       errors.email = 'Email không hợp lệ';
     }
     
-    // Validate owner nếu có chọn tạo tài khoản
     if (createOwnerAccount) {
       if (!ownerFormData.username) errors.owner_username = 'Tên đăng nhập không được để trống';
       if (!ownerFormData.email) errors.owner_email = 'Email không được để trống';
@@ -177,12 +224,9 @@ const ShopsManagement = () => {
         errors.owner_password = 'Mật khẩu phải có ít nhất 6 ký tự';
       }
     }
-    
     return errors;
   };
 
-  // Handle add shop
-  // SỬA LẠI hàm handleAddShop (QUAN TRỌNG NHẤT)
   const handleAddShop = async (e) => {
     e.preventDefault();
     const errors = validateForm();
@@ -196,9 +240,7 @@ const ShopsManagement = () => {
       let response;
       
       if (createOwnerAccount) {
-        // Gọi API tạo cả shop và tài khoản
         const combinedData = {
-          // Thông tin shop
           shop_name: formData.name,
           shop_slug: formData.slug,
           shop_description: formData.description,
@@ -210,8 +252,8 @@ const ShopsManagement = () => {
           shop_ward: formData.ward,
           shop_logo_url: formData.logo_url,
           shop_banner_url: formData.banner_url,
+          location_id: formData.location_id,
           
-          // Thông tin chủ shop
           owner_username: ownerFormData.username,
           owner_email: ownerFormData.email,
           owner_password: ownerFormData.password,
@@ -224,41 +266,30 @@ const ShopsManagement = () => {
         console.log('Sending combined data:', combinedData);
         response = await adminApi.post('/api/v1/shops/with-owner', combinedData);
       } else {
-
-        showToast('Vui lòng chọn "Tạo tài khoản chủ shop" hoặc thêm chức năng chọn owner', 'error');
+        showToast('Vui lòng chọn "Tạo tài khoản chủ shop"', 'error');
         setSubmitting(false);
         return;
-
       }
-      
-      console.log('API Response:', response.data);
       
       if (response.data) {
         let message = 'Thêm cửa hàng thành công!';
         if (createOwnerAccount && response.data.data) {
           const { login_info } = response.data.data;
-          message = `Tạo cửa hàng và tài khoản thành công! 
-Tên đăng nhập: ${login_info.username}
-Mật khẩu: ${login_info.password}`;
+          message = `Tạo cửa hàng và tài khoản thành công! Tên đăng nhập: ${login_info.username}, Mật khẩu: ${login_info.password}`;
         }
-        
         showToast(message, 'success');
         setShowModal(false);
-        
-        // Reset form
         resetForm();
         setOwnerFormData({
           username: '', email: '', password: '', 
           full_name: '', phone: '', gender: '', address: ''
         });
         setCreateOwnerAccount(false);
-        
+        setSelectedLocation(null);
         fetchShops();
       }
     } catch (err) {
       console.error('Error details:', err);
-      console.error('Server error response:', err.response?.data);
-      
       const errorMessage = err.response?.data?.detail || 
                           err.response?.data?.message || 
                           'Có lỗi xảy ra khi thêm cửa hàng';
@@ -268,57 +299,61 @@ Mật khẩu: ${login_info.password}`;
     }
   };
 
-  // Handle update shop
   const handleUpdateShop = async (e) => {
-  e.preventDefault();
-  const errors = validateForm();
-  if (Object.keys(errors).length > 0) {
-    setFormErrors(errors);
-    return;
-  }
-
-  setSubmitting(true);
-  try {
-    const response = await adminApi.put(`/api/v1/admin/shops/${selectedShop._id}`, formData);
-    if (response.data) {
-      showToast('Cập nhật cửa hàng thành công!', 'success');
-      setShowModal(false);
-      resetForm();
-      fetchShops();
+    e.preventDefault();
+    const errors = validateForm();
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
     }
-  } catch (err) {
-    console.error('Error updating shop:', err);
-    showToast(err.response?.data?.detail || 'Có lỗi xảy ra khi cập nhật', 'error');
-  } finally {
-    setSubmitting(false);
-  }
-};
 
-  // Handle delete shop
-  const handleDeleteShop = (shopId) => {
-  setDialogConfig({
-    title: 'Xác nhận xóa',
-    message: 'Bạn có chắc chắn muốn xóa cửa hàng này? Hành động này không thể hoàn tác.',
-    type: 'warning',
-    onConfirm: async () => {
-      try {
-        const response = await adminApi.delete(`/api/v1/admin/shops/${shopId}`);
-        if (response.data) {
-          showToast('Xóa cửa hàng thành công!', 'success');
-          fetchShops();
-        }
-      } catch (err) {
-        console.error('Error deleting shop:', err);
-        showToast(err.response?.data?.detail || 'Có lỗi xảy ra khi xóa', 'error');
+    setSubmitting(true);
+    try {
+      const response = await adminApi.put(`/api/v1/admin/shops/${selectedShop._id}`, {
+        ...formData,
+        location_id: formData.location_id
+      });
+      if (response.data) {
+        showToast('Cập nhật cửa hàng thành công!', 'success');
+        setShowModal(false);
+        resetForm();
+        fetchShops();
       }
+    } catch (err) {
+      console.error('Error updating shop:', err);
+      showToast(err.response?.data?.detail || 'Có lỗi xảy ra khi cập nhật', 'error');
+    } finally {
+      setSubmitting(false);
     }
-  });
-  setShowConfirmDialog(true);
-};
+  };
+
+  const handleDeleteShop = (shopId) => {
+    setDialogConfig({
+      title: 'Xác nhận xóa',
+      message: 'Bạn có chắc chắn muốn xóa cửa hàng này? Hành động này không thể hoàn tác.',
+      type: 'warning',
+      onConfirm: async () => {
+        try {
+          const response = await adminApi.delete(`/api/v1/admin/shops/${shopId}`);
+          if (response.data) {
+            showToast('Xóa cửa hàng thành công!', 'success');
+            fetchShops();
+          }
+        } catch (err) {
+          console.error('Error deleting shop:', err);
+          showToast(err.response?.data?.detail || 'Có lỗi xảy ra khi xóa', 'error');
+        }
+      }
+    });
+    setShowConfirmDialog(true);
+  };
   
-  // Open modal for view/edit/add
-  const openModal = (mode, shop = null) => {
+  // ✅ SỬA LẠI openModal - load location details khi ở chế độ view/edit
+  const openModal = async (mode, shop = null) => {
     setModalMode(mode);
+    setSelectedLocation(null);
+    setLocationDetails(null);
+    
     if (shop) {
       setSelectedShop(shop);
       setFormData({
@@ -334,15 +369,24 @@ Mật khẩu: ${login_info.password}`;
         logo_url: shop.logo_url || '',
         banner_url: shop.banner_url || '',
         status: shop.status || 'active',
-        is_verified: shop.is_verified || false
+        is_verified: shop.is_verified || false,
+        location_id: shop.location_id || ''
       });
+      
+      // ✅ Nếu có location_id, lấy chi tiết location để hiển thị
+      if (shop.location_id) {
+        const location = await fetchLocationById(shop.location_id);
+        if (location) {
+          setLocationDetails(location);
+          setSelectedLocation(location);
+        }
+      }
     } else {
       resetForm();
     }
     setShowModal(true);
   };
 
-  // THÊM resetFormOwner
   const resetForm = () => {
     setFormData({
       name: '',
@@ -357,13 +401,15 @@ Mật khẩu: ${login_info.password}`;
       logo_url: '',
       banner_url: '',
       status: 'active',
-      is_verified: false
+      is_verified: false,
+      location_id: ''
     });
     setFormErrors({});
     setSelectedShop(null);
+    setSelectedLocation(null);
+    setLocationDetails(null);
   };
 
-  // Export to Excel
   const handleExportExcel = () => {
     const headers = ['Thứ tự', 'Tên cửa hàng', 'Số điện thoại', 'Địa chỉ', 'Link trang', 'Trạng thái'];
     const csvContent = [
@@ -386,7 +432,6 @@ Mật khẩu: ${login_info.password}`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
     showToast('Xuất file Excel thành công!', 'success');
   };
 
@@ -400,7 +445,6 @@ Mật khẩu: ${login_info.password}`;
 
   return (
     <div className="users-management">
-      {/* Toast notifications */}
       {toast.show && (
         <div className="toast-container">
           <Toast 
@@ -411,7 +455,6 @@ Mật khẩu: ${login_info.password}`;
         </div>
       )}
 
-      {/* Confirm Dialog */}
       <ConfirmDialog
         isOpen={showConfirmDialog}
         onClose={() => setShowConfirmDialog(false)}
@@ -432,7 +475,6 @@ Mật khẩu: ${login_info.password}`;
         </div>
       )}
 
-      {/* Search and Actions Bar */}
       <div className="actions-bar">
         <div className="users-search-box">
           <Search size={18} className="search-icon" />
@@ -457,7 +499,6 @@ Mật khẩu: ${login_info.password}`;
         </div>
       </div>
 
-      {/* Shops Table */}
       <div className="table-container">
         {loading ? (
           <div className="loading-spinner">
@@ -521,25 +562,13 @@ Mật khẩu: ${login_info.password}`;
                     </td>
                     <td>
                       <div className="action-cell">
-                        <button 
-                          className="action-btn view" 
-                          onClick={() => openModal('view', shop)}
-                          title="Xem chi tiết"
-                        >
+                        <button className="action-btn view" onClick={() => openModal('view', shop)} title="Xem chi tiết">
                           <Eye size={16} />
                         </button>
-                        <button 
-                          className="action-btn edit" 
-                          onClick={() => openModal('edit', shop)}
-                          title="Sửa"
-                        >
+                        <button className="action-btn edit" onClick={() => openModal('edit', shop)} title="Sửa">
                           <Edit2 size={16} />
                         </button>
-                        <button 
-                          className="action-btn delete"
-                          onClick={() => handleDeleteShop(shop._id)} // Gọi hàm xóa
-                          title="Xóa cửa hàng"
-                        >
+                        <button className="action-btn delete" onClick={() => handleDeleteShop(shop._id)} title="Xóa cửa hàng">
                           <Trash2 size={16} />
                         </button>
                       </div>
@@ -548,9 +577,7 @@ Mật khẩu: ${login_info.password}`;
                 ))
               ) : (
                 <tr>
-                  <td colSpan="7" className="empty-table">
-                    Không có dữ liệu
-                  </td>
+                  <td colSpan="7" className="empty-table">Không có dữ liệu</td>
                 </tr>
               )}
             </tbody>
@@ -558,28 +585,18 @@ Mật khẩu: ${login_info.password}`;
         )}
       </div>
 
-      {/* Pagination */}
       {!loading && filteredShops.length > 0 && (
         <div className="pagination">
           <div className="pagination-info">
             Hiển thị {indexOfFirstItem + 1} - {Math.min(indexOfLastItem, filteredShops.length)} / {filteredShops.length} cửa hàng
           </div>
           <div className="pagination-controls">
-            <button 
-              className="pagination-btn" 
-              onClick={() => setCurrentPage(1)}
-              disabled={currentPage === 1}
-            >
+            <button className="pagination-btn" onClick={() => setCurrentPage(1)} disabled={currentPage === 1}>
               <ChevronsLeft size={16} />
             </button>
-            <button 
-              className="pagination-btn" 
-              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-              disabled={currentPage === 1}
-            >
+            <button className="pagination-btn" onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1}>
               <ChevronLeft size={16} />
             </button>
-            
             {[...Array(Math.min(5, totalPages))].map((_, i) => {
               let pageNum;
               if (totalPages <= 5) {
@@ -591,42 +608,21 @@ Mật khẩu: ${login_info.password}`;
               } else {
                 pageNum = currentPage - 2 + i;
               }
-              
               return (
-                <button
-                  key={i}
-                  className={`pagination-btn ${currentPage === pageNum ? 'active' : ''}`}
-                  onClick={() => setCurrentPage(pageNum)}
-                >
+                <button key={i} className={`pagination-btn ${currentPage === pageNum ? 'active' : ''}`} onClick={() => setCurrentPage(pageNum)}>
                   {pageNum}
                 </button>
               );
             })}
-            
-            <button 
-              className="pagination-btn" 
-              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-              disabled={currentPage === totalPages}
-            >
+            <button className="pagination-btn" onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages}>
               <ChevronRight size={16} />
             </button>
-            <button 
-              className="pagination-btn" 
-              onClick={() => setCurrentPage(totalPages)}
-              disabled={currentPage === totalPages}
-            >
+            <button className="pagination-btn" onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages}>
               <ChevronsRight size={16} />
             </button>
           </div>
           <div className="pagination-items-per-page">
-            <select 
-              value={itemsPerPage} 
-              onChange={(e) => {
-                setItemsPerPage(Number(e.target.value));
-                setCurrentPage(1);
-              }}
-              className="items-per-page-select"
-            >
+            <select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }} className="items-per-page-select">
               <option value={5}>5 / trang</option>
               <option value={10}>10 / trang</option>
               <option value={20}>20 / trang</option>
@@ -639,7 +635,7 @@ Mật khẩu: ${login_info.password}`;
       {/* Shop Modal */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
+          <div className="modal-content" style={{ maxWidth: '700px', width: '90%' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h3>
                 {modalMode === 'add' ? 'Thêm cửa hàng mới' : 
@@ -652,406 +648,224 @@ Mật khẩu: ${login_info.password}`;
             </div>
 
             <form onSubmit={modalMode === 'add' ? handleAddShop : handleUpdateShop}>
-              <div className="modal-body">
+              <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
                 <div className="form-grid">
                   {/* Tên cửa hàng */}
                   <div className="form-group">
                     <label htmlFor="name">Tên cửa hàng *</label>
-                    <input
-                      type="text"
-                      id="name"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      disabled={modalMode === 'view'}
-                      className={formErrors.name ? 'error' : ''}
-                    />
-                    {formErrors.name && (
-                      <span className="error-message">{formErrors.name}</span>
-                    )}
+                    <input type="text" id="name" name="name" value={formData.name} onChange={handleInputChange} disabled={modalMode === 'view'} className={formErrors.name ? 'error' : ''} />
+                    {formErrors.name && <span className="error-message">{formErrors.name}</span>}
                   </div>
 
                   {/* Slug */}
                   <div className="form-group">
                     <label htmlFor="slug">Slug (URL) *</label>
-                    <input
-                      type="text"
-                      id="slug"
-                      name="slug"
-                      value={formData.slug}
-                      onChange={handleInputChange}
-                      disabled={modalMode === 'view'}
-                      className={formErrors.slug ? 'error' : ''}
-                      placeholder="ten-cua-hang"
-                    />
-                    {formErrors.slug && (
-                      <span className="error-message">{formErrors.slug}</span>
-                    )}
+                    <input type="text" id="slug" name="slug" value={formData.slug} onChange={handleInputChange} disabled={modalMode === 'view'} className={formErrors.slug ? 'error' : ''} placeholder="ten-cua-hang" />
+                    {formErrors.slug && <span className="error-message">{formErrors.slug}</span>}
                   </div>
 
                   {/* Số điện thoại */}
                   <div className="form-group">
                     <label htmlFor="phone">Số điện thoại</label>
-                    <input
-                      type="tel"
-                      id="phone"
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleInputChange}
-                      disabled={modalMode === 'view'}
-                    />
+                    <input type="tel" id="phone" name="phone" value={formData.phone} onChange={handleInputChange} disabled={modalMode === 'view'} />
                   </div>
 
                   {/* Email */}
                   <div className="form-group">
                     <label htmlFor="email">Email</label>
-                    <input
-                      type="email"
-                      id="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      disabled={modalMode === 'view'}
-                      className={formErrors.email ? 'error' : ''}
-                    />
-                    {formErrors.email && (
-                      <span className="error-message">{formErrors.email}</span>
-                    )}
+                    <input type="email" id="email" name="email" value={formData.email} onChange={handleInputChange} disabled={modalMode === 'view'} className={formErrors.email ? 'error' : ''} />
+                    {formErrors.email && <span className="error-message">{formErrors.email}</span>}
                   </div>
 
                   {/* Địa chỉ */}
                   <div className="form-group full-width">
                     <label htmlFor="address">Địa chỉ</label>
-                    <textarea
-                      id="address"
-                      name="address"
-                      value={formData.address}
-                      onChange={handleInputChange}
-                      disabled={modalMode === 'view'}
-                      rows="2"
-                    />
+                    <textarea id="address" name="address" value={formData.address} onChange={handleInputChange} disabled={modalMode === 'view'} rows="2" />
                   </div>
 
                   {/* Tỉnh/Thành */}
                   <div className="form-group">
                     <label htmlFor="province">Tỉnh/Thành phố</label>
-                    <input
-                      type="text"
-                      id="province"
-                      name="province"
-                      value={formData.province}
-                      onChange={handleInputChange}
-                      disabled={modalMode === 'view'}
-                    />
+                    <input type="text" id="province" name="province" value={formData.province} onChange={handleInputChange} disabled={modalMode === 'view'} />
                   </div>
 
                   {/* Quận/Huyện */}
                   <div className="form-group">
                     <label htmlFor="district">Quận/Huyện</label>
-                    <input
-                      type="text"
-                      id="district"
-                      name="district"
-                      value={formData.district}
-                      onChange={handleInputChange}
-                      disabled={modalMode === 'view'}
-                    />
+                    <input type="text" id="district" name="district" value={formData.district} onChange={handleInputChange} disabled={modalMode === 'view'} />
                   </div>
 
                   {/* Phường/Xã */}
                   <div className="form-group">
                     <label htmlFor="ward">Phường/Xã</label>
-                    <input
-                      type="text"
-                      id="ward"
-                      name="ward"
-                      value={formData.ward}
-                      onChange={handleInputChange}
-                      disabled={modalMode === 'view'}
-                    />
+                    <input type="text" id="ward" name="ward" value={formData.ward} onChange={handleInputChange} disabled={modalMode === 'view'} />
                   </div>
 
                   {/* Logo URL */}
                   <div className="form-group">
                     <label htmlFor="logo_url">Logo URL</label>
-                    <input
-                      type="text"
-                      id="logo_url"
-                      name="logo_url"
-                      value={formData.logo_url}
-                      onChange={handleInputChange}
-                      disabled={modalMode === 'view'}
-                    />
+                    <input type="text" id="logo_url" name="logo_url" value={formData.logo_url} onChange={handleInputChange} disabled={modalMode === 'view'} />
                   </div>
 
                   {/* Banner URL */}
                   <div className="form-group">
                     <label htmlFor="banner_url">Banner URL</label>
-                    <input
-                      type="text"
-                      id="banner_url"
-                      name="banner_url"
-                      value={formData.banner_url}
-                      onChange={handleInputChange}
-                      disabled={modalMode === 'view'}
-                    />
+                    <input type="text" id="banner_url" name="banner_url" value={formData.banner_url} onChange={handleInputChange} disabled={modalMode === 'view'} />
                   </div>
 
                   {/* Mô tả */}
                   <div className="form-group full-width">
                     <label htmlFor="description">Mô tả</label>
-                    <textarea
-                      id="description"
-                      name="description"
-                      value={formData.description}
-                      onChange={handleInputChange}
-                      disabled={modalMode === 'view'}
-                      rows="3"
-                    />
+                    <textarea id="description" name="description" value={formData.description} onChange={handleInputChange} disabled={modalMode === 'view'} rows="3" />
                   </div>
-                  
-            {modalMode === 'add' && (
-            <div className="owner-section" style={{ 
-                marginTop: '30px', 
-                borderTop: '2px dashed #1976d2', 
-                paddingTop: '20px' 
-            }}>
-                <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                marginBottom: '20px',
-                background: '#e3f2fd',
-                padding: '10px 15px',
-                borderRadius: '8px'
-                }}>
-                <input
-                    type="checkbox"
-                    id="createOwner"
-                    checked={createOwnerAccount}
-                    onChange={(e) => setCreateOwnerAccount(e.target.checked)}
-                    style={{ 
-                    width: '18px', 
-                    height: '18px', 
-                    marginRight: '10px',
-                    cursor: 'pointer'
-                    }}
-                />
-                <label htmlFor="createOwner" style={{ 
-                    fontWeight: 'bold', 
-                    color: '#1976d2',
-                    fontSize: '16px',
-                    cursor: 'pointer'
-                }}>
-                    Tạo tài khoản chủ shop mới (Khuyến nghị)
-                </label>
-                </div>
-                
-                {createOwnerAccount && (
-                <div className="owner-form" style={{ 
-                    background: '#f8f9fa', 
-                    padding: '20px', 
-                    borderRadius: '8px',
-                    marginBottom: '20px',
-                    border: '1px solid #e0e0e0'
-                }}>
-                    <h4 style={{ 
-                    marginBottom: '20px', 
-                    color: '#333',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                    }}>
-                    <span style={{
-                        background: '#1976d2',
-                        color: 'white',
-                        width: '24px',
-                        height: '24px',
-                        borderRadius: '50%',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '14px'
-                    }}>✓</span>
-                    Thông tin tài khoản chủ shop
-                    </h4>
+
+                  {/* ✅ PHẦN HIỂN THỊ VỊ TRÍ - SỬA LẠI CHO CHẾ ĐỘ VIEW */}
+                  <div className="form-group full-width" style={{ marginTop: '15px', borderTop: '1px solid #eee', paddingTop: '15px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <MapPin size={16} />
+                      Vị trí cửa hàng
+                    </label>
                     
-                    <div className="form-grid">
-                    {/* Username */}
-                    <div className="form-group">
-                        <label htmlFor="owner_username">
-                        Tên đăng nhập <span style={{ color: '#d32f2f' }}>*</span>
-                        </label>
-                        <input
-                        type="text"
-                        id="owner_username"
-                        name="username"
-                        value={ownerFormData.username}
-                        onChange={handleOwnerInputChange}
-                        className={formErrors.owner_username ? 'error' : ''}
-                        placeholder="vd: chushop123"
-                        />
-                        {formErrors.owner_username && (
-                        <span className="error-message">{formErrors.owner_username}</span>
+                    {/* Hiển thị khi đã chọn location */}
+                    {(selectedLocation || locationDetails) && (
+                      <div style={{ 
+                        padding: '12px', 
+                        background: modalMode === 'view' ? '#f5f5f5' : '#e8f5e9', 
+                        borderRadius: '8px', 
+                        border: `1px solid ${modalMode === 'view' ? '#ddd' : '#4caf50'}`,
+                        marginBottom: '10px'
+                      }}>
+                        <div><strong>{selectedLocation?.name || locationDetails?.name}</strong></div>
+                        <div style={{ fontSize: '13px', color: '#666', marginTop: '5px' }}>
+                          📍 {selectedLocation?.address || locationDetails?.address}
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#999', marginTop: '3px' }}>
+                          🗺️ {selectedLocation?.lat || locationDetails?.lat}, {selectedLocation?.lng || locationDetails?.lng}
+                        </div>
+                        {modalMode !== 'view' && (
+                          <button 
+                            type="button" 
+                            onClick={() => { setSelectedLocation(null); setLocationDetails(null); setFormData(prev => ({ ...prev, location_id: '' })); }} 
+                            style={{ marginTop: '8px', background: '#f44336', color: 'white', border: 'none', borderRadius: '4px', padding: '4px 8px', cursor: 'pointer', fontSize: '12px' }}
+                          >
+                            Bỏ chọn
+                          </button>
                         )}
-                    </div>
+                      </div>
+                    )}
                     
-                    {/* Email */}
-                    <div className="form-group">
-                        <label htmlFor="owner_email">
-                        Email <span style={{ color: '#d32f2f' }}>*</span>
-                        </label>
-                        <input
-                        type="email"
-                        id="owner_email"
-                        name="email"
-                        value={ownerFormData.email}
-                        onChange={handleOwnerInputChange}
-                        className={formErrors.owner_email ? 'error' : ''}
-                        placeholder="shop@example.com"
-                        />
-                        {formErrors.owner_email && (
-                        <span className="error-message">{formErrors.owner_email}</span>
-                        )}
-                    </div>
-                    
-                    {/* Password */}
-                    <div className="form-group">
-                        <label htmlFor="owner_password">
-                        Mật khẩu <span style={{ color: '#d32f2f' }}>*</span>
-                        </label>
-                        <input
-                        type="password"
-                        id="owner_password"
-                        name="password"
-                        value={ownerFormData.password}
-                        onChange={handleOwnerInputChange}
-                        className={formErrors.owner_password ? 'error' : ''}
-                        placeholder="Ít nhất 6 ký tự"
-                        />
-                        {formErrors.owner_password && (
-                        <span className="error-message">{formErrors.owner_password}</span>
-                        )}
-                    </div>
-                    
-                    {/* Họ tên */}
-                    <div className="form-group">
-                        <label htmlFor="owner_full_name">Họ và tên</label>
-                        <input
-                        type="text"
-                        id="owner_full_name"
-                        name="full_name"
-                        value={ownerFormData.full_name}
-                        onChange={handleOwnerInputChange}
-                        placeholder="Nguyễn Văn A"
-                        />
-                    </div>
-                    
-                    {/* Số điện thoại */}
-                    <div className="form-group">
-                        <label htmlFor="owner_phone">Số điện thoại</label>
-                        <input
-                        type="tel"
-                        id="owner_phone"
-                        name="phone"
-                        value={ownerFormData.phone}
-                        onChange={handleOwnerInputChange}
-                        placeholder="0912345678"
-                        />
-                    </div>
-                    
-                    {/* Giới tính */}
-                    <div className="form-group">
-                        <label htmlFor="owner_gender">Giới tính</label>
-                        <select
-                        id="owner_gender"
-                        name="gender"
-                        value={ownerFormData.gender}
-                        onChange={handleOwnerInputChange}
+                    {/* Nút chọn location - chỉ hiển thị khi chưa chọn và không phải chế độ view */}
+                    {!selectedLocation && !locationDetails && modalMode !== 'view' && (
+                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <button 
+                          type="button" 
+                          onClick={() => { fetchLocations(); setShowLocationSelector(true); }} 
+                          style={{ padding: '10px 16px', background: '#2196f3', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}
                         >
-                        <option value="">Chọn giới tính</option>
-                        <option value="male">Nam</option>
-                        <option value="female">Nữ</option>
-                        <option value="other">Khác</option>
-                        </select>
-                    </div>
+                          <MapPin size={16} /> Chọn từ danh sách địa điểm
+                        </button>
+                        <span style={{ fontSize: '12px', color: '#999' }}>Hoặc nhập thủ công bên trên</span>
+                      </div>
+                    )}
                     
-                    {/* Địa chỉ */}
-                    <div className="form-group full-width">
-                        <label htmlFor="owner_address">Địa chỉ</label>
-                        <textarea
-                        id="owner_address"
-                        name="address"
-                        value={ownerFormData.address}
-                        onChange={handleOwnerInputChange}
-                        rows="2"
-                        placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành"
-                        />
-                    </div>
-                    </div>
+                    {/* Hiển thị khi chưa chọn location ở chế độ view */}
+                    {!selectedLocation && !locationDetails && modalMode === 'view' && (
+                      <div style={{ padding: '12px', background: '#fff3e0', borderRadius: '8px', color: '#e65100' }}>
+                        <MapPin size={16} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+                        Chưa có thông tin vị trí
+                      </div>
+                    )}
                     
-                    {/* Ghi chú */}
-                    <div style={{
-                    background: '#fff3e0',
-                    padding: '10px',
-                    borderRadius: '4px',
-                    marginTop: '15px',
-                    fontSize: '13px',
-                    color: '#e65100',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                    }}>
-                    <AlertCircle size={16} />
-                    <span>
-                        Tài khoản sẽ được tạo với quyền "Chủ shop". 
-                        Sau khi tạo, chủ shop có thể đăng nhập bằng email/mật khẩu này.
-                    </span>
+                    {/* Hiển thị location_id nếu có */}
+                    {formData.location_id && !selectedLocation && !locationDetails && (
+                      <div style={{ fontSize: '12px', color: '#4caf50', marginTop: '5px' }}>
+                        ✓ Đã liên kết với địa điểm ID: {formData.location_id}
+                      </div>
+                    )}
+                  </div>
+
+                  {modalMode === 'add' && (
+                    <div className="owner-section" style={{ marginTop: '20px', borderTop: '2px dashed #1976d2', paddingTop: '20px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '20px', background: '#e3f2fd', padding: '10px 15px', borderRadius: '8px' }}>
+                        <input type="checkbox" id="createOwner" checked={createOwnerAccount} onChange={(e) => setCreateOwnerAccount(e.target.checked)} style={{ width: '18px', height: '18px', marginRight: '10px', cursor: 'pointer' }} />
+                        <label htmlFor="createOwner" style={{ fontWeight: 'bold', color: '#1976d2', fontSize: '16px', cursor: 'pointer' }}>Tạo tài khoản chủ shop mới (Khuyến nghị)</label>
+                      </div>
+                      
+                      {createOwnerAccount && (
+                        <div className="owner-form" style={{ background: '#f8f9fa', padding: '20px', borderRadius: '8px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
+                          <h4 style={{ marginBottom: '20px', color: '#333' }}>Thông tin tài khoản chủ shop</h4>
+                          <div className="form-grid">
+                            <div className="form-group"><label>Tên đăng nhập *</label><input type="text" name="username" value={ownerFormData.username} onChange={handleOwnerInputChange} /></div>
+                            <div className="form-group"><label>Email *</label><input type="email" name="email" value={ownerFormData.email} onChange={handleOwnerInputChange} /></div>
+                            <div className="form-group"><label>Mật khẩu *</label><input type="password" name="password" value={ownerFormData.password} onChange={handleOwnerInputChange} placeholder="Ít nhất 6 ký tự" /></div>
+                            <div className="form-group"><label>Họ và tên</label><input type="text" name="full_name" value={ownerFormData.full_name} onChange={handleOwnerInputChange} /></div>
+                            <div className="form-group"><label>Số điện thoại</label><input type="tel" name="phone" value={ownerFormData.phone} onChange={handleOwnerInputChange} /></div>
+                            <div className="form-group"><label>Giới tính</label><select name="gender" value={ownerFormData.gender} onChange={handleOwnerInputChange}><option value="">Chọn</option><option value="male">Nam</option><option value="female">Nữ</option><option value="other">Khác</option></select></div>
+                            <div className="form-group full-width"><label>Địa chỉ</label><textarea name="address" value={ownerFormData.address} onChange={handleOwnerInputChange} rows="2" /></div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {!createOwnerAccount && (
+                        <div style={{ background: '#fff3e0', padding: '15px', borderRadius: '8px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <AlertCircle size={20} color="#e65100" />
+                          <span style={{ color: '#e65100' }}>Bạn cần tạo tài khoản chủ shop để có thể đăng nhập vào cửa hàng này!</span>
+                        </div>
+                      )}
                     </div>
-                </div>
-                )}
-                
-                {!createOwnerAccount && (
-                <div style={{
-                    background: '#fff3e0',
-                    padding: '15px',
-                    borderRadius: '8px',
-                    marginBottom: '20px',
-                    border: '1px solid #ffe0b2',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px'
-                }}>
-                    <AlertCircle size={20} color="#e65100" />
-                    <span style={{ color: '#e65100' }}>
-                    Bạn cần tạo tài khoản chủ shop để có thể đăng nhập vào cửa hàng này!
-                    </span>
-                </div>
-                )}
-            </div>
-            )}
+                  )}
                 </div>
               </div>
 
               <div className="modal-footer">
-                <button 
-                  type="button" 
-                  className="btn btn-secondary"
-                  onClick={() => setShowModal(false)}
-                >
-                  Hủy
-                </button>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Hủy</button>
                 {modalMode !== 'view' && (
-                  <button 
-                    type="submit" 
-                    className="btn btn-primary"
-                    disabled={submitting}
-                  >
+                  <button type="submit" className="btn btn-primary" disabled={submitting}>
                     <Save size={18} />
                     <span>{submitting ? 'Đang lưu...' : 'Lưu'}</span>
                   </button>
                 )}
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal chọn địa điểm */}
+      {showLocationSelector && (
+        <div className="modal-overlay" onClick={() => setShowLocationSelector(false)}>
+          <div className="modal-content" style={{ maxWidth: '800px', width: '90%' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3><MapPin size={18} style={{ marginRight: '8px' }} />Chọn vị trí cửa hàng</h3>
+              <button className="modal-close" onClick={() => setShowLocationSelector(false)}><X size={20} /></button>
+            </div>
+            <div className="modal-body">
+              <div style={{ marginBottom: '15px' }}>
+                <div className="users-search-box" style={{ width: '100%' }}>
+                  <Search size={18} className="search-icon" />
+                  <input type="text" placeholder="Tìm kiếm địa điểm..." value={searchLocationTerm} onChange={(e) => setSearchLocationTerm(e.target.value)} className="users-search-input" style={{ width: '100%' }} />
+                </div>
+              </div>
+              
+              {loadingLocations ? (
+                <div className="loading-spinner" style={{ padding: '40px' }}><div className="spinner"></div><p>Đang tải...</p></div>
+              ) : filteredLocations.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}><MapPin size={48} /><p>Không tìm thấy địa điểm nào</p></div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '500px', overflowY: 'auto' }}>
+                  {filteredLocations.map(location => (
+                    <div key={location._id || location.id} onClick={() => handleSelectLocation(location)} style={{ padding: '15px', border: '1px solid #e0e0e0', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s' }}>
+                      <div><strong>{location.name}</strong></div>
+                      <div style={{ fontSize: '13px', color: '#666' }}>📍 {location.address}</div>
+                      <div style={{ fontSize: '11px', color: '#999' }}>🗺️ {location.lat}, {location.lng}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={() => setShowLocationSelector(false)}>Đóng</button>
+            </div>
           </div>
         </div>
       )}

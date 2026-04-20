@@ -1,10 +1,10 @@
 // src/api/locationApi.js
-import { adminApi } from './api';  // ← SỬA: dùng adminApi thay vì api mặc định
+import { adminApi } from './api';
 
 const locationApi = {
   // Province APIs
   getAllProvinces: (status = 'active') => 
-    adminApi.get(`/api/v1/locations/provinces/all?status=${status}`),  // ← thêm adminApi
+    adminApi.get(`/api/v1/locations/provinces/all?status=${status}`),
   
   getProvince: (provinceId) => 
     adminApi.get(`/api/v1/locations/provinces/${provinceId}`),
@@ -42,6 +42,10 @@ const locationApi = {
   
   deleteLocation: (locationId, hardDelete = false) => 
     adminApi.delete(`/api/v1/locations/${locationId}?hard_delete=${hardDelete}`),
+  
+  // ✅ SỬA LẠI - Dùng endpoint đúng
+  getAllLocations: (limit = 200) => 
+    adminApi.get('/api/v1/locations', { params: { limit } }),
 };
 
 export default locationApi;

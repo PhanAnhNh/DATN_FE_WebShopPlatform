@@ -687,7 +687,7 @@ const AdminLocations = () => {
                   <label>URL Hình ảnh (cách nhau bằng dấu phẩy)</label>
                   <input
                     type="text"
-                    value={locationForm.images.join(', ')}
+                    value={Array.isArray(locationForm.images) ? locationForm.images.join(', ') : ''}
                     onChange={(e) => {
                       const urls = e.target.value.split(',').map(url => url.trim()).filter(url => url);
                       setLocationForm(prev => ({ ...prev, images: urls }));
@@ -700,7 +700,7 @@ const AdminLocations = () => {
                   </div>
                   
                   {/* Preview ảnh */}
-                  {locationForm.images.length > 0 && (
+                  {Array.isArray(locationForm.images) && locationForm.images.length > 0 && (
                     <div style={{ display: 'flex', gap: '10px', marginTop: '10px', flexWrap: 'wrap' }}>
                       {locationForm.images.map((url, index) => (
                         <div key={index} style={{ position: 'relative' }}>

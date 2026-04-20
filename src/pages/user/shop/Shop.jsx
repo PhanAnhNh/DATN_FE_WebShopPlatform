@@ -1,8 +1,11 @@
+// ShopPage.jsx - SỬA LẠI
+
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Layout from "../../../components/layout/Layout";
 import api from "../../../api/api";
 import locationApi from "../../../api/locationApi";
+import { useUserLocation } from "../../../components/Hooks/useUserLocation";
 
 const ShopPage = () => {
     const navigate = useNavigate();
@@ -14,6 +17,8 @@ const ShopPage = () => {
     const [provinces, setProvinces] = useState([]);
     const [loading, setLoading] = useState(true);
     const [imageErrors, setImageErrors] = useState({});
+    const { location, loading: locationLoading } = useUserLocation();
+    const [nearbyLoading, setNearbyLoading] = useState(false);
 
     // Fetch provinces from API
     useEffect(() => {
@@ -33,10 +38,54 @@ const ShopPage = () => {
         }
     };
 
+    // Khi có location, fetch shops gần đây
+    useEffect(() => {
+        if (location) {
+            fetchNearbyShops();
+        }
+    }, [location]);
+
+    const fetchNearbyShops = async () => {
+        setNearbyLoading(true);
+        try {
+            const res = await api.get("/api/v1/shops/nearby", {
+                params: {
+                    lat: location.lat,
+                    lng: location.lng,
+                    radius_km: 10,
+                    limit: 20
+                }
+            });
+            
+            console.log("Nearby shops response:", res.data);
+            
+            // Format distance hiển thị
+            const formatted = (res.data.data || []).map(shop => ({
+                id: shop._id || shop.id,
+                name: shop.name,
+                rating: shop.rating || 4.5,
+                distance_km: shop.distance_km,
+                distance_text: shop.distance_km < 1 
+                    ? `${Math.round(shop.distance_km * 1000)}m` 
+                    : `${shop.distance_km.toFixed(1)}km`,
+                avatar: shop.logo_url,
+                banner_url: shop.banner_url,
+                cover_image: shop.banner_url || "https://via.placeholder.com/300x160?text=Shop"
+            }));
+            
+            console.log("Formatted shops:", formatted);
+            setFeaturedShops(formatted);
+            
+        } catch (error) {
+            console.error("Lỗi lấy shop gần đây:", error);
+        } finally {
+            setNearbyLoading(false);
+        }
+    };
+
     // Hàm đọc cache khi component mount
     const loadFromCache = () => {
         const cachedProducts = sessionStorage.getItem('shop_featuredProducts');
-        const cachedShops = sessionStorage.getItem('shop_featuredShops');
         const cacheTime = sessionStorage.getItem('shop_cache_timestamp');
         const cachedCategory = sessionStorage.getItem('shop_activeCategory');
         const cachedSubCategory = sessionStorage.getItem('shop_selectedSubCategory');
@@ -47,16 +96,17 @@ const ShopPage = () => {
         
         let hasValidCache = false;
         
-        if (cachedProducts && cachedShops && isCacheValid) {
+        if (cachedProducts && isCacheValid) {
             try {
                 setFeaturedProducts(JSON.parse(cachedProducts));
-                setFeaturedShops(JSON.parse(cachedShops));
                 hasValidCache = true;
-                console.log("✅ Loaded products and shops from cache");
+                console.log("✅ Loaded products from cache");
             } catch (e) {
-                console.error("Error parsing products/shops cache:", e);
+                console.error("Error parsing products cache:", e);
             }
         }
+        
+        // ⚠️ KHÔNG load shops từ cache nữa, vì shops sẽ được lấy từ API nearby
         
         if (cachedCategory) {
             setActiveCategory(cachedCategory);
@@ -75,13 +125,10 @@ const ShopPage = () => {
         return hasValidCache;
     };
 
-    // Hàm lưu cache
+    // Hàm lưu cache (chỉ lưu products)
     const saveToCache = () => {
         if (featuredProducts.length > 0) {
             sessionStorage.setItem('shop_featuredProducts', JSON.stringify(featuredProducts));
-        }
-        if (featuredShops.length > 0) {
-            sessionStorage.setItem('shop_featuredShops', JSON.stringify(featuredShops));
         }
         sessionStorage.setItem('shop_activeCategory', activeCategory);
         sessionStorage.setItem('shop_selectedSubCategory', selectedSubCategory);
@@ -91,34 +138,26 @@ const ShopPage = () => {
 
     // Effect để lưu cache khi có thay đổi
     useEffect(() => {
-        if (featuredProducts.length > 0 || featuredShops.length > 0) {
+        if (featuredProducts.length > 0) {
             saveToCache();
         }
-    }, [featuredProducts, featuredShops, activeCategory, selectedSubCategory, priceRange]);
+    }, [featuredProducts, activeCategory, selectedSubCategory, priceRange]);
 
-    // Effect chính - load dữ liệu khi mount hoặc khi filters thay đổi
+    // Effect chính - load dữ liệu products khi mount
     useEffect(() => {
         const hasCache = loadFromCache();
         
-        if (hasCache && featuredProducts.length > 0 && featuredShops.length > 0) {
-            console.log("Using cached data, skipping API call");
+        if (hasCache && featuredProducts.length > 0) {
+            console.log("Using cached products data");
             setLoading(false);
         } else {
-            console.log("No valid cache, fetching from API");
-            fetchData();
+            console.log("No valid cache, fetching products from API");
+            fetchProducts();
         }
     }, []);
 
-    // Effect để fetch khi filters thay đổi
-    useEffect(() => {
-        const isFirstRender = featuredProducts.length === 0 && featuredShops.length === 0;
-        if (!isFirstRender) {
-            console.log("Filters changed, fetching new data");
-            fetchData();
-        }
-    }, [activeCategory, selectedSubCategory, priceRange]);
-
-    const fetchData = async () => {
+    // Chỉ fetch products, không fetch shops
+    const fetchProducts = async () => {
         setLoading(true);
         try {
             const productsRes = await api.get("/api/v1/products", {
@@ -127,49 +166,25 @@ const ShopPage = () => {
                     sub_category: selectedSubCategory || undefined
                 }
             });
-            const products = productsRes.data || [];
-            setFeaturedProducts(products);
-
-            const shopsRes = await api.get("/api/v1/shops");
             
-            const mappedShops = (shopsRes.data || []).map(shop => ({
-                ...shop,
-                id: shop.id || shop._id,
-                banner_url: shop.banner_url || shop.cover,
-                name: shop.name || shop.shop_name,
-                rating: shop.rating || 4.5,
-                distance: shop.distance || "1km"
+            const products = (productsRes.data || []).map(product => ({
+                id: product.id || product._id,
+                name: product.name,
+                price: product.price,
+                unit: product.unit || "kg",
+                shop_name: product.shop_name || product.shop?.name || "Cửa hàng",
+                image: product.image_url || product.image || "https://via.placeholder.com/300?text=No+Image",
+                fallbackIcon: "🍎"
             }));
             
-            setFeaturedShops(mappedShops);
+            setFeaturedProducts(products);
+            console.log("✅ Loaded products from API:", products.length);
+            
             sessionStorage.setItem('shop_cache_timestamp', Date.now().toString());
             
         } catch (error) {
-            console.error("Error fetching data:", error);
-            const fallbackProducts = [
-                { id: 1, name: "Táo đỏ tươi", price: 60000, unit: "kg", shop_name: "Shop rau củ Đà Lạt", image: "🍎", fallbackIcon: "🍎" },
-                { id: 2, name: "Chuối thiên nhiên", price: 20000, unit: "kg", shop_name: "Nông sản sạch", image: "🍌", fallbackIcon: "🍌" }
-            ];
-            const fallbackShops = [
-                {
-                    id: 1,
-                    name: "Shop rau củ Đà Lạt",
-                    rating: 5.0,
-                    distance: "2km",
-                    avatar: "🌱",
-                    cover: "https://images.unsplash.com/photo-1488459716781-31db52582fe9?w=600&h=400&fit=crop"
-                },
-                {
-                    id: 2,
-                    name: "Hải sản Nha Trang",
-                    rating: 4.8,
-                    distance: "5km",
-                    avatar: "🦐",
-                    cover: "https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=600&h=400&fit=crop"
-                }
-            ];
-            setFeaturedProducts(fallbackProducts);
-            setFeaturedShops(fallbackShops);
+            console.error("Error fetching products:", error);
+            setFeaturedProducts([]);
         } finally {
             setLoading(false);
         }
@@ -244,10 +259,13 @@ const ShopPage = () => {
         );
     };
 
+    // Hiển thị trạng thái loading cho nearby shops
+    const isLoadingShops = nearbyLoading || (locationLoading && !location);
+
     return (
         <Layout>
             <div className="shop-page" style={{ maxWidth: "1200px", margin: "0 auto" }}>
-                {/* Header với các tab Diễn Đàn / Cửa Hàng */}
+                {/* Header tabs - giữ nguyên */}
                 <div style={{ display: "flex", gap: "10px", marginBottom: "20px", alignItems: "center" }}>
                     <div style={{ display: "flex", flex: 1, gap: "10px" }}>
                         <div 
@@ -296,7 +314,7 @@ const ShopPage = () => {
                     </div>
                 </div>
 
-                {/* Khu vực tỉnh thành nổi bật - Lấy từ database */}
+                {/* Khu vực tỉnh thành - giữ nguyên */}
                 <div style={{
                     background: "white",
                     borderRadius: "16px",
@@ -370,7 +388,7 @@ const ShopPage = () => {
                 <div style={{ display: "flex", gap: "20px" }}>
                     {/* Nội dung chính bên phải */}
                     <div style={{ flex: 1 }}>
-                        {/* Sản phẩm nổi bật */}
+                        {/* Sản phẩm nổi bật - giữ nguyên */}
                         <div style={{
                             background: "white",
                             borderRadius: "12px",
@@ -412,7 +430,7 @@ const ShopPage = () => {
                             </div>
                         </div>
 
-                        {/* Danh sách shop */}
+                        {/* Danh sách shop gần bạn */}
                         <div style={{
                             background: "white",
                             borderRadius: "12px",
@@ -420,15 +438,41 @@ const ShopPage = () => {
                             boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
                         }}>
                             <h3 style={{ margin: "0 0 15px 0", fontSize: "18px", color: "#333" }}>Shop gần bạn</h3>
-                            <div style={{
-                                display: "grid",
-                                gridTemplateColumns: "repeat(3, 1fr)",
-                                gap: "20px"
-                            }}>
-                                {loading && featuredShops.length === 0 ? (
-                                    <div style={{ textAlign: "center", padding: "40px" }}>Đang tải...</div>
-                                ) : (
-                                    featuredShops.map(shop => (
+                            
+                            {!location && !locationLoading ? (
+                                <div style={{ textAlign: "center", padding: "40px", color: "#999" }}>
+                                    🌍 Cho phép truy cập vị trí để xem shop gần bạn
+                                </div>
+                            ) : isLoadingShops ? (
+                                <div style={{ textAlign: "center", padding: "40px" }}>
+                                    <div style={{ 
+                                        width: "30px", 
+                                        height: "30px", 
+                                        border: "3px solid #f3f3f3", 
+                                        borderTop: "3px solid #2e7d32", 
+                                        borderRadius: "50%", 
+                                        animation: "spin 1s linear infinite",
+                                        margin: "0 auto 10px"
+                                    }}></div>
+                                    <p>Đang tìm shop gần bạn...</p>
+                                    <style>{`
+                                        @keyframes spin {
+                                            0% { transform: rotate(0deg); }
+                                            100% { transform: rotate(360deg); }
+                                        }
+                                    `}</style>
+                                </div>
+                            ) : featuredShops.length === 0 ? (
+                                <div style={{ textAlign: "center", padding: "40px", color: "#999" }}>
+                                    🏪 Không tìm thấy shop nào trong bán kính 10km
+                                </div>
+                            ) : (
+                                <div style={{
+                                    display: "grid",
+                                    gridTemplateColumns: "repeat(3, 1fr)",
+                                    gap: "20px"
+                                }}>
+                                    {featuredShops.map(shop => (
                                         <div
                                             key={shop.id}
                                             style={{
@@ -444,7 +488,7 @@ const ShopPage = () => {
                                         >
                                             <div style={{
                                                 height: "160px",
-                                                backgroundImage: `url(${shop.banner_url || shop.cover || "https://via.placeholder.com/300x160?text=No+Image"})`,
+                                                backgroundImage: `url(${shop.banner_url || shop.cover_image || "https://via.placeholder.com/300x160?text=Shop"})`,
                                                 backgroundSize: "cover",
                                                 backgroundPosition: "center",
                                                 backgroundColor: "#f5f5f5"
@@ -460,8 +504,11 @@ const ShopPage = () => {
                                                 </div>
 
                                                 <div style={{ color: "#666", fontSize: "14px", marginTop: "5px" }}>
-                                                    📍 Cách bạn: {shop.distance}
-                                                </div>
+                                                    <div>📍 Cách bạn: <strong>{shop.distance_text || "Đang tính..."}</strong></div>
+                                                    {shop.duration_min && (
+                                                        <div>⏱️ Ước tính: <strong>{shop.duration_min} phút</strong></div>
+                                                    )}
+                                                    </div>
 
                                                 <button
                                                     style={{
@@ -481,9 +528,9 @@ const ShopPage = () => {
                                                 </button>
                                             </div>
                                         </div>
-                                    ))
-                                )}
-                            </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
