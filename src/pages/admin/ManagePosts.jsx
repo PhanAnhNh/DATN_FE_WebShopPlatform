@@ -1,11 +1,13 @@
+// src/pages/admin/posts/PostsManagement.jsx
 import React, { useState, useEffect } from 'react';
 import { 
   Search, Plus, Download, Edit2, Trash2, Eye,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   X, Save, AlertCircle, CheckCircle, Image, Video,
-  Globe, Users, Lock, Filter, Calendar, Tag
+  Globe, Users, Lock, Filter, Calendar, Tag,
+  Upload, Link as LinkIcon
 } from 'lucide-react';
-import {adminApi} from '../../api/api';
+import { adminApi } from '../../api/api';
 import '../../css/AdminManageLayout.css';
 import Toast from '../../components/common/Toast';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
@@ -62,7 +64,19 @@ const PostsManagement = () => {
   const [formErrors, setFormErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [tagInput, setTagInput] = useState('');
+  
+  // Image upload states
+  const [imageFiles, setImageFiles] = useState([]);
+  const [imagePreviews, setImagePreviews] = useState([]);
+  const [uploadingImages, setUploadingImages] = useState(false);
+  const [imageUploadMethod, setImageUploadMethod] = useState('url');
   const [imageUrlInput, setImageUrlInput] = useState('');
+  
+  // Video upload states
+  const [videoFiles, setVideoFiles] = useState([]);
+  const [videoPreviews, setVideoPreviews] = useState([]);
+  const [uploadingVideos, setUploadingVideos] = useState(false);
+  const [videoUploadMethod, setVideoUploadMethod] = useState('url');
   const [videoUrlInput, setVideoUrlInput] = useState('');
 
   // Fetch posts from API
@@ -75,74 +89,136 @@ const PostsManagement = () => {
   };
 
   const fetchPosts = async () => {
-  try {
-    setLoading(true);
-    setError(null);
-    
-    // Dùng API admin để lấy tất cả bài viết
-    const response = await adminApi.get('/api/v1/admin/posts?limit=100');
-    console.log('Posts data:', response.data);
-    
-    setPosts(response.data);
-    setTotalPosts(response.data.length);
-  } catch (err) {
-    console.error('Error fetching posts:', err);
-    setError('Không thể tải danh sách bài viết');
-  } finally {
-    setLoading(false);
-  }
-};
-
-  // Filter posts based on search term and filters
-  const filteredPosts = posts.filter(post => {
-    if (!post) return false;
-    
-    if (!searchTerm && visibilityFilter === 'all' && categoryFilter === 'all') return true;
-    
-    // Search filter
-    if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase();
-      const authorName = post.author_name?.toLowerCase() || '';
-      const content = post.content?.toLowerCase() || '';
-      
-      if (!authorName.includes(searchLower) && !content.includes(searchLower)) {
-        return false;
-      }
-    }
-    
-    // Visibility filter
-    if (visibilityFilter !== 'all' && post.visibility !== visibilityFilter) {
-      return false;
-    }
-    
-    // Category filter (post_type)
-    if (categoryFilter !== 'all' && post.post_type !== categoryFilter) {
-      return false;
-    }
-    
-    return true;
-  });
-
-  // Pagination
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentPosts = filteredPosts.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredPosts.length / itemsPerPage);
-
-  // Handle form input change
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
-    
-    if (formErrors[name]) {
-      setFormErrors(prev => ({ ...prev, [name]: '' }));
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await adminApi.get('/api/v1/admin/posts?limit=100');
+      console.log('Posts data:', response.data);
+      setPosts(response.data);
+      setTotalPosts(response.data.length);
+    } catch (err) {
+      console.error('Error fetching posts:', err);
+      setError('Không thể tải danh sách bài viết');
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Handle tags
+  // ==================== UPLOAD IMAGE TO R2 ====================
+  
+  const uploadImageToR2 = async (file) => {
+    if (!file) return null;
+
+    const formDataUpload = new FormData();
+    formDataUpload.append('file', file);
+
+    try {
+      const response = await adminApi.post('/api/v1/upload/image', formDataUpload, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
+      if (response.data.success) {
+        return response.data.image_url;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error uploading to R2:', error);
+      if (error.response?.data?.detail) {
+        showToast(`Lỗi upload: ${error.response.data.detail}`, 'error');
+      } else {
+        showToast('Có lỗi xảy ra khi upload ảnh', 'error');
+      }
+      return null;
+    }
+  };
+
+  const uploadMultipleImages = async (files) => {
+    const uploadedUrls = [];
+    for (const file of files) {
+      const url = await uploadImageToR2(file);
+      if (url) {
+        uploadedUrls.push(url);
+      }
+    }
+    return uploadedUrls;
+  };
+
+  // ==================== IMAGE HANDLERS ====================
+  
+  const handleImageSelect = (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
+    const invalidFiles = files.filter(f => !f.type.startsWith('image/'));
+    if (invalidFiles.length > 0) {
+      showToast('Vui lòng chỉ chọn file ảnh', 'error');
+      return;
+    }
+
+    const oversizedFiles = files.filter(f => f.size > 5 * 1024 * 1024);
+    if (oversizedFiles.length > 0) {
+      showToast('Kích thước file không được vượt quá 5MB', 'error');
+      return;
+    }
+
+    setImageFiles(prev => [...prev, ...files]);
+    const newPreviews = files.map(file => URL.createObjectURL(file));
+    setImagePreviews(prev => [...prev, ...newPreviews]);
+    setImageUrlInput('');
+  };
+
+  const handleImageUrlAdd = () => {
+    if (imageUrlInput.trim()) {
+      setImagePreviews(prev => [...prev, imageUrlInput.trim()]);
+      setImageFiles(prev => [...prev, null]); // null for URL images
+      setImageUrlInput('');
+    }
+  };
+
+  const handleRemoveImage = (index) => {
+    setImageFiles(prev => prev.filter((_, i) => i !== index));
+    setImagePreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // ==================== VIDEO HANDLERS ====================
+  
+  const handleVideoSelect = (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
+    const invalidFiles = files.filter(f => !f.type.startsWith('video/'));
+    if (invalidFiles.length > 0) {
+      showToast('Vui lòng chỉ chọn file video', 'error');
+      return;
+    }
+
+    const oversizedFiles = files.filter(f => f.size > 50 * 1024 * 1024);
+    if (oversizedFiles.length > 0) {
+      showToast('Kích thước video không được vượt quá 50MB', 'error');
+      return;
+    }
+
+    setVideoFiles(prev => [...prev, ...files]);
+    const newPreviews = files.map(file => URL.createObjectURL(file));
+    setVideoPreviews(prev => [...prev, ...newPreviews]);
+    setVideoUrlInput('');
+  };
+
+  const handleVideoUrlAdd = () => {
+    if (videoUrlInput.trim()) {
+      setVideoPreviews(prev => [...prev, videoUrlInput.trim()]);
+      setVideoFiles(prev => [...prev, null]); // null for URL videos
+      setVideoUrlInput('');
+    }
+  };
+
+  const handleRemoveVideo = (index) => {
+    setVideoFiles(prev => prev.filter((_, i) => i !== index));
+    setVideoPreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // ==================== TAG HANDLERS ====================
+  
   const handleAddTag = () => {
     if (tagInput.trim()) {
       setFormData(prev => ({
@@ -160,43 +236,20 @@ const PostsManagement = () => {
     }));
   };
 
-  // Handle images
-  const handleAddImage = () => {
-    if (imageUrlInput.trim()) {
-      setFormData(prev => ({
-        ...prev,
-        images: [...prev.images, imageUrlInput.trim()]
-      }));
-      setImageUrlInput('');
+  // ==================== FORM HANDLERS ====================
+  
+  const handleInputChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+    
+    if (formErrors[name]) {
+      setFormErrors(prev => ({ ...prev, [name]: '' }));
     }
   };
 
-  const handleRemoveImage = (index) => {
-    setFormData(prev => ({
-      ...prev,
-      images: prev.images.filter((_, i) => i !== index)
-    }));
-  };
-
-  // Handle videos
-  const handleAddVideo = () => {
-    if (videoUrlInput.trim()) {
-      setFormData(prev => ({
-        ...prev,
-        videos: [...prev.videos, videoUrlInput.trim()]
-      }));
-      setVideoUrlInput('');
-    }
-  };
-
-  const handleRemoveVideo = (index) => {
-    setFormData(prev => ({
-      ...prev,
-      videos: prev.videos.filter((_, i) => i !== index)
-    }));
-  };
-
-  // Validate form
   const validateForm = () => {
     const errors = {};
     if (!formData.content) {
@@ -205,112 +258,183 @@ const PostsManagement = () => {
     return errors;
   };
 
-  // SỬA: handleAddPost dùng API thật
-    const handleAddPost = async (e) => {
+  // ==================== CRUD OPERATIONS ====================
+  
+  const handleAddPost = async (e) => {
     e.preventDefault();
     const errors = validateForm();
     if (Object.keys(errors).length > 0) {
-        setFormErrors(errors);
-        return;
+      setFormErrors(errors);
+      return;
     }
 
     setSubmitting(true);
+    setUploadingImages(true);
+    setUploadingVideos(true);
+    
     try {
-        // Vẫn dùng API user để tạo bài viết
-        const response = await adminApi.post('/posts/', formData);
-        console.log('Add post response:', response.data);
-        
-        showToast('Thêm bài viết thành công!', 'success');
-        setShowModal(false);
-        resetForm();
-        fetchPosts();
+      // Upload images to R2
+      const imageFilesToUpload = imageFiles.filter(f => f !== null);
+      const uploadedImageUrls = await uploadMultipleImages(imageFilesToUpload);
+      
+      // Combine uploaded URLs with manually entered URLs
+      let imageIndex = 0;
+      const finalImageUrls = imagePreviews.map(preview => {
+        if (preview.startsWith('http')) {
+          return preview; // URL already
+        } else {
+          return uploadedImageUrls[imageIndex++] || null;
+        }
+      }).filter(url => url !== null);
+      
+      // Upload videos to R2 (if needed - you may want to handle video differently)
+      const videoFilesToUpload = videoFiles.filter(f => f !== null);
+      const uploadedVideoUrls = await uploadMultipleImages(videoFilesToUpload);
+      
+      let videoIndex = 0;
+      const finalVideoUrls = videoPreviews.map(preview => {
+        if (preview.startsWith('http')) {
+          return preview;
+        } else {
+          return uploadedVideoUrls[videoIndex++] || null;
+        }
+      }).filter(url => url !== null);
+      
+      const postData = {
+        ...formData,
+        images: finalImageUrls,
+        videos: finalVideoUrls
+      };
+      
+      const response = await adminApi.post('/posts/', postData);
+      console.log('Add post response:', response.data);
+      
+      showToast('Thêm bài viết thành công!', 'success');
+      setShowModal(false);
+      resetForm();
+      fetchPosts();
     } catch (err) {
-        console.error('Error adding post:', err);
-        const errorMessage = err.response?.data?.detail || 'Có lỗi xảy ra khi thêm bài viết';
-        showToast(errorMessage, 'error');
+      console.error('Error adding post:', err);
+      const errorMessage = err.response?.data?.detail || 'Có lỗi xảy ra khi thêm bài viết';
+      showToast(errorMessage, 'error');
     } finally {
-        setSubmitting(false);
+      setSubmitting(false);
+      setUploadingImages(false);
+      setUploadingVideos(false);
     }
-    };
+  };
 
-  // SỬA: handleUpdatePost dùng API thật
-    const handleUpdatePost = async (e) => {
+  const handleUpdatePost = async (e) => {
     e.preventDefault();
     const errors = validateForm();
     if (Object.keys(errors).length > 0) {
-        setFormErrors(errors);
-        return;
+      setFormErrors(errors);
+      return;
     }
 
     setSubmitting(true);
+    setUploadingImages(true);
+    setUploadingVideos(true);
+    
     try {
-        // Dùng API admin để cập nhật (không cần check quyền)
-        const response = await adminApi.put(`/admin/posts/${selectedPost._id}`, formData);
-        console.log('Update post response:', response.data);
-        
-        showToast('Cập nhật bài viết thành công!', 'success');
-        setShowModal(false);
-        resetForm();
-        fetchPosts();
+      // Upload new images to R2
+      const imageFilesToUpload = imageFiles.filter(f => f !== null);
+      const uploadedImageUrls = await uploadMultipleImages(imageFilesToUpload);
+      
+      let imageIndex = 0;
+      const finalImageUrls = imagePreviews.map(preview => {
+        if (preview.startsWith('http')) {
+          return preview;
+        } else {
+          return uploadedImageUrls[imageIndex++] || null;
+        }
+      }).filter(url => url !== null);
+      
+      // Upload new videos
+      const videoFilesToUpload = videoFiles.filter(f => f !== null);
+      const uploadedVideoUrls = await uploadMultipleImages(videoFilesToUpload);
+      
+      let videoIndex = 0;
+      const finalVideoUrls = videoPreviews.map(preview => {
+        if (preview.startsWith('http')) {
+          return preview;
+        } else {
+          return uploadedVideoUrls[videoIndex++] || null;
+        }
+      }).filter(url => url !== null);
+      
+      const postData = {
+        ...formData,
+        images: finalImageUrls,
+        videos: finalVideoUrls
+      };
+      
+      const response = await adminApi.put(`/api/v1/admin/posts/${selectedPost._id}`, postData);
+      console.log('Update post response:', response.data);
+      
+      showToast('Cập nhật bài viết thành công!', 'success');
+      setShowModal(false);
+      resetForm();
+      fetchPosts();
     } catch (err) {
-        console.error('Error updating post:', err);
-        const errorMessage = err.response?.data?.detail || 'Có lỗi xảy ra khi cập nhật';
-        showToast(errorMessage, 'error');
+      console.error('Error updating post:', err);
+      const errorMessage = err.response?.data?.detail || 'Có lỗi xảy ra khi cập nhật';
+      showToast(errorMessage, 'error');
     } finally {
-        setSubmitting(false);
+      setSubmitting(false);
+      setUploadingImages(false);
+      setUploadingVideos(false);
     }
-    };
+  };
 
-    const handleDeletePost = (postId) => {
+  const handleDeletePost = (postId) => {
     setDialogConfig({
-        title: 'Xác nhận xóa',
-        message: 'Bạn có chắc chắn muốn xóa bài viết này? Hành động này không thể hoàn tác.',
-        type: 'warning',
-        onConfirm: async () => {
+      title: 'Xác nhận xóa',
+      message: 'Bạn có chắc chắn muốn xóa bài viết này? Hành động này không thể hoàn tác.',
+      type: 'warning',
+      onConfirm: async () => {
         try {
-            // Dùng API admin để xóa
-            const response = await adminApi.delete(`/admin/posts/${postId}`);
-            console.log('Delete post response:', response.data);
-            
-            showToast('Xóa bài viết thành công!', 'success');
-            fetchPosts();
+          const response = await adminApi.delete(`/api/v1/admin/posts/${postId}`);
+          console.log('Delete post response:', response.data);
+          showToast('Xóa bài viết thành công!', 'success');
+          fetchPosts();
         } catch (err) {
-            console.error('Error deleting post:', err);
-            const errorMessage = err.response?.data?.detail || 'Có lỗi xảy ra khi xóa';
-            showToast(errorMessage, 'error');
+          console.error('Error deleting post:', err);
+          const errorMessage = err.response?.data?.detail || 'Có lỗi xảy ra khi xóa';
+          showToast(errorMessage, 'error');
         }
-        }
+      }
     });
     setShowConfirmDialog(true);
-    };
-  // SỬA: handleToggleStatus dùng API thật
-    const handleToggleStatus = (post) => {
+  };
+
+  const handleToggleStatus = (post) => {
     const newStatus = !post.is_active;
     setDialogConfig({
-        title: newStatus ? 'Hiện bài viết' : 'Ẩn bài viết',
-        message: `Bạn có chắc chắn muốn ${newStatus ? 'hiện' : 'ẩn'} bài viết này?`,
-        type: 'warning',
-        onConfirm: async () => {
+      title: newStatus ? 'Hiện bài viết' : 'Ẩn bài viết',
+      message: `Bạn có chắc chắn muốn ${newStatus ? 'hiện' : 'ẩn'} bài viết này?`,
+      type: 'warning',
+      onConfirm: async () => {
         try {
-            // Dùng API admin để cập nhật trạng thái
-            const response = await adminApi.put(`/admin/posts/${post._id}/status?is_active=${newStatus}`);
-            console.log('Update status response:', response.data);
-            
-            showToast(`Cập nhật trạng thái thành công!`, 'success');
-            fetchPosts();
+          const response = await adminApi.put(`/api/v1/admin/posts/${post._id}/status?is_active=${newStatus}`);
+          console.log('Update status response:', response.data);
+          showToast(`Cập nhật trạng thái thành công!`, 'success');
+          fetchPosts();
         } catch (err) {
-            console.error('Error updating status:', err);
-            const errorMessage = err.response?.data?.detail || 'Có lỗi xảy ra';
-            showToast(errorMessage, 'error');
+          console.error('Error updating status:', err);
+          const errorMessage = err.response?.data?.detail || 'Có lỗi xảy ra';
+          showToast(errorMessage, 'error');
         }
-        }
+      }
     });
     setShowConfirmDialog(true);
-    };
+  };
 
-  // Open modal for view/edit/add
   const openModal = (mode, post = null) => {
     setModalMode(mode);
+    resetImageStates();
+    resetVideoStates();
+    
     if (post) {
       setSelectedPost(post);
       setFormData({
@@ -326,6 +450,18 @@ const PostsManagement = () => {
         allow_share: post.allow_share !== false,
         is_pinned: post.is_pinned || false
       });
+      
+      // Set previews for existing images
+      if (post.images && post.images.length > 0) {
+        setImagePreviews([...post.images]);
+        setImageFiles(post.images.map(() => null));
+      }
+      
+      // Set previews for existing videos
+      if (post.videos && post.videos.length > 0) {
+        setVideoPreviews([...post.videos]);
+        setVideoFiles(post.videos.map(() => null));
+      }
     } else {
       resetForm();
     }
@@ -349,11 +485,24 @@ const PostsManagement = () => {
     setFormErrors({});
     setSelectedPost(null);
     setTagInput('');
-    setImageUrlInput('');
-    setVideoUrlInput('');
+    resetImageStates();
+    resetVideoStates();
   };
 
-  // Export to Excel
+  const resetImageStates = () => {
+    setImageFiles([]);
+    setImagePreviews([]);
+    setImageUrlInput('');
+    setImageUploadMethod('url');
+  };
+
+  const resetVideoStates = () => {
+    setVideoFiles([]);
+    setVideoPreviews([]);
+    setVideoUrlInput('');
+    setVideoUploadMethod('url');
+  };
+
   const handleExportExcel = () => {
     const headers = ['Thứ tự', 'Tên người đăng', 'Nội dung', 'Ngày đăng', 'Loại bài', 'Hình ảnh', 'Hiển thị'];
     const csvContent = [
@@ -377,9 +526,32 @@ const PostsManagement = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
     showToast('Xuất file Excel thành công!', 'success');
   };
+
+  // Filter logic
+  const filteredPosts = posts.filter(post => {
+    if (!post) return false;
+    if (!searchTerm && visibilityFilter === 'all' && categoryFilter === 'all') return true;
+    
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      const authorName = post.author_name?.toLowerCase() || '';
+      const content = post.content?.toLowerCase() || '';
+      if (!authorName.includes(searchLower) && !content.includes(searchLower)) {
+        return false;
+      }
+    }
+    if (visibilityFilter !== 'all' && post.visibility !== visibilityFilter) return false;
+    if (categoryFilter !== 'all' && post.post_type !== categoryFilter) return false;
+    return true;
+  });
+
+  // Pagination
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentPosts = filteredPosts.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredPosts.length / itemsPerPage);
 
   const getVisibilityIcon = (visibility) => {
     switch(visibility) {
@@ -401,14 +573,10 @@ const PostsManagement = () => {
 
   const getVisibilityBadge = (visibility) => {
     switch(visibility) {
-      case 'public':
-        return 'status-badge success';
-      case 'friends':
-        return 'status-badge warning';
-      case 'private':
-        return 'status-badge inactive';
-      default:
-        return 'status-badge';
+      case 'public': return 'status-badge success';
+      case 'friends': return 'status-badge warning';
+      case 'private': return 'status-badge inactive';
+      default: return 'status-badge';
     }
   };
 
@@ -432,6 +600,152 @@ const PostsManagement = () => {
       minute: '2-digit'
     });
   };
+
+  // Component upload ảnh
+  const ImageUploadSection = ({ 
+    title, previews, onFileSelect, onUrlAdd, urlValue, setUrlValue, 
+    onRemove, uploadMethod, setUploadMethod, isViewMode, multiple = true 
+  }) => (
+    <div className="form-group full-width">
+      <label>{title}</label>
+      
+      {!isViewMode && (
+        <div className="image-method-selector" style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+          <button
+            type="button"
+            className={`method-btn ${uploadMethod === 'url' ? 'active' : ''}`}
+            onClick={() => setUploadMethod('url')}
+            style={{
+              padding: '8px 16px',
+              background: uploadMethod === 'url' ? '#1976d2' : '#e0e0e0',
+              color: uploadMethod === 'url' ? 'white' : '#333',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            <LinkIcon size={16} style={{ marginRight: '5px' }} /> Nhập URL
+          </button>
+          <button
+            type="button"
+            className={`method-btn ${uploadMethod === 'file' ? 'active' : ''}`}
+            onClick={() => setUploadMethod('file')}
+            style={{
+              padding: '8px 16px',
+              background: uploadMethod === 'file' ? '#1976d2' : '#e0e0e0',
+              color: uploadMethod === 'file' ? 'white' : '#333',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            <Upload size={16} style={{ marginRight: '5px' }} /> Tải lên từ máy
+          </button>
+        </div>
+      )}
+
+      {uploadMethod === 'url' ? (
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+          <input
+            type="text"
+            placeholder={`Nhập URL ${title.toLowerCase()}`}
+            value={urlValue}
+            onChange={(e) => setUrlValue(e.target.value)}
+            disabled={isViewMode}
+            style={{ flex: 1, padding: '8px', border: '1px solid #e0e0e0', borderRadius: '4px' }}
+          />
+          {!isViewMode && (
+            <button
+              type="button"
+              onClick={onUrlAdd}
+              className="btn btn-secondary"
+              style={{ padding: '8px 15px' }}
+            >
+              Thêm
+            </button>
+          )}
+        </div>
+      ) : (
+        !isViewMode && (
+          <div className="image-upload-container" style={{ marginBottom: '10px' }}>
+            <input
+              type="file"
+              accept="image/*"
+              multiple={multiple}
+              onChange={onFileSelect}
+              style={{ display: 'none' }}
+              id={`${title}-upload`}
+            />
+            <label htmlFor={`${title}-upload`} style={{
+              display: 'inline-block',
+              padding: '8px 16px',
+              background: '#4caf50',
+              color: 'white',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}>
+              <Upload size={16} style={{ marginRight: '5px' }} /> Chọn {title.toLowerCase()} từ máy
+            </label>
+          </div>
+        )
+      )}
+      
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '10px' }}>
+        {previews.map((item, index) => (
+          <div key={index} style={{ position: 'relative' }}>
+            {item.startsWith('http') ? (
+              <img 
+                src={item} 
+                alt={`${title}-${index}`}
+                style={{
+                  width: '100px',
+                  height: '100px',
+                  objectFit: 'cover',
+                  borderRadius: '8px',
+                  border: '1px solid #e0e0e0'
+                }}
+              />
+            ) : (
+              <img 
+                src={item} 
+                alt={`${title}-${index}`}
+                style={{
+                  width: '100px',
+                  height: '100px',
+                  objectFit: 'cover',
+                  borderRadius: '8px',
+                  border: '1px solid #e0e0e0'
+                }}
+              />
+            )}
+            {!isViewMode && (
+              <button
+                type="button"
+                onClick={() => onRemove(index)}
+                style={{
+                  position: 'absolute',
+                  top: '-8px',
+                  right: '-8px',
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '50%',
+                  background: '#f44336',
+                  color: 'white',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                ×
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <div className="users-management">
@@ -468,12 +782,7 @@ const PostsManagement = () => {
       )}
 
       {/* Filter Bar */}
-      <div className="filter-bar" style={{ 
-        display: 'flex', 
-        gap: '15px', 
-        marginBottom: '20px',
-        flexWrap: 'wrap'
-      }}>
+      <div className="filter-bar" style={{ display: 'flex', gap: '15px', marginBottom: '20px', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Filter size={16} color="#666" />
           <span style={{ fontSize: '14px', color: '#666' }}>Lọc:</span>
@@ -482,14 +791,7 @@ const PostsManagement = () => {
         <select 
           value={visibilityFilter}
           onChange={(e) => setVisibilityFilter(e.target.value)}
-          style={{
-            padding: '8px 12px',
-            border: '1px solid #e0e0e0',
-            borderRadius: '6px',
-            fontSize: '14px',
-            outline: 'none',
-            minWidth: '120px'
-          }}
+          style={{ padding: '8px 12px', border: '1px solid #e0e0e0', borderRadius: '6px', fontSize: '14px', outline: 'none', minWidth: '120px' }}
         >
           <option value="all">Tất cả hiển thị</option>
           <option value="public">Công khai</option>
@@ -500,14 +802,7 @@ const PostsManagement = () => {
         <select 
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
-          style={{
-            padding: '8px 12px',
-            border: '1px solid #e0e0e0',
-            borderRadius: '6px',
-            fontSize: '14px',
-            outline: 'none',
-            minWidth: '120px'
-          }}
+          style={{ padding: '8px 12px', border: '1px solid #e0e0e0', borderRadius: '6px', fontSize: '14px', outline: 'none', minWidth: '120px' }}
         >
           <option value="all">Tất cả loại</option>
           <option value="text">Bài viết</option>
@@ -570,42 +865,15 @@ const PostsManagement = () => {
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         {post.author_avatar ? (
-                          <img 
-                            src={post.author_avatar} 
-                            alt={post.author_name}
-                            style={{
-                              width: '32px',
-                              height: '32px',
-                              borderRadius: '50%',
-                              objectFit: 'cover'
-                            }}
-                          />
+                          <img src={post.author_avatar} alt={post.author_name} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
                         ) : (
-                          <div style={{
-                            width: '32px',
-                            height: '32px',
-                            borderRadius: '50%',
-                            background: '#1976d2',
-                            color: 'white',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '14px',
-                            fontWeight: 'bold'
-                          }}>
+                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#1976d2', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 'bold' }}>
                             {post.author_name?.charAt(0).toUpperCase() || 'A'}
                           </div>
                         )}
                         <div>
                           <div style={{ fontWeight: 500 }}>{post.author_name || 'Người dùng'}</div>
-                          <div style={{ 
-                            fontSize: '12px', 
-                            color: '#666',
-                            maxWidth: '200px',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap'
-                          }}>
+                          <div style={{ fontSize: '12px', color: '#666', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {post.content?.substring(0, 50)}...
                           </div>
                         </div>
@@ -618,14 +886,7 @@ const PostsManagement = () => {
                       </div>
                     </td>
                     <td>
-                      <span style={{
-                        padding: '4px 8px',
-                        background: '#e3f2fd',
-                        color: '#1976d2',
-                        borderRadius: '4px',
-                        fontSize: '12px',
-                        fontWeight: 500
-                      }}>
+                      <span style={{ padding: '4px 8px', background: '#e3f2fd', color: '#1976d2', borderRadius: '4px', fontSize: '12px', fontWeight: 500 }}>
                         {getPostTypeText(post.post_type)}
                       </span>
                     </td>
@@ -640,36 +901,20 @@ const PostsManagement = () => {
                       )}
                     </td>
                     <td>
-                      <span className={getVisibilityBadge(post.visibility)} style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                      }}>
+                      <span className={getVisibilityBadge(post.visibility)} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                         {getVisibilityIcon(post.visibility)}
                         {getVisibilityText(post.visibility)}
                       </span>
                     </td>
                     <td>
                       <div className="action-cell">
-                        <button 
-                          className="action-btn view" 
-                          onClick={() => openModal('view', post)}
-                          title="Xem chi tiết"
-                        >
+                        <button className="action-btn view" onClick={() => openModal('view', post)} title="Xem chi tiết">
                           <Eye size={16} />
                         </button>
-                        <button 
-                          className="action-btn edit" 
-                          onClick={() => openModal('edit', post)}
-                          title="Sửa"
-                        >
+                        <button className="action-btn edit" onClick={() => openModal('edit', post)} title="Sửa">
                           <Edit2 size={16} />
                         </button>
-                        <button 
-                          className={`action-btn ${post.is_active ? 'delete' : 'view'}`}
-                          onClick={() => handleToggleStatus(post)}
-                          title={post.is_active ? 'Ẩn bài viết' : 'Hiện bài viết'}
-                        >
+                        <button className={`action-btn ${post.is_active ? 'delete' : 'view'}`} onClick={() => handleToggleStatus(post)} title={post.is_active ? 'Ẩn bài viết' : 'Hiện bài viết'}>
                           {post.is_active ? <Trash2 size={16} /> : <CheckCircle size={16} />}
                         </button>
                       </div>
@@ -678,9 +923,7 @@ const PostsManagement = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="7" className="empty-table">
-                    Không có dữ liệu
-                  </td>
+                  <td colSpan="7" className="empty-table">Không có dữ liệu</td>
                 </tr>
               )}
             </tbody>
@@ -695,21 +938,12 @@ const PostsManagement = () => {
             Hiển thị {indexOfFirstItem + 1} - {Math.min(indexOfLastItem, filteredPosts.length)} / {filteredPosts.length} bài viết
           </div>
           <div className="pagination-controls">
-            <button 
-              className="pagination-btn" 
-              onClick={() => setCurrentPage(1)}
-              disabled={currentPage === 1}
-            >
+            <button className="pagination-btn" onClick={() => setCurrentPage(1)} disabled={currentPage === 1}>
               <ChevronsLeft size={16} />
             </button>
-            <button 
-              className="pagination-btn" 
-              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-              disabled={currentPage === 1}
-            >
+            <button className="pagination-btn" onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} disabled={currentPage === 1}>
               <ChevronLeft size={16} />
             </button>
-            
             {[...Array(Math.min(5, totalPages))].map((_, i) => {
               let pageNum;
               if (totalPages <= 5) {
@@ -721,42 +955,21 @@ const PostsManagement = () => {
               } else {
                 pageNum = currentPage - 2 + i;
               }
-              
               return (
-                <button
-                  key={i}
-                  className={`pagination-btn ${currentPage === pageNum ? 'active' : ''}`}
-                  onClick={() => setCurrentPage(pageNum)}
-                >
+                <button key={i} className={`pagination-btn ${currentPage === pageNum ? 'active' : ''}`} onClick={() => setCurrentPage(pageNum)}>
                   {pageNum}
                 </button>
               );
             })}
-            
-            <button 
-              className="pagination-btn" 
-              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-              disabled={currentPage === totalPages}
-            >
+            <button className="pagination-btn" onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} disabled={currentPage === totalPages}>
               <ChevronRight size={16} />
             </button>
-            <button 
-              className="pagination-btn" 
-              onClick={() => setCurrentPage(totalPages)}
-              disabled={currentPage === totalPages}
-            >
+            <button className="pagination-btn" onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages}>
               <ChevronsRight size={16} />
             </button>
           </div>
           <div className="pagination-items-per-page">
-            <select 
-              value={itemsPerPage} 
-              onChange={(e) => {
-                setItemsPerPage(Number(e.target.value));
-                setCurrentPage(1);
-              }}
-              className="items-per-page-select"
-            >
+            <select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }} className="items-per-page-select">
               <option value={5}>5 / trang</option>
               <option value={10}>10 / trang</option>
               <option value={20}>20 / trang</option>
@@ -769,7 +982,7 @@ const PostsManagement = () => {
       {/* Post Modal */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '700px' }}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '800px', maxHeight: '80vh', overflowY: 'auto' }}>
             <div className="modal-header">
               <h3>
                 {modalMode === 'add' ? 'Thêm bài viết mới' : 
@@ -797,75 +1010,23 @@ const PostsManagement = () => {
                       className={formErrors.content ? 'error' : ''}
                       placeholder="Nhập nội dung bài viết..."
                     />
-                    {formErrors.content && (
-                      <span className="error-message">{formErrors.content}</span>
-                    )}
+                    {formErrors.content && <span className="error-message">{formErrors.content}</span>}
                   </div>
 
                   {/* Hình ảnh */}
-                  <div className="form-group full-width">
-                    <label>Hình ảnh</label>
-                    {modalMode !== 'view' && (
-                      <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-                        <input
-                          type="text"
-                          value={imageUrlInput}
-                          onChange={(e) => setImageUrlInput(e.target.value)}
-                          placeholder="Nhập URL hình ảnh..."
-                          style={{ flex: 1, padding: '8px', border: '1px solid #e0e0e0', borderRadius: '4px' }}
-                        />
-                        <button
-                          type="button"
-                          onClick={handleAddImage}
-                          className="btn btn-secondary"
-                          style={{ padding: '8px 15px' }}
-                        >
-                          Thêm
-                        </button>
-                      </div>
-                    )}
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                      {formData.images.map((img, index) => (
-                        <div key={index} style={{ position: 'relative' }}>
-                          <img 
-                            src={img} 
-                            alt={`img-${index}`}
-                            style={{
-                              width: '80px',
-                              height: '80px',
-                              objectFit: 'cover',
-                              borderRadius: '4px',
-                              border: '1px solid #e0e0e0'
-                            }}
-                          />
-                          {modalMode !== 'view' && (
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveImage(index)}
-                              style={{
-                                position: 'absolute',
-                                top: '-5px',
-                                right: '-5px',
-                                width: '20px',
-                                height: '20px',
-                                borderRadius: '50%',
-                                background: '#d32f2f',
-                                color: 'white',
-                                border: 'none',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '12px'
-                              }}
-                            >
-                              ×
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                  <ImageUploadSection
+                    title="Hình ảnh"
+                    previews={imagePreviews}
+                    onFileSelect={handleImageSelect}
+                    onUrlAdd={handleImageUrlAdd}
+                    urlValue={imageUrlInput}
+                    setUrlValue={setImageUrlInput}
+                    onRemove={handleRemoveImage}
+                    uploadMethod={imageUploadMethod}
+                    setUploadMethod={setImageUploadMethod}
+                    isViewMode={modalMode === 'view'}
+                    multiple={true}
+                  />
 
                   {/* Video */}
                   <div className="form-group full-width">
@@ -881,7 +1042,7 @@ const PostsManagement = () => {
                         />
                         <button
                           type="button"
-                          onClick={handleAddVideo}
+                          onClick={handleVideoUrlAdd}
                           className="btn btn-secondary"
                           style={{ padding: '8px 15px' }}
                         >
@@ -890,31 +1051,12 @@ const PostsManagement = () => {
                       </div>
                     )}
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                      {formData.videos.map((video, index) => (
-                        <div key={index} style={{ 
-                          padding: '8px 12px',
-                          background: '#f5f5f5',
-                          borderRadius: '4px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px'
-                        }}>
+                      {videoPreviews.map((video, index) => (
+                        <div key={index} style={{ padding: '8px 12px', background: '#f5f5f5', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <Video size={16} />
                           <span style={{ fontSize: '13px' }}>Video {index + 1}</span>
                           {modalMode !== 'view' && (
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveVideo(index)}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                color: '#d32f2f',
-                                cursor: 'pointer',
-                                fontSize: '16px'
-                              }}
-                            >
-                              ×
-                            </button>
+                            <button type="button" onClick={() => handleRemoveVideo(index)} style={{ background: 'none', border: 'none', color: '#d32f2f', cursor: 'pointer', fontSize: '16px' }}>×</button>
                           )}
                         </div>
                       ))}
@@ -934,48 +1076,16 @@ const PostsManagement = () => {
                           style={{ flex: 1, padding: '8px', border: '1px solid #e0e0e0', borderRadius: '4px' }}
                           onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
                         />
-                        <button
-                          type="button"
-                          onClick={handleAddTag}
-                          className="btn btn-secondary"
-                          style={{ padding: '8px 15px' }}
-                        >
-                          Thêm
-                        </button>
+                        <button type="button" onClick={handleAddTag} className="btn btn-secondary" style={{ padding: '8px 15px' }}>Thêm</button>
                       </div>
                     )}
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                       {formData.tags.map((tag, index) => (
-                        <span
-                          key={index}
-                          style={{
-                            padding: '4px 10px',
-                            background: '#e3f2fd',
-                            color: '#1976d2',
-                            borderRadius: '16px',
-                            fontSize: '13px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '5px'
-                          }}
-                        >
+                        <span key={index} style={{ padding: '4px 10px', background: '#e3f2fd', color: '#1976d2', borderRadius: '16px', fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
                           <Tag size={12} />
                           {tag}
                           {modalMode !== 'view' && (
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveTag(index)}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                color: '#1976d2',
-                                cursor: 'pointer',
-                                fontSize: '14px',
-                                marginLeft: '4px'
-                              }}
-                            >
-                              ×
-                            </button>
+                            <button type="button" onClick={() => handleRemoveTag(index)} style={{ background: 'none', border: 'none', color: '#1976d2', cursor: 'pointer', fontSize: '14px', marginLeft: '4px' }}>×</button>
                           )}
                         </span>
                       ))}
@@ -985,27 +1095,13 @@ const PostsManagement = () => {
                   {/* Địa điểm */}
                   <div className="form-group">
                     <label htmlFor="location">Địa điểm</label>
-                    <input
-                      type="text"
-                      id="location"
-                      name="location"
-                      value={formData.location}
-                      onChange={handleInputChange}
-                      disabled={modalMode === 'view'}
-                      placeholder="Nhập địa điểm..."
-                    />
+                    <input type="text" id="location" name="location" value={formData.location} onChange={handleInputChange} disabled={modalMode === 'view'} placeholder="Nhập địa điểm..." />
                   </div>
 
                   {/* Loại bài viết */}
                   <div className="form-group">
                     <label htmlFor="post_type">Loại bài viết</label>
-                    <select
-                      id="post_type"
-                      name="post_type"
-                      value={formData.post_type}
-                      onChange={handleInputChange}
-                      disabled={modalMode === 'view'}
-                    >
+                    <select id="post_type" name="post_type" value={formData.post_type} onChange={handleInputChange} disabled={modalMode === 'view'}>
                       <option value="text">Bài viết thường</option>
                       <option value="product">Bài viết sản phẩm</option>
                       <option value="review">Đánh giá</option>
@@ -1016,13 +1112,7 @@ const PostsManagement = () => {
                   {/* Danh mục sản phẩm */}
                   <div className="form-group">
                     <label htmlFor="product_category">Danh mục</label>
-                    <select
-                      id="product_category"
-                      name="product_category"
-                      value={formData.product_category}
-                      onChange={handleInputChange}
-                      disabled={modalMode === 'view'}
-                    >
+                    <select id="product_category" name="product_category" value={formData.product_category} onChange={handleInputChange} disabled={modalMode === 'view'}>
                       <option value="general">Chung/Khác</option>
                       <option value="agriculture">Nông sản</option>
                       <option value="seafood">Hải sản</option>
@@ -1033,13 +1123,7 @@ const PostsManagement = () => {
                   {/* Hiển thị */}
                   <div className="form-group">
                     <label htmlFor="visibility">Hiển thị</label>
-                    <select
-                      id="visibility"
-                      name="visibility"
-                      value={formData.visibility}
-                      onChange={handleInputChange}
-                      disabled={modalMode === 'view'}
-                    >
+                    <select id="visibility" name="visibility" value={formData.visibility} onChange={handleInputChange} disabled={modalMode === 'view'}>
                       <option value="public">Công khai</option>
                       <option value="friends">Bạn bè</option>
                       <option value="private">Chỉ mình tôi</option>
@@ -1050,36 +1134,16 @@ const PostsManagement = () => {
                   <div className="form-group" style={{ gridColumn: 'span 2' }}>
                     <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
                       <label className="checkbox-label">
-                        <input
-                          type="checkbox"
-                          name="allow_comment"
-                          checked={formData.allow_comment}
-                          onChange={handleInputChange}
-                          disabled={modalMode === 'view'}
-                        />
+                        <input type="checkbox" name="allow_comment" checked={formData.allow_comment} onChange={handleInputChange} disabled={modalMode === 'view'} />
                         <span>Cho phép bình luận</span>
                       </label>
-
                       <label className="checkbox-label">
-                        <input
-                          type="checkbox"
-                          name="allow_share"
-                          checked={formData.allow_share}
-                          onChange={handleInputChange}
-                          disabled={modalMode === 'view'}
-                        />
+                        <input type="checkbox" name="allow_share" checked={formData.allow_share} onChange={handleInputChange} disabled={modalMode === 'view'} />
                         <span>Cho phép chia sẻ</span>
                       </label>
-
                       {modalMode !== 'add' && (
                         <label className="checkbox-label">
-                          <input
-                            type="checkbox"
-                            name="is_pinned"
-                            checked={formData.is_pinned}
-                            onChange={handleInputChange}
-                            disabled={modalMode === 'view'}
-                          />
+                          <input type="checkbox" name="is_pinned" checked={formData.is_pinned} onChange={handleInputChange} disabled={modalMode === 'view'} />
                           <span>Ghim bài viết</span>
                         </label>
                       )}
@@ -1088,12 +1152,7 @@ const PostsManagement = () => {
 
                   {/* Thống kê (chỉ xem) */}
                   {modalMode === 'view' && selectedPost && (
-                    <div className="form-group full-width" style={{ 
-                      background: '#f5f5f5', 
-                      padding: '15px', 
-                      borderRadius: '8px',
-                      marginTop: '10px'
-                    }}>
+                    <div className="form-group full-width" style={{ background: '#f5f5f5', padding: '15px', borderRadius: '8px', marginTop: '10px' }}>
                       <h4 style={{ marginBottom: '10px', fontSize: '14px', color: '#666' }}>Thống kê tương tác</h4>
                       <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
                         <div><strong>❤️ {selectedPost.stats?.like_count || 0}</strong> lượt thích</div>
@@ -1106,19 +1165,11 @@ const PostsManagement = () => {
               </div>
 
               <div className="modal-footer">
-                <button 
-                  type="button" 
-                  className="btn btn-secondary"
-                  onClick={() => setShowModal(false)}
-                >
+                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
                   {modalMode === 'view' ? 'Đóng' : 'Hủy'}
                 </button>
                 {modalMode !== 'view' && (
-                  <button 
-                    type="submit" 
-                    className="btn btn-primary"
-                    disabled={submitting}
-                  >
+                  <button type="submit" className="btn btn-primary" disabled={submitting || uploadingImages || uploadingVideos}>
                     <Save size={18} />
                     <span>{submitting ? 'Đang lưu...' : 'Lưu'}</span>
                   </button>

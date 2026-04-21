@@ -229,24 +229,35 @@ const ShopProducts = () => {
     }));
   };
 
-  const uploadImage = async (productId) => {
-    if (!imageFile) return formData.image_url;
+  // THAY THẾ HÀM uploadImage CŨ BẰNG HÀM MỚI NÀY
+  const uploadImage = async () => {
+      if (!imageFile) return null;
 
-    const formDataUpload = new FormData();
-    formDataUpload.append('file', imageFile);
+      const formDataUpload = new FormData();
+      formDataUpload.append('file', imageFile);
 
-    try {
-      setUploading(true);
-      const response = await shopApi.post(`/api/v1/shop/products/${productId}/upload-image`, formDataUpload, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      return response.data.image_url;
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      return null;
-    } finally {
-      setUploading(false);
-    }
+      try {
+          setUploading(true);
+          // Gọi API upload lên R2
+          const response = await shopApi.post('/api/v1/upload/image', formDataUpload, {
+              headers: { 'Content-Type': 'multipart/form-data' }
+          });
+          
+          if (response.data.success) {
+              return response.data.image_url;
+          }
+          return null;
+      } catch (error) {
+          console.error('Error uploading to R2:', error);
+          if (error.response?.data?.detail) {
+              alert(`Lỗi upload: ${error.response.data.detail}`);
+          } else {
+              alert('Có lỗi xảy ra khi upload ảnh');
+          }
+          return null;
+      } finally {
+          setUploading(false);
+      }
   };
 
   const handleAddProduct = async () => {
@@ -277,12 +288,26 @@ const ShopProducts = () => {
     try {
       setSaving(true);
       
+      // === QUAN TRỌNG: Upload ảnh TRƯỚC khi tạo sản phẩm ===
+      let uploadedImageUrl = null;
+      if (imageFile) {
+        uploadedImageUrl = await uploadImage();
+        if (!uploadedImageUrl) {
+          alert('Không thể upload ảnh. Vui lòng thử lại.');
+          setSaving(false);
+          return;
+        }
+      }
+      
+      // Dùng URL đã upload hoặc URL nhập tay
+      const finalImageUrl = uploadedImageUrl || formData.image_url || null;
+      
       const productData = {
         name: formData.name,
         description: formData.description,
         category_id: formData.category_id,
         origin: formData.origin || null,
-        image_url: formData.image_url || null,
+        image_url: finalImageUrl,  // ← ĐÃ CÓ URL ẢNH
         variants: variants.map(v => ({
           name: v.name,
           price: parseFloat(v.price),
@@ -300,10 +325,6 @@ const ShopProducts = () => {
       
       const response = await shopApi.post('/api/v1/shop/products', productData);
       console.log('Product created:', response.data);
-
-      if (imageFile) {
-        await uploadImage(response.data.id);
-      }
 
       fetchProducts();
       setShowAddModal(false);
@@ -345,44 +366,48 @@ const ShopProducts = () => {
     if (!selectedProduct) return;
 
     try {
-      setSaving(true);
-      
-      const updateData = {
-        name: formData.name,
-        description: formData.description,
-        category_id: formData.category_id,
-        origin: formData.origin || null,
-        price: parseFloat(formData.price),
-        stock: parseInt(formData.stock),
-        image_url: formData.image_url || null
-      };
+        setSaving(true);
+        
+        // Upload ảnh mới nếu có
+        let uploadedImageUrl = null;
+        if (imageFile) {
+            uploadedImageUrl = await uploadImage();
+        }
+        
+        const finalImageUrl = uploadedImageUrl || formData.image_url || null;
+        
+        const updateData = {
+            name: formData.name,
+            description: formData.description,
+            category_id: formData.category_id,
+            origin: formData.origin || null,
+            price: parseFloat(formData.price),
+            stock: parseInt(formData.stock),
+            image_url: finalImageUrl
+        };
 
-      await shopApi.put(`/api/v1/shop/products/${selectedProduct.id}`, updateData);
+        await shopApi.put(`/api/v1/shop/products/${selectedProduct.id}`, updateData);
 
-      if (imageFile) {
-        await uploadImage(selectedProduct.id);
-      }
-
-      fetchProducts();
-      setShowEditModal(false);
-      resetForm();
-      alert('Cập nhật sản phẩm thành công!');
+        fetchProducts();
+        setShowEditModal(false);
+        resetForm();
+        alert('Cập nhật sản phẩm thành công!');
     } catch (error) {
-      console.error('Error updating product:', error);
-      
-      if (error.response?.status === 401) {
-        localStorage.removeItem('shop_token');
-        localStorage.removeItem('shop_data');
-        localStorage.removeItem('shop_info');
-        window.location.href = '/shop/login';
-        return;
-      }
-      
-      alert('Có lỗi xảy ra khi cập nhật sản phẩm');
+        console.error('Error updating product:', error);
+        
+        if (error.response?.status === 401) {
+            localStorage.removeItem('shop_token');
+            localStorage.removeItem('shop_data');
+            localStorage.removeItem('shop_info');
+            window.location.href = '/shop/login';
+            return;
+        }
+        
+        alert('Có lỗi xảy ra khi cập nhật sản phẩm');
     } finally {
-      setSaving(false);
+        setSaving(false);
     }
-  };
+};
 
   const handleViewProduct = async (product) => {
     try {

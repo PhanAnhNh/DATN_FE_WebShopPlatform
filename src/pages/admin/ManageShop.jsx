@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   Search, Plus, Download, Edit2, Trash2, Eye,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
-  X, Save, AlertCircle, CheckCircle, Store, MapPin, Link as LinkIcon
+  X, Save, AlertCircle, CheckCircle, Store, MapPin, Link as LinkIcon,
+  Upload, Image, Trash
 } from 'lucide-react';
 import { adminApi } from '../../api/api';
 import locationApi from '../../api/locationApi';
@@ -24,7 +25,7 @@ const ShopsManagement = () => {
   const [loadingLocations, setLoadingLocations] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [searchLocationTerm, setSearchLocationTerm] = useState('');
-  const [locationDetails, setLocationDetails] = useState(null); // ✅ Thêm state lưu chi tiết location
+  const [locationDetails, setLocationDetails] = useState(null);
   
   // Modal states
   const [showModal, setShowModal] = useState(false);
@@ -46,6 +47,18 @@ const ShopsManagement = () => {
     message: '',
     type: 'success'
   });
+
+  // Image upload states
+  const [logoFile, setLogoFile] = useState(null);
+  const [logoPreview, setLogoPreview] = useState('');
+  const [bannerFile, setBannerFile] = useState(null);
+  const [bannerPreview, setBannerPreview] = useState('');
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+  const [logoUploadMethod, setLogoUploadMethod] = useState('url');
+  const [bannerUploadMethod, setBannerUploadMethod] = useState('url');
+  const [logoUrlInput, setLogoUrlInput] = useState('');
+  const [bannerUrlInput, setBannerUrlInput] = useState('');
 
   // Form state
   const [formData, setFormData] = useState({
@@ -104,7 +117,6 @@ const ShopsManagement = () => {
     }
   };
 
-  // ✅ THÊM HÀM fetchLocationById - lấy chi tiết location từ ID
   const fetchLocationById = async (locationId) => {
     if (!locationId) return null;
     try {
@@ -130,6 +142,106 @@ const ShopsManagement = () => {
     } finally {
       setLoadingLocations(false);
     }
+  };
+
+  // ==================== UPLOAD IMAGE FUNCTIONS ====================
+  
+  const uploadImageToR2 = async (file) => {
+    if (!file) return null;
+
+    const formDataUpload = new FormData();
+    formDataUpload.append('file', file);
+
+    try {
+      const response = await adminApi.post('/api/v1/upload/image', formDataUpload, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
+      if (response.data.success) {
+        return response.data.image_url;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error uploading to R2:', error);
+      if (error.response?.data?.detail) {
+        showToast(`Lỗi upload: ${error.response.data.detail}`, 'error');
+      } else {
+        showToast('Có lỗi xảy ra khi upload ảnh', 'error');
+      }
+      return null;
+    }
+  };
+
+  const handleLogoSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      showToast('Vui lòng chọn file ảnh', 'error');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Kích thước file không được vượt quá 5MB', 'error');
+      return;
+    }
+
+    setLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
+    setLogoUrlInput('');
+    setFormData(prev => ({ ...prev, logo_url: '' }));
+  };
+
+  const handleBannerSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      showToast('Vui lòng chọn file ảnh', 'error');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Kích thước file không được vượt quá 5MB', 'error');
+      return;
+    }
+
+    setBannerFile(file);
+    setBannerPreview(URL.createObjectURL(file));
+    setBannerUrlInput('');
+    setFormData(prev => ({ ...prev, banner_url: '' }));
+  };
+
+  const handleLogoUrlChange = (e) => {
+    const url = e.target.value;
+    setLogoUrlInput(url);
+    setLogoPreview(url);
+    setLogoFile(null);
+    setFormData(prev => ({ ...prev, logo_url: url }));
+  };
+
+  const handleBannerUrlChange = (e) => {
+    const url = e.target.value;
+    setBannerUrlInput(url);
+    setBannerPreview(url);
+    setBannerFile(null);
+    setFormData(prev => ({ ...prev, banner_url: url }));
+  };
+
+  const resetLogo = () => {
+    setLogoFile(null);
+    setLogoPreview('');
+    setLogoUrlInput('');
+    setLogoUploadMethod('url');
+    setFormData(prev => ({ ...prev, logo_url: '' }));
+  };
+
+  const resetBanner = () => {
+    setBannerFile(null);
+    setBannerPreview('');
+    setBannerUrlInput('');
+    setBannerUploadMethod('url');
+    setFormData(prev => ({ ...prev, banner_url: '' }));
   };
 
   const handleSelectLocation = (location) => {
@@ -237,43 +349,58 @@ const ShopsManagement = () => {
 
     setSubmitting(true);
     try {
-      let response;
-      
-      if (createOwnerAccount) {
-        const combinedData = {
-          shop_name: formData.name,
-          shop_slug: formData.slug,
-          shop_description: formData.description,
-          shop_phone: formData.phone,
-          shop_email: formData.email,
-          shop_address: formData.address,
-          shop_province: formData.province,
-          shop_district: formData.district,
-          shop_ward: formData.ward,
-          shop_logo_url: formData.logo_url,
-          shop_banner_url: formData.banner_url,
-          location_id: formData.location_id,
-          
-          owner_username: ownerFormData.username,
-          owner_email: ownerFormData.email,
-          owner_password: ownerFormData.password,
-          owner_full_name: ownerFormData.full_name,
-          owner_phone: ownerFormData.phone,
-          owner_gender: ownerFormData.gender,
-          owner_address: ownerFormData.address || formData.address
-        };
-        
-        console.log('Sending combined data:', combinedData);
-        response = await adminApi.post('/api/v1/shops/with-owner', combinedData);
-      } else {
-        showToast('Vui lòng chọn "Tạo tài khoản chủ shop"', 'error');
-        setSubmitting(false);
-        return;
+      // Upload logo if exists
+      let uploadedLogoUrl = null;
+      if (logoFile) {
+        uploadedLogoUrl = await uploadImageToR2(logoFile);
+        if (!uploadedLogoUrl) {
+          setSubmitting(false);
+          return;
+        }
       }
+
+      // Upload banner if exists
+      let uploadedBannerUrl = null;
+      if (bannerFile) {
+        uploadedBannerUrl = await uploadImageToR2(bannerFile);
+        if (!uploadedBannerUrl) {
+          setSubmitting(false);
+          return;
+        }
+      }
+
+      const finalLogoUrl = uploadedLogoUrl || formData.logo_url || null;
+      const finalBannerUrl = uploadedBannerUrl || formData.banner_url || null;
+
+      const combinedData = {
+        shop_name: formData.name,
+        shop_slug: formData.slug,
+        shop_description: formData.description,
+        shop_phone: formData.phone,
+        shop_email: formData.email,
+        shop_address: formData.address,
+        shop_province: formData.province,
+        shop_district: formData.district,
+        shop_ward: formData.ward,
+        shop_logo_url: finalLogoUrl,
+        shop_banner_url: finalBannerUrl,
+        location_id: formData.location_id,
+        
+        owner_username: ownerFormData.username,
+        owner_email: ownerFormData.email,
+        owner_password: ownerFormData.password,
+        owner_full_name: ownerFormData.full_name,
+        owner_phone: ownerFormData.phone,
+        owner_gender: ownerFormData.gender,
+        owner_address: ownerFormData.address || formData.address
+      };
+      
+      console.log('Sending combined data:', combinedData);
+      const response = await adminApi.post('/api/v1/shops/with-owner', combinedData);
       
       if (response.data) {
         let message = 'Thêm cửa hàng thành công!';
-        if (createOwnerAccount && response.data.data) {
+        if (response.data.data && response.data.data.login_info) {
           const { login_info } = response.data.data;
           message = `Tạo cửa hàng và tài khoản thành công! Tên đăng nhập: ${login_info.username}, Mật khẩu: ${login_info.password}`;
         }
@@ -286,6 +413,8 @@ const ShopsManagement = () => {
         });
         setCreateOwnerAccount(false);
         setSelectedLocation(null);
+        resetLogo();
+        resetBanner();
         fetchShops();
       }
     } catch (err) {
@@ -309,14 +438,44 @@ const ShopsManagement = () => {
 
     setSubmitting(true);
     try {
+      // Upload logo if exists
+      let uploadedLogoUrl = null;
+      if (logoFile) {
+        uploadedLogoUrl = await uploadImageToR2(logoFile);
+      }
+
+      // Upload banner if exists
+      let uploadedBannerUrl = null;
+      if (bannerFile) {
+        uploadedBannerUrl = await uploadImageToR2(bannerFile);
+      }
+
+      const finalLogoUrl = uploadedLogoUrl || formData.logo_url || null;
+      const finalBannerUrl = uploadedBannerUrl || formData.banner_url || null;
+
       const response = await adminApi.put(`/api/v1/admin/shops/${selectedShop._id}`, {
-        ...formData,
+        name: formData.name,
+        slug: formData.slug,
+        description: formData.description,
+        phone: formData.phone,
+        email: formData.email,
+        address: formData.address,
+        province: formData.province,
+        district: formData.district,
+        ward: formData.ward,
+        logo_url: finalLogoUrl,
+        banner_url: finalBannerUrl,
+        status: formData.status,
+        is_verified: formData.is_verified,
         location_id: formData.location_id
       });
+      
       if (response.data) {
         showToast('Cập nhật cửa hàng thành công!', 'success');
         setShowModal(false);
         resetForm();
+        resetLogo();
+        resetBanner();
         fetchShops();
       }
     } catch (err) {
@@ -348,11 +507,12 @@ const ShopsManagement = () => {
     setShowConfirmDialog(true);
   };
   
-  // ✅ SỬA LẠI openModal - load location details khi ở chế độ view/edit
   const openModal = async (mode, shop = null) => {
     setModalMode(mode);
     setSelectedLocation(null);
     setLocationDetails(null);
+    resetLogo();
+    resetBanner();
     
     if (shop) {
       setSelectedShop(shop);
@@ -373,7 +533,16 @@ const ShopsManagement = () => {
         location_id: shop.location_id || ''
       });
       
-      // ✅ Nếu có location_id, lấy chi tiết location để hiển thị
+      // Set previews for existing images
+      if (shop.logo_url) {
+        setLogoPreview(shop.logo_url);
+        setLogoUrlInput(shop.logo_url);
+      }
+      if (shop.banner_url) {
+        setBannerPreview(shop.banner_url);
+        setBannerUrlInput(shop.banner_url);
+      }
+      
       if (shop.location_id) {
         const location = await fetchLocationById(shop.location_id);
         if (location) {
@@ -442,6 +611,112 @@ const ShopsManagement = () => {
   const getStatusText = (status) => {
     return status === 'active' ? 'Hoạt động' : 'Ngừng hoạt động';
   };
+
+  // Component upload ảnh
+  const ImageUploadSection = ({ label, preview, onFileSelect, onUrlChange, urlValue, uploadMethod, setUploadMethod, onReset, isViewMode }) => (
+    <div className="form-group full-width">
+      <label>{label}</label>
+      
+      {!isViewMode && (
+        <div className="image-method-selector" style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+          <button
+            type="button"
+            className={`method-btn ${uploadMethod === 'url' ? 'active' : ''}`}
+            onClick={() => setUploadMethod('url')}
+            style={{
+              padding: '8px 16px',
+              background: uploadMethod === 'url' ? '#1976d2' : '#e0e0e0',
+              color: uploadMethod === 'url' ? 'white' : '#333',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            <LinkIcon size={16} style={{ marginRight: '5px' }} /> Nhập URL
+          </button>
+          <button
+            type="button"
+            className={`method-btn ${uploadMethod === 'file' ? 'active' : ''}`}
+            onClick={() => setUploadMethod('file')}
+            style={{
+              padding: '8px 16px',
+              background: uploadMethod === 'file' ? '#1976d2' : '#e0e0e0',
+              color: uploadMethod === 'file' ? 'white' : '#333',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            <Upload size={16} style={{ marginRight: '5px' }} /> Tải lên từ máy
+          </button>
+        </div>
+      )}
+
+      {uploadMethod === 'url' ? (
+        <div className="image-url-input">
+          <input
+            type="text"
+            placeholder={`Nhập URL ${label.toLowerCase()}`}
+            value={urlValue}
+            onChange={onUrlChange}
+            disabled={isViewMode}
+            style={{ width: '100%', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}
+          />
+        </div>
+      ) : (
+        !isViewMode && (
+          <div className="image-upload-container">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={onFileSelect}
+              style={{ display: 'none' }}
+              id={`${label}-upload`}
+            />
+            <label htmlFor={`${label}-upload`} style={{
+              display: 'inline-block',
+              padding: '8px 16px',
+              background: '#4caf50',
+              color: 'white',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}>
+              <Upload size={16} style={{ marginRight: '5px' }} /> Chọn ảnh từ máy
+            </label>
+          </div>
+        )
+      )}
+      
+      {preview && (
+        <div className="image-preview" style={{ marginTop: '10px', position: 'relative', display: 'inline-block' }}>
+          <img src={preview} alt={label} style={{ maxWidth: '200px', maxHeight: '150px', borderRadius: '8px', border: '1px solid #ddd' }} />
+          {!isViewMode && (
+            <button 
+              type="button"
+              onClick={onReset}
+              style={{
+                position: 'absolute',
+                top: '-10px',
+                right: '-10px',
+                background: '#f44336',
+                color: 'white',
+                border: 'none',
+                borderRadius: '50%',
+                width: '24px',
+                height: '24px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className="users-management">
@@ -635,7 +910,7 @@ const ShopsManagement = () => {
       {/* Shop Modal */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal-content" style={{ maxWidth: '700px', width: '90%' }} onClick={e => e.stopPropagation()}>
+          <div className="modal-content" style={{ maxWidth: '800px', width: '90%' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h3>
                 {modalMode === 'add' ? 'Thêm cửa hàng mới' : 
@@ -677,6 +952,32 @@ const ShopsManagement = () => {
                     {formErrors.email && <span className="error-message">{formErrors.email}</span>}
                   </div>
 
+                  {/* Logo URL - Upload Section */}
+                  <ImageUploadSection
+                    label="Logo cửa hàng"
+                    preview={logoPreview}
+                    onFileSelect={handleLogoSelect}
+                    onUrlChange={handleLogoUrlChange}
+                    urlValue={logoUrlInput}
+                    uploadMethod={logoUploadMethod}
+                    setUploadMethod={setLogoUploadMethod}
+                    onReset={resetLogo}
+                    isViewMode={modalMode === 'view'}
+                  />
+
+                  {/* Banner URL - Upload Section */}
+                  <ImageUploadSection
+                    label="Banner cửa hàng"
+                    preview={bannerPreview}
+                    onFileSelect={handleBannerSelect}
+                    onUrlChange={handleBannerUrlChange}
+                    urlValue={bannerUrlInput}
+                    uploadMethod={bannerUploadMethod}
+                    setUploadMethod={setBannerUploadMethod}
+                    onReset={resetBanner}
+                    isViewMode={modalMode === 'view'}
+                  />
+
                   {/* Địa chỉ */}
                   <div className="form-group full-width">
                     <label htmlFor="address">Địa chỉ</label>
@@ -701,25 +1002,24 @@ const ShopsManagement = () => {
                     <input type="text" id="ward" name="ward" value={formData.ward} onChange={handleInputChange} disabled={modalMode === 'view'} />
                   </div>
 
-                  {/* Logo URL */}
-                  <div className="form-group">
-                    <label htmlFor="logo_url">Logo URL</label>
-                    <input type="text" id="logo_url" name="logo_url" value={formData.logo_url} onChange={handleInputChange} disabled={modalMode === 'view'} />
-                  </div>
-
-                  {/* Banner URL */}
-                  <div className="form-group">
-                    <label htmlFor="banner_url">Banner URL</label>
-                    <input type="text" id="banner_url" name="banner_url" value={formData.banner_url} onChange={handleInputChange} disabled={modalMode === 'view'} />
-                  </div>
-
                   {/* Mô tả */}
                   <div className="form-group full-width">
                     <label htmlFor="description">Mô tả</label>
                     <textarea id="description" name="description" value={formData.description} onChange={handleInputChange} disabled={modalMode === 'view'} rows="3" />
                   </div>
 
-                  {/* ✅ PHẦN HIỂN THỊ VỊ TRÍ - SỬA LẠI CHO CHẾ ĐỘ VIEW */}
+                  {/* Trạng thái */}
+                  {modalMode !== 'add' && (
+                    <div className="form-group">
+                      <label htmlFor="status">Trạng thái</label>
+                      <select id="status" name="status" value={formData.status} onChange={handleInputChange} disabled={modalMode === 'view'}>
+                        <option value="active">Hoạt động</option>
+                        <option value="inactive">Ngừng hoạt động</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {/* ✅ PHẦN HIỂN THỊ VỊ TRÍ */}
                   <div className="form-group full-width" style={{ marginTop: '15px', borderTop: '1px solid #eee', paddingTop: '15px' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <MapPin size={16} />
@@ -795,13 +1095,13 @@ const ShopsManagement = () => {
                         <div className="owner-form" style={{ background: '#f8f9fa', padding: '20px', borderRadius: '8px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
                           <h4 style={{ marginBottom: '20px', color: '#333' }}>Thông tin tài khoản chủ shop</h4>
                           <div className="form-grid">
-                            <div className="form-group"><label>Tên đăng nhập *</label><input type="text" name="username" value={ownerFormData.username} onChange={handleOwnerInputChange} /></div>
-                            <div className="form-group"><label>Email *</label><input type="email" name="email" value={ownerFormData.email} onChange={handleOwnerInputChange} /></div>
-                            <div className="form-group"><label>Mật khẩu *</label><input type="password" name="password" value={ownerFormData.password} onChange={handleOwnerInputChange} placeholder="Ít nhất 6 ký tự" /></div>
-                            <div className="form-group"><label>Họ và tên</label><input type="text" name="full_name" value={ownerFormData.full_name} onChange={handleOwnerInputChange} /></div>
-                            <div className="form-group"><label>Số điện thoại</label><input type="tel" name="phone" value={ownerFormData.phone} onChange={handleOwnerInputChange} /></div>
-                            <div className="form-group"><label>Giới tính</label><select name="gender" value={ownerFormData.gender} onChange={handleOwnerInputChange}><option value="">Chọn</option><option value="male">Nam</option><option value="female">Nữ</option><option value="other">Khác</option></select></div>
-                            <div className="form-group full-width"><label>Địa chỉ</label><textarea name="address" value={ownerFormData.address} onChange={handleOwnerInputChange} rows="2" /></div>
+                            <div className="form-group"><label>Tên đăng nhập *</label><input type="text" name="username" value={ownerFormData.username} onChange={handleOwnerInputChange} disabled={modalMode !== 'add'} /></div>
+                            <div className="form-group"><label>Email *</label><input type="email" name="email" value={ownerFormData.email} onChange={handleOwnerInputChange} disabled={modalMode !== 'add'} /></div>
+                            <div className="form-group"><label>Mật khẩu *</label><input type="password" name="password" value={ownerFormData.password} onChange={handleOwnerInputChange} disabled={modalMode !== 'add'} placeholder="Ít nhất 6 ký tự" /></div>
+                            <div className="form-group"><label>Họ và tên</label><input type="text" name="full_name" value={ownerFormData.full_name} onChange={handleOwnerInputChange} disabled={modalMode !== 'add'} /></div>
+                            <div className="form-group"><label>Số điện thoại</label><input type="tel" name="phone" value={ownerFormData.phone} onChange={handleOwnerInputChange} disabled={modalMode !== 'add'} /></div>
+                            <div className="form-group"><label>Giới tính</label><select name="gender" value={ownerFormData.gender} onChange={handleOwnerInputChange} disabled={modalMode !== 'add'}><option value="">Chọn</option><option value="male">Nam</option><option value="female">Nữ</option><option value="other">Khác</option></select></div>
+                            <div className="form-group full-width"><label>Địa chỉ</label><textarea name="address" value={ownerFormData.address} onChange={handleOwnerInputChange} disabled={modalMode !== 'add'} rows="2" /></div>
                           </div>
                         </div>
                       )}
@@ -820,7 +1120,7 @@ const ShopsManagement = () => {
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Hủy</button>
                 {modalMode !== 'view' && (
-                  <button type="submit" className="btn btn-primary" disabled={submitting}>
+                  <button type="submit" className="btn btn-primary" disabled={submitting || uploadingLogo || uploadingBanner}>
                     <Save size={18} />
                     <span>{submitting ? 'Đang lưu...' : 'Lưu'}</span>
                   </button>
