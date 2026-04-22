@@ -1,8 +1,9 @@
+// src/pages/admin/users/UsersManagement.jsx
 import React, { useState, useEffect } from 'react';
 import { 
   Search, Plus, Download, Edit2, Trash2, Eye,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
-  X, Save, AlertCircle, CheckCircle
+  X, Save, AlertCircle, CheckCircle, Upload, Link as LinkIcon, Image as ImageIcon
 } from 'lucide-react';
 import api from '../../api/api';
 import '../../css/AdminManageLayout.css';
@@ -39,6 +40,13 @@ const UsersManagement = () => {
     type: 'success'
   });
 
+  // Avatar upload states
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState('');
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarUploadMethod, setAvatarUploadMethod] = useState('url');
+  const [avatarUrlInput, setAvatarUrlInput] = useState('');
+
   // Form state
   const [formData, setFormData] = useState({
     username: '',
@@ -49,7 +57,8 @@ const UsersManagement = () => {
     gender: '',
     role: 'user',
     is_active: true,
-    password: ''
+    password: '',
+    avatar_url: ''
   });
   
   const [formErrors, setFormErrors] = useState({});
@@ -79,28 +88,89 @@ const UsersManagement = () => {
       setLoading(false);
     }
   };
-// Filter users based on search term - Cách an toàn nhất
-const filteredUsers = users.filter(user => {
-  if (!user) return false;
+
+  // ==================== UPLOAD AVATAR TO R2 ====================
   
-  // Nếu searchTerm rỗng thì hiển thị tất cả
-  if (!searchTerm) return true;
+  const uploadImageToR2 = async (file) => {
+    if (!file) return null;
+
+    const formDataUpload = new FormData();
+    formDataUpload.append('file', file);
+
+    try {
+      const response = await api.post('/api/v1/upload/image', formDataUpload, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
+      if (response.data.success) {
+        return response.data.image_url;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error uploading to R2:', error);
+      if (error.response?.data?.detail) {
+        showToast(`Lỗi upload: ${error.response.data.detail}`, 'error');
+      } else {
+        showToast('Có lỗi xảy ra khi upload ảnh', 'error');
+      }
+      return null;
+    }
+  };
+
+  // ==================== AVATAR HANDLERS ====================
   
-  const searchLower = searchTerm.toLowerCase();
-  
-  // Kiểm tra từng field với optional chaining và ép kiểu về string
-  const username = user.username?.toLowerCase() || '';
-  const email = user.email?.toLowerCase() || '';
-  const fullName = user.full_name?.toLowerCase() || '';
-  const phone = user.phone?.toString() || '';
-  
-  return (
-    username.includes(searchLower) ||
-    email.includes(searchLower) ||
-    fullName.includes(searchLower) ||
-    phone.includes(searchTerm)
-  );
-});
+  const handleAvatarSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      showToast('Vui lòng chọn file ảnh', 'error');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Kích thước file không được vượt quá 5MB', 'error');
+      return;
+    }
+
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+    setAvatarUrlInput('');
+    setFormData(prev => ({ ...prev, avatar_url: '' }));
+  };
+
+  const handleAvatarUrlChange = (e) => {
+    const url = e.target.value;
+    setAvatarUrlInput(url);
+    setAvatarPreview(url);
+    setAvatarFile(null);
+    setFormData(prev => ({ ...prev, avatar_url: url }));
+  };
+
+  const resetAvatar = () => {
+    setAvatarFile(null);
+    setAvatarPreview('');
+    setAvatarUrlInput('');
+    setAvatarUploadMethod('url');
+    setFormData(prev => ({ ...prev, avatar_url: '' }));
+  };
+
+  // Filter users
+  const filteredUsers = users.filter(user => {
+    if (!user) return false;
+    if (!searchTerm) return true;
+    const searchLower = searchTerm.toLowerCase();
+    const username = user.username?.toLowerCase() || '';
+    const email = user.email?.toLowerCase() || '';
+    const fullName = user.full_name?.toLowerCase() || '';
+    const phone = user.phone?.toString() || '';
+    return (
+      username.includes(searchLower) ||
+      email.includes(searchLower) ||
+      fullName.includes(searchLower) ||
+      phone.includes(searchTerm)
+    );
+  });
 
   // Pagination
   const indexOfLastItem = currentPage * itemsPerPage;
@@ -129,49 +199,73 @@ const filteredUsers = users.filter(user => {
     
     if (modalMode === 'add' && !formData.password) {
       errors.password = 'Mật khẩu không được để trống';
+    } else if (modalMode === 'add' && formData.password && formData.password.length < 6) {
+      errors.password = 'Mật khẩu phải có ít nhất 6 ký tự';
     }
     
     return errors;
   };
 
   // Handle add user
-// Sửa lại handleAddUser
-const handleAddUser = async (e) => {
-  e.preventDefault();
-  const errors = validateForm();
-  if (Object.keys(errors).length > 0) {
-    setFormErrors(errors);
-    return;
-  }
-
-  setSubmitting(true);
-  try {
-    // Log dữ liệu gửi lên
-    console.log('Sending data to API:', formData);
-    
-    const response = await api.post('/api/v1/users', formData);
-    console.log('API Response:', response.data);
-    
-    if (response.data) {
-      showToast('Thêm người dùng thành công!', 'success');
-      setShowModal(false);
-      resetForm();
-      fetchUsers();
+  const handleAddUser = async (e) => {
+    e.preventDefault();
+    const errors = validateForm();
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
     }
-  } catch (err) {
-    console.error('Error details:', err);
-    // Log chi tiết lỗi từ server
-    console.error('Server error response:', err.response?.data);
+
+    setSubmitting(true);
+    setUploadingAvatar(true);
     
-    // Hiển thị lỗi chi tiết hơn
-    const errorMessage = err.response?.data?.detail || 
-                        err.response?.data?.message || 
-                        'Có lỗi xảy ra khi thêm người dùng';
-    showToast(errorMessage, 'error');
-  } finally {
-    setSubmitting(false);
-  }
-};
+    try {
+      // Upload avatar if exists
+      let uploadedAvatarUrl = null;
+      if (avatarFile) {
+        uploadedAvatarUrl = await uploadImageToR2(avatarFile);
+        if (!uploadedAvatarUrl) {
+          setSubmitting(false);
+          setUploadingAvatar(false);
+          return;
+        }
+      }
+      
+      const finalAvatarUrl = uploadedAvatarUrl || formData.avatar_url || null;
+      
+      const userData = {
+        username: formData.username,
+        email: formData.email,
+        password: formData.password,
+        full_name: formData.full_name || null,
+        phone: formData.phone || null,
+        address: formData.address || null,
+        gender: formData.gender || null,
+        role: formData.role,
+        avatar_url: finalAvatarUrl
+      };
+      
+      console.log('Sending user data:', userData);
+      
+      const response = await api.post('/api/v1/users', userData);
+      console.log('API Response:', response.data);
+      
+      if (response.data) {
+        showToast('Thêm người dùng thành công!', 'success');
+        setShowModal(false);
+        resetForm();
+        fetchUsers();
+      }
+    } catch (err) {
+      console.error('Error details:', err);
+      const errorMessage = err.response?.data?.detail || 
+                          err.response?.data?.message || 
+                          'Có lỗi xảy ra khi thêm người dùng';
+      showToast(errorMessage, 'error');
+    } finally {
+      setSubmitting(false);
+      setUploadingAvatar(false);
+    }
+  };
 
   // Handle update user
   const handleUpdateUser = async (e) => {
@@ -183,8 +277,32 @@ const handleAddUser = async (e) => {
     }
 
     setSubmitting(true);
+    setUploadingAvatar(true);
+    
     try {
-      const response = await api.put(`/api/v1/users/${selectedUser._id}`, formData);
+      // Upload new avatar if exists
+      let uploadedAvatarUrl = null;
+      if (avatarFile) {
+        uploadedAvatarUrl = await uploadImageToR2(avatarFile);
+      }
+      
+      const finalAvatarUrl = uploadedAvatarUrl || formData.avatar_url || null;
+      
+      const updateData = {
+        full_name: formData.full_name || null,
+        phone: formData.phone || null,
+        address: formData.address || null,
+        gender: formData.gender || null,
+        role: formData.role,
+        is_active: formData.is_active,
+        avatar_url: finalAvatarUrl
+      };
+      
+      if (formData.password) {
+        updateData.password = formData.password;
+      }
+      
+      const response = await api.put(`/api/v1/users/${selectedUser._id}`, updateData);
       if (response.data) {
         showToast('Cập nhật người dùng thành công!', 'success');
         setShowModal(false);
@@ -196,6 +314,7 @@ const handleAddUser = async (e) => {
       showToast(err.response?.data?.detail || 'Có lỗi xảy ra khi cập nhật', 'error');
     } finally {
       setSubmitting(false);
+      setUploadingAvatar(false);
     }
   };
 
@@ -224,6 +343,8 @@ const handleAddUser = async (e) => {
   // Open modal for view/edit/add
   const openModal = (mode, user = null) => {
     setModalMode(mode);
+    resetAvatar();
+    
     if (user) {
       setSelectedUser(user);
       setFormData({
@@ -235,8 +356,15 @@ const handleAddUser = async (e) => {
         gender: user.gender || '',
         role: user.role || 'user',
         is_active: user.is_active !== false,
-        password: ''
+        password: '',
+        avatar_url: user.avatar_url || ''
       });
+      
+      // Set preview for existing avatar
+      if (user.avatar_url) {
+        setAvatarPreview(user.avatar_url);
+        setAvatarUrlInput(user.avatar_url);
+      }
     } else {
       resetForm();
     }
@@ -253,10 +381,12 @@ const handleAddUser = async (e) => {
       gender: '',
       role: 'user',
       is_active: true,
-      password: ''
+      password: '',
+      avatar_url: ''
     });
     setFormErrors({});
     setSelectedUser(null);
+    resetAvatar();
   };
 
   // Export to Excel
@@ -282,7 +412,6 @@ const handleAddUser = async (e) => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
     showToast('Xuất file Excel thành công!', 'success');
   };
 
@@ -290,7 +419,126 @@ const handleAddUser = async (e) => {
     return isActive ? 'status-badge active' : 'status-badge inactive';
   };
 
-  // Thêm CSS animations vào file CSS
+  // Component upload avatar
+  const AvatarUploadSection = ({ isViewMode }) => (
+    <div className="form-group full-width">
+      <label>Ảnh đại diện (Avatar)</label>
+      
+      {!isViewMode && (
+        <div className="image-method-selector" style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+          <button
+            type="button"
+            className={`method-btn ${avatarUploadMethod === 'url' ? 'active' : ''}`}
+            onClick={() => setAvatarUploadMethod('url')}
+            style={{
+              padding: '8px 16px',
+              background: avatarUploadMethod === 'url' ? '#1976d2' : '#e0e0e0',
+              color: avatarUploadMethod === 'url' ? 'white' : '#333',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            <LinkIcon size={16} style={{ marginRight: '5px' }} /> Nhập URL
+          </button>
+          <button
+            type="button"
+            className={`method-btn ${avatarUploadMethod === 'file' ? 'active' : ''}`}
+            onClick={() => setAvatarUploadMethod('file')}
+            style={{
+              padding: '8px 16px',
+              background: avatarUploadMethod === 'file' ? '#1976d2' : '#e0e0e0',
+              color: avatarUploadMethod === 'file' ? 'white' : '#333',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            <Upload size={16} style={{ marginRight: '5px' }} /> Tải lên từ máy
+          </button>
+        </div>
+      )}
+
+      {avatarUploadMethod === 'url' ? (
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+          <input
+            type="text"
+            placeholder="Nhập URL ảnh đại diện"
+            value={avatarUrlInput}
+            onChange={handleAvatarUrlChange}
+            disabled={isViewMode}
+            style={{ flex: 1, padding: '8px', border: '1px solid #e0e0e0', borderRadius: '4px' }}
+          />
+        </div>
+      ) : (
+        !isViewMode && (
+          <div className="image-upload-container" style={{ marginBottom: '10px' }}>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleAvatarSelect}
+              style={{ display: 'none' }}
+              id="avatar-upload"
+            />
+            <label htmlFor="avatar-upload" style={{
+              display: 'inline-block',
+              padding: '8px 16px',
+              background: '#4caf50',
+              color: 'white',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}>
+              <Upload size={16} style={{ marginRight: '5px' }} /> Chọn ảnh từ máy
+            </label>
+            <p style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
+              Hỗ trợ: JPG, PNG, GIF, WebP (Tối đa 5MB)
+            </p>
+          </div>
+        )
+      )}
+      
+      {avatarPreview && (
+        <div className="image-preview" style={{ marginTop: '10px', position: 'relative', display: 'inline-block' }}>
+          <img 
+            src={avatarPreview} 
+            alt="Avatar preview" 
+            style={{ 
+              width: '100px', 
+              height: '100px', 
+              objectFit: 'cover', 
+              borderRadius: '50%', 
+              border: '2px solid #1976d2'
+            }} 
+          />
+          {!isViewMode && (
+            <button 
+              type="button"
+              onClick={resetAvatar}
+              style={{
+                position: 'absolute',
+                top: '-10px',
+                right: '-10px',
+                background: '#f44336',
+                color: 'white',
+                border: 'none',
+                borderRadius: '50%',
+                width: '24px',
+                height: '24px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  // CSS animations
   useEffect(() => {
     const style = document.createElement('style');
     style.textContent = `
@@ -317,13 +565,13 @@ const handleAddUser = async (e) => {
     <div className="users-management">
       {/* Toast notifications */}
       {toast.show && (
-        <div className="toast-container"> {/* THÊM container này */}
-        <Toast 
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast({ show: false, message: '', type: 'success' })}
-        />
-      </div>
+        <div className="toast-container">
+          <Toast 
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast({ show: false, message: '', type: 'success' })}
+          />
+        </div>
       )}
 
       {/* Confirm Dialog */}
@@ -400,7 +648,7 @@ const handleAddUser = async (e) => {
                     <td>
                       <div className="user-info-cell">
                         {user.avatar_url ? (
-                          <img src={user.avatar_url} alt={user.username} className="user-avatar-small" />
+                          <img src={user.avatar_url} alt={user.username} className="user-avatar-small" style={{ borderRadius: '50%', objectFit: 'cover' }} />
                         ) : (
                           <div className="user-avatar-small default">
                             {user.username?.charAt(0).toUpperCase()}
@@ -540,7 +788,7 @@ const handleAddUser = async (e) => {
       {/* User Modal */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '700px' }}>
             <div className="modal-header">
               <h3>
                 {modalMode === 'add' ? 'Thêm người dùng mới' : 
@@ -563,7 +811,7 @@ const handleAddUser = async (e) => {
                       name="username"
                       value={formData.username}
                       onChange={handleInputChange}
-                      disabled={modalMode === 'view'}
+                      disabled={modalMode === 'view' || modalMode === 'edit'}
                       className={formErrors.username ? 'error' : ''}
                     />
                     {formErrors.username && (
@@ -579,7 +827,7 @@ const handleAddUser = async (e) => {
                       name="email"
                       value={formData.email}
                       onChange={handleInputChange}
-                      disabled={modalMode === 'view'}
+                      disabled={modalMode === 'view' || modalMode === 'edit'}
                       className={formErrors.email ? 'error' : ''}
                     />
                     {formErrors.email && (
@@ -642,6 +890,9 @@ const handleAddUser = async (e) => {
                     </select>
                   </div>
 
+                  {/* Avatar upload section */}
+                  <AvatarUploadSection isViewMode={modalMode === 'view'} />
+
                   <div className="form-group full-width">
                     <label htmlFor="address">Địa chỉ</label>
                     <textarea
@@ -661,13 +912,28 @@ const handleAddUser = async (e) => {
                         type="password"
                         id="password"
                         name="password"
-                        value={formData.password || ''}
+                        value={formData.password}
                         onChange={handleInputChange}
                         className={formErrors.password ? 'error' : ''}
+                        placeholder="Ít nhất 6 ký tự"
                       />
                       {formErrors.password && (
                         <span className="error-message">{formErrors.password}</span>
                       )}
+                    </div>
+                  )}
+
+                  {modalMode === 'edit' && (
+                    <div className="form-group">
+                      <label htmlFor="password">Mật khẩu mới (để trống nếu không đổi)</label>
+                      <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        value={formData.password}
+                        onChange={handleInputChange}
+                        placeholder="Nhập mật khẩu mới nếu muốn thay đổi"
+                      />
                     </div>
                   )}
 
@@ -700,7 +966,7 @@ const handleAddUser = async (e) => {
                   <button 
                     type="submit" 
                     className="btn btn-primary"
-                    disabled={submitting}
+                    disabled={submitting || uploadingAvatar}
                   >
                     <Save size={18} />
                     <span>{submitting ? 'Đang lưu...' : 'Lưu'}</span>
