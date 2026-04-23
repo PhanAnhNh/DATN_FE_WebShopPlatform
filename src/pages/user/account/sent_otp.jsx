@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Toast from '../../../components/common/Toast';
+import { BACKEND_URL } from '../../../config'
 
 function VerifyOTP() {
   const [otpCode, setOtpCode] = useState(["", "", "", "", "", ""]);

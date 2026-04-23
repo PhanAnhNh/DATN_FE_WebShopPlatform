@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Toast from '../../../components/common/Toast';
+import { BACKEND_URL } from '../../../config'
 
 function ResetPassword() {
   const [newPassword, setNewPassword] = useState("");

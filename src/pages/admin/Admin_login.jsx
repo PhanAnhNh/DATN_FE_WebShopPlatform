@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import Toast from "../../components/common/Toast";
 import "../../css/AdminManageLayout.css";
 import { CheckCircle, AlertCircle, Shield } from 'lucide-react';
+import { adminApi } from '../../api/api';
 
 function AdminLogin() {
   const [username, setUsername] = useState("");
@@ -31,15 +32,9 @@ function AdminLogin() {
     setLoading(true);
 
     try {
-      const response = await fetch(`${BACKEND_URL}/api/v1/admin/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          login_identifier: username,
-          password: password
-        })
+       const response = await adminApi.post("/api/v1/admin/login", {
+        login_identifier: username,
+        password: password
       });
 
       const data = await response.json();

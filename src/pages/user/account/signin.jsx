@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Toast from '../../../components/common/Toast';
 import "../../../css/AdminManageLayout.css";
+import userApi from '../../../api/api';
 
 function Login() {
   const [email, setEmail] = useState("");
@@ -34,13 +35,11 @@ function Login() {
       formData.append("username", email);
       formData.append("password", password);
 
-      const response = await fetch(`${BACKEND_URL}/api/v1/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: formData,
-      });
+      const response = await userApi.post("/api/v1/auth/login", formData.toString(), {
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+    });
 
       if (!response.ok) {
         const errorData = await response.json();

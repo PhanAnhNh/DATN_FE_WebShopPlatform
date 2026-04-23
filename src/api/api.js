@@ -1,7 +1,6 @@
 // src/api/api.js
 import axios from 'axios';
-
-const BACKEND_URL = 'https://datnwebshopplatform-production.up.railway.app';
+import {BACKEND_URL} from '../config' 
 
 const api = axios.create({
   baseURL: BACKEND_URL,

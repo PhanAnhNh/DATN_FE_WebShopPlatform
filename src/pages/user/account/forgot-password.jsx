@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Toast from '../../../components/common/Toast';
+import { BACKEND_URL } from '../../../config'
 
 function ForgotPassword() {
   const [email, setEmail] = useState("");

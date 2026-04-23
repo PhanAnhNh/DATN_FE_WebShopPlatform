@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import Toast from '../../components/common/Toast';
 import "../../css/AdminManageLayout.css";
 import { Store, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { shopApi } from "../../api/api";
 
 function ShopLogin() {
   const [loginIdentifier, setLoginIdentifier] = useState("");
@@ -37,14 +38,12 @@ function ShopLogin() {
       formData.append('username', loginIdentifier);
       formData.append('password', password);
 
-      const response = await fetch(`${BACKEND_URL}/api/v1/shop/auth/login`, {
-        method: "POST",
+      const response = await shopApi.post("/api/v1/shop/auth/login", formData.toString(), {
         headers: {
           "Content-Type": "application/x-www-form-urlencoded"
-        },
-        body: formData.toString()
+        }
       });
-
+      
       const data = await response.json();
       console.log("Shop login response:", data);
 
