@@ -212,7 +212,7 @@ const ShopPage = () => {
         setLoading(true);
         try {
             // Fetch products thường
-            const productsRes = await api.get("/api/v1/products", {
+            const productsRes = await userApi.get("/api/v1/products", {
                 params: {
                     category: activeCategory !== "all" ? activeCategory : undefined,
                     sub_category: selectedSubCategory || undefined
@@ -270,7 +270,7 @@ const ShopPage = () => {
                 return;
             }
             
-            const res = await api.get("/api/v1/shops/nearby", {
+            const res = await userApi.get("/api/v1/shops/nearby", {
                 params: {
                     lat: location.lat,
                     lng: location.lng,
