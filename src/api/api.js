@@ -2,6 +2,16 @@
 import axios from 'axios';
 import {BACKEND_URL} from '../config' 
 
+const ensureHttps = (url) => {
+  if (url && url.startsWith('http://')) {
+    console.warn(`⚠️ Converting HTTP to HTTPS: ${url}`);
+    return url.replace('http://', 'https://');
+  }
+  return url;
+};
+
+const secureBackendUrl = ensureHttps(BACKEND_URL);
+
 const api = axios.create({
   baseURL: BACKEND_URL,
   headers: {

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Layout from "../../../components/layout/Layout";
-import api from "../../../api/api";
+import {userApi} from "../../../api/api";
 import locationApi from "../../../api/locationApi";
 import { useUserLocation } from "../../../components/Hooks/useUserLocation";
 
@@ -54,51 +54,50 @@ const ShopPage = () => {
         }
     };
 
-    // 👉 THÊM HÀM MỚI: Fetch sản phẩm hot (bán chạy nhất)
     const fetchHotProducts = async () => {
-        try {
-            // Kiểm tra cache cho sản phẩm hot
-            const cachedHot = sessionStorage.getItem('shop_hotProducts');
-            const cacheTime = sessionStorage.getItem('shop_full_cache_timestamp');
-            const now = Date.now();
-            const isCacheValid = cacheTime && (now - parseInt(cacheTime) < 300000);
+    try {
+        const cachedHot = sessionStorage.getItem('shop_hotProducts');
+        const cacheTime = sessionStorage.getItem('shop_full_cache_timestamp');
+        const now = Date.now();
+        const isCacheValid = cacheTime && (now - parseInt(cacheTime) < 300000);
 
-            if (cachedHot && isCacheValid) {
-                setHotProducts(JSON.parse(cachedHot));
-                console.log("✅ Loaded hot products from cache");
-                return;
-            }
-
-            // Gọi API lấy sản phẩm hot (top 3 sản phẩm bán chạy nhất)
-            const res = await api.get("/api/v1/products/hot", {
-                params: { limit: 3 }
-            });
-            
-            console.log("🔥 Hot products API response:", res.data);
-            
-            const formatted = (res.data || []).map(product => ({
-                id: product.id || product._id,
-                name: product.name,
-                price: product.price,
-                unit: product.unit || "kg",
-                shop_name: product.shop_name || product.shop?.name || "Cửa hàng",
-                image: product.image_url || product.image || "https://via.placeholder.com/300?text=No+Image",
-                fallbackIcon: "🔥",
-                sold_quantity: product.sold_quantity || 0
-            }));
-            
-            setHotProducts(formatted);
-            
-            // Lưu cache
-            sessionStorage.setItem('shop_hotProducts', JSON.stringify(formatted));
-            console.log("✅ Loaded hot products from API:", formatted.length);
-            
-        } catch (error) {
-            console.error("Error fetching hot products:", error);
-            // Fallback: nếu API chưa có, dùng sản phẩm thường
-            setHotProducts([]);
+        if (cachedHot && isCacheValid) {
+            setHotProducts(JSON.parse(cachedHot));
+            console.log("✅ Loaded hot products from cache");
+            return;
         }
-    };
+
+        // DÙNG userApi thay vì api
+        const res = await userApi.get("/api/v1/products/hot", {
+            params: { limit: 3 }
+        });
+        
+        console.log("🔥 Hot products API response:", res.data);
+        
+        const formatted = (res.data || []).map(product => ({
+            id: product.id || product._id,
+            name: product.name,
+            price: product.price,
+            unit: product.unit || "kg",
+            shop_name: product.shop_name || product.shop?.name || "Cửa hàng",
+            image: product.image_url || product.image || "https://via.placeholder.com/300?text=No+Image",
+            fallbackIcon: "🔥",
+            sold_quantity: product.sold_quantity || 0
+        }));
+        
+        setHotProducts(formatted);
+        sessionStorage.setItem('shop_hotProducts', JSON.stringify(formatted));
+        
+    } catch (error) {
+        console.error("Error fetching hot products:", error);
+        console.error("Error details:", error.message);
+        if (error.response) {
+            console.error("Response status:", error.response.status);
+            console.error("Response data:", error.response.data);
+        }
+        setHotProducts([]);
+    }
+};
 
     // Hàm đọc cache đầy đủ khi component mount
     const loadFullCache = () => {
