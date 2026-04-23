@@ -8,14 +8,15 @@ import {
   FaRegStar, FaMapMarkerAlt, FaPhone, FaEnvelope, FaCalendarAlt,
   FaHeart, FaRegHeart, FaSearch, FaBox, FaShoppingCart, FaEye,
   FaCheckCircle, FaShareAlt, FaFacebook, FaTwitter, FaInstagram,
-  FaTruck, FaShieldAlt, FaClock, FaReply, FaThumbsUp, FaUserCircle, FaEdit
+  FaTruck, FaShieldAlt, FaClock, FaReply, FaThumbsUp, FaUserCircle, FaEdit,
+  FaFilter, FaSortAmountDown, FaSortAmountUp, FaSortAmountDownAlt
 } from 'react-icons/fa';
 
 const ShopDetailPage = () => {
     const { shop_id } = useParams();
     const navigate = useNavigate();
     
-    // State với cache initialization
+    // State
     const [activeTab, setActiveTab] = useState("products");
     const [shop, setShop] = useState(null);
     const [products, setProducts] = useState([]);
@@ -32,116 +33,132 @@ const ShopDetailPage = () => {
     const [likedReviews, setLikedReviews] = useState({});
     const [newRating, setNewRating] = useState(5);
     const [showRatingSelector, setShowRatingSelector] = useState(false);
-    const [isCacheLoaded, setIsCacheLoaded] = useState(false);
+    const [sortOption, setSortOption] = useState("default"); // default, price_asc, price_desc, rating_desc, sold_desc
+    const [showSortMenu, setShowSortMenu] = useState(false);
+    const [productReviews, setProductReviews] = useState({});
+    const [loadingReviews, setLoadingReviews] = useState(false);
+    
+    const token = localStorage.getItem('user_token');
 
-    // Lọc sản phẩm theo từ khóa tìm kiếm
-    const filteredProducts = products.filter(product => {
-        if (!searchTerm.trim()) return true;
-        const searchLower = searchTerm.toLowerCase().trim();
-        const productName = (product.name || "").toLowerCase();
-        return productName.includes(searchLower);
-    });
-
-    // Hàm đọc cache
-    const loadFromCache = (id) => {
-        if (!id) return false;
+    // Lọc và sắp xếp sản phẩm
+    const getFilteredAndSortedProducts = () => {
+        let filtered = [...products];
         
-        const cachedShop = sessionStorage.getItem(`shop_data_${id}`);
-        const cacheTime = sessionStorage.getItem(`shop_cache_time_${id}`);
-        const isCacheValid = cachedShop && cacheTime && (Date.now() - parseInt(cacheTime) < 300000);
-        
-        if (isCacheValid) {
-            try {
-                const parsedShop = JSON.parse(cachedShop);
-                setShop(parsedShop);
-                
-                const cachedProducts = sessionStorage.getItem(`shop_products_${id}`);
-                if (cachedProducts) {
-                    setProducts(JSON.parse(cachedProducts));
-                }
-                
-                const cachedReviews = sessionStorage.getItem(`shop_reviews_${id}`);
-                if (cachedReviews) {
-                    setReviews(JSON.parse(cachedReviews));
-                }
-                
-                const cachedTab = sessionStorage.getItem(`shop_tab_${id}`);
-                if (cachedTab) {
-                    setActiveTab(cachedTab);
-                }
-                
-                const cachedFollowing = sessionStorage.getItem(`shop_following_${id}`);
-                if (cachedFollowing !== null) {
-                    setIsFollowing(cachedFollowing === "true");
-                }
-                
-                const cachedLiked = sessionStorage.getItem(`shop_liked_reviews_${id}`);
-                if (cachedLiked) {
-                    setLikedReviews(JSON.parse(cachedLiked));
-                }
-                
-                console.log("✅ Loaded from cache for shop:", id);
-                return true;
-            } catch (e) {
-                console.error("Error parsing cache:", e);
-            }
+        // Lọc theo tìm kiếm
+        if (searchTerm.trim()) {
+            const searchLower = searchTerm.toLowerCase().trim();
+            filtered = filtered.filter(product => 
+                (product.name || "").toLowerCase().includes(searchLower)
+            );
         }
-        return false;
+        
+        // Sắp xếp
+        switch (sortOption) {
+            case "price_asc":
+                filtered.sort((a, b) => (a.price || 0) - (b.price || 0));
+                break;
+            case "price_desc":
+                filtered.sort((a, b) => (b.price || 0) - (a.price || 0));
+                break;
+            case "rating_desc":
+                filtered.sort((a, b) => (b.average_rating || b.rating || 0) - (a.average_rating || a.rating || 0));
+                break;
+            case "sold_desc":
+                filtered.sort((a, b) => (b.sold_count || b.sold_quantity || 0) - (a.sold_count || a.sold_quantity || 0));
+                break;
+            default:
+                // Mặc định sắp xếp theo mới nhất
+                filtered.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+        }
+        
+        return filtered;
     };
+    
+    const filteredProducts = getFilteredAndSortedProducts();
 
-    // Hàm lưu cache
-    const saveToCache = (id) => {
-        if (!id) return;
-        
-        if (shop) {
-            sessionStorage.setItem(`shop_data_${id}`, JSON.stringify(shop));
-            sessionStorage.setItem(`shop_cache_time_${id}`, Date.now().toString());
-        }
-        if (products.length > 0) {
-            sessionStorage.setItem(`shop_products_${id}`, JSON.stringify(products));
-        }
-        if (reviews.length > 0) {
-            sessionStorage.setItem(`shop_reviews_${id}`, JSON.stringify(reviews));
-        }
-        sessionStorage.setItem(`shop_tab_${id}`, activeTab);
-        sessionStorage.setItem(`shop_following_${id}`, isFollowing);
-        sessionStorage.setItem(`shop_liked_reviews_${id}`, JSON.stringify(likedReviews));
-    };
-
-    // Effect để lưu cache khi có thay đổi
-    useEffect(() => {
-        if (shop_id && (shop || products.length > 0 || reviews.length > 0)) {
-            saveToCache(shop_id);
-        }
-    }, [shop, products, reviews, activeTab, isFollowing, likedReviews, shop_id]);
-
-    // Effect chính - load dữ liệu
+    // Fetch dữ liệu từ API
     useEffect(() => {
         if (!shop_id) return;
-        
-        console.log("=== Loading shop data for ID:", shop_id);
-        
-        // Thử đọc cache trước
-        const hasCache = loadFromCache(shop_id);
-        
-        if (hasCache) {
-            console.log("Using cached data, skipping API call");
-            setLoading(false);
-            setIsCacheLoaded(true);
-        } else {
-            console.log("No valid cache, fetching from API");
-            setLoading(true);
-            fetchShopData();
-        }
-        
-        // Kiểm tra follow status từ API
+        fetchShopData();
         checkFollowStatus();
-        
-        // Cleanup function
-        return () => {
-            console.log("Cleaning up for shop:", shop_id);
-        };
     }, [shop_id]);
+
+    const fetchShopData = async () => {
+        setLoading(true);
+        try {
+            // Lấy thông tin shop
+            const shopRes = await api.get(`/api/v1/shops/${shop_id}`);
+            setShop(shopRes.data);
+
+            // Lấy sản phẩm của shop
+            try {
+                const productsRes = await api.get(`/api/v1/shops/${shop_id}/products`);
+                const normalizedProducts = (productsRes.data || []).map(product => ({
+                    ...product,
+                    id: product.id || product._id,
+                    rating: product.average_rating || product.rating || 0,
+                    sold_count: product.sold_count || product.sold_quantity || 0
+                }));
+                setProducts(normalizedProducts);
+                
+                // Cập nhật số lượng sản phẩm
+                if (shopRes.data && normalizedProducts.length !== shopRes.data.products_count) {
+                    setShop(prev => ({
+                        ...prev,
+                        products_count: normalizedProducts.length
+                    }));
+                }
+            } catch (productsError) {
+                console.error("Error fetching products:", productsError);
+                setProducts([]);
+            }
+
+            // Lấy đánh giá của shop
+            try {
+                const reviewsRes = await api.get(`/api/v1/shops/${shop_id}/reviews`);
+                const normalizedReviews = (reviewsRes.data || []).map(review => ({
+                    ...review,
+                    id: review.id || review._id,
+                    date: review.created_at || review.date,
+                    likes: review.helpful_count || review.likes || 0
+                }));
+                setReviews(normalizedReviews);
+            } catch (reviewsError) {
+                console.error("Error fetching reviews:", reviewsError);
+                setReviews([]);
+            }
+            
+            // Lấy đánh giá cho từng sản phẩm
+            await fetchProductsRatings(normalizedProducts);
+            
+        } catch (error) {
+            console.error("Error fetching shop data:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+    
+    const fetchProductsRatings = async (productsList) => {
+        if (!productsList || productsList.length === 0) return;
+        
+        setLoadingReviews(true);
+        try {
+            const ratingsMap = {};
+            for (const product of productsList) {
+                try {
+                    const statsRes = await api.get(`/api/v1/reviews/product/${product.id}/stats`);
+                    ratingsMap[product.id] = statsRes.data;
+                } catch (err) {
+                    ratingsMap[product.id] = { average_rating: 0, total_reviews: 0 };
+                }
+            }
+            setProductReviews(ratingsMap);
+        } catch (error) {
+            console.error("Error fetching products ratings:", error);
+        } finally {
+            setLoadingReviews(false);
+        }
+    };
 
     const checkFollowStatus = async () => {
         try {
@@ -153,120 +170,6 @@ const ShopDetailPage = () => {
         } catch (error) {
             console.error("Error checking follow status:", error);
         }
-    };
-
-    const fetchShopData = async () => {
-        setLoading(true);
-        try {
-            const shopRes = await api.get(`/api/v1/shops/${shop_id}`);
-            setShop(shopRes.data);
-
-            try {
-                const productsRes = await api.get(`/api/v1/shops/${shop_id}/products`);
-                const normalizedProducts = (productsRes.data || []).map(product => ({
-                    ...product,
-                    id: product.id || product._id || product.product_id || String(product.id || Math.random())
-                }));
-                setProducts(normalizedProducts);
-                
-                // Cập nhật số lượng sản phẩm trong shop từ dữ liệu thực tế
-                if (shopRes.data && normalizedProducts.length !== shopRes.data.products_count) {
-                    setShop(prev => ({
-                        ...prev,
-                        products_count: normalizedProducts.length
-                    }));
-                }
-            } catch (productsError) {
-                console.log("Products API not available, using mock data");
-                const mockProducts = [
-                    { id: 1, name: "Táo đỏ tươi", price: 60000, image_url: "https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=400", sold_count: 150, rating: 4.8 },
-                    { id: 2, name: "Bưởi da xanh", price: 45000, image_url: "https://images.unsplash.com/photo-1579542089558-9e5fc3a01708?w=400", sold_count: 234, rating: 4.9 },
-                    { id: 3, name: "Cam sành", price: 35000, image_url: "https://images.unsplash.com/photo-1557800636-894a64c1696f?w=400", sold_count: 178, rating: 4.7 },
-                    { id: 4, name: "Chuối già", price: 25000, image_url: "https://images.unsplash.com/photo-1603833665858-e61d17a86224?w=400", sold_count: 98, rating: 4.6 },
-                    { id: 5, name: "Dừa xiêm", price: 11000, image_url: "https://images.unsplash.com/photo-1584308666744-00d6d8b9f8f8?w=400", sold_count: 45, rating: 4.5 },
-                    { id: 6, name: "Măng cụt", price: 55000, image_url: "https://images.unsplash.com/photo-1584345604476-8ec5e12e42dd?w=400", sold_count: 67, rating: 4.9 }
-                ];
-                setProducts(mockProducts);
-                
-                // Cập nhật số lượng sản phẩm cho mock data
-                if (shopRes.data) {
-                    setShop(prev => ({
-                        ...prev,
-                        products_count: mockProducts.length
-                    }));
-                }
-            }
-
-            try {
-                const reviewsRes = await api.get(`/api/v1/shops/${shop_id}/reviews`);
-                const normalizedReviews = (reviewsRes.data || []).map(review => ({
-                    ...review,
-                    id: review.id || review._id || review.review_id || String(review.id || Math.random())
-                }));
-                setReviews(normalizedReviews);
-            } catch (reviewsError) {
-                console.log("Reviews API not available, using mock data");
-                setReviews([
-                    { id: 1, user_name: "Nguyễn Văn An", user_avatar: "https://randomuser.me/api/portraits/men/1.jpg", rating: 5, comment: "Sản phẩm chất lượng, giao hàng nhanh, đóng gói cẩn thận. Sẽ ủng hộ dài dài!", date: "2026-01-20", likes: 12 },
-                    { id: 2, user_name: "Lương Văn Linh", user_avatar: "https://randomuser.me/api/portraits/men/2.jpg", rating: 5, comment: "Rất hài lòng với chất lượng sản phẩm. Giá cả hợp lý.", date: "2026-01-18", likes: 8 },
-                    { id: 3, user_name: "Phan Anh Nhật", user_avatar: "https://randomuser.me/api/portraits/men/3.jpg", rating: 4, comment: "Sản phẩm tốt, đóng gói kỹ. Sẽ mua lại lần sau.", date: "2026-01-17", likes: 5 }
-                ]);
-            }
-        } catch (error) {
-            console.error("Error fetching shop data:", error);
-            const mockShop = {
-                id: shop_id,
-                name: "Đặc Sản Quê Tôi",
-                logo_url: "https://via.placeholder.com/120",
-                banner_url: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1200&h=400&fit=crop",
-                description: "Chuyên cung cấp các sản phẩm đặc sản vùng miền chất lượng cao, tươi ngon mỗi ngày. Cam kết nguồn gốc rõ ràng, an toàn vệ sinh thực phẩm.",
-                products_count: 6,
-                followers_count: 13700,
-                rating: 4.9,
-                total_reviews: 2000,
-                chat_response_rate: 84,
-                created_at: "2025-01-01T00:00:00Z",
-                address: "Hà Nội, Việt Nam",
-                phone: "0987654321",
-                email: "dacsanquetoi@gmail.com"
-            };
-            setShop(mockShop);
-            setProducts([
-                { id: 1, name: "Táo đỏ tươi", price: 60000, image_url: "https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=400", sold_count: 150, rating: 4.8 },
-                { id: 2, name: "Bưởi da xanh", price: 45000, image_url: "https://images.unsplash.com/photo-1579542089558-9e5fc3a01708?w=400", sold_count: 234, rating: 4.9 },
-                { id: 3, name: "Cam sành", price: 35000, image_url: "https://images.unsplash.com/photo-1557800636-894a64c1696f?w=400", sold_count: 178, rating: 4.7 },
-                { id: 4, name: "Chuối già", price: 25000, image_url: "https://images.unsplash.com/photo-1603833665858-e61d17a86224?w=400", sold_count: 98, rating: 4.6 },
-                { id: 5, name: "Dừa xiêm", price: 11000, image_url: "https://images.unsplash.com/photo-1584308666744-00d6d8b9f8f8?w=400", sold_count: 45, rating: 4.5 },
-                { id: 6, name: "Măng cụt", price: 55000, image_url: "https://images.unsplash.com/photo-1584345604476-8ec5e12e42dd?w=400", sold_count: 67, rating: 4.9 }
-            ]);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const formatNumber = (num) => {
-        if (num >= 1000) {
-            return (num / 1000).toFixed(1) + 'k';
-        }
-        return num?.toString() || "0";
-    };
-
-    const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('vi-VN', {
-            style: 'currency',
-            currency: 'VND'
-        }).format(amount || 0);
-    };
-
-    const formatDate = (dateString) => {
-        if (!dateString) return "Không rõ";
-        const date = new Date(dateString);
-        const now = new Date();
-        const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
-        if (diffDays === 0) return "Hôm nay";
-        if (diffDays === 1) return "Hôm qua";
-        if (diffDays < 7) return `${diffDays} ngày trước`;
-        return date.toLocaleDateString('vi-VN');
     };
 
     const handleFollow = async () => {
@@ -292,32 +195,81 @@ const ShopDetailPage = () => {
     
     const handleSubmitComment = async () => {
         if (!newComment.trim()) return;
+        if (!token) {
+            alert("Vui lòng đăng nhập để bình luận");
+            navigate('/login');
+            return;
+        }
+        
         try {
-            await api.post(`/api/v1/shops/${shop_id}/reviews`, { 
+            const response = await api.post(`/api/v1/shops/${shop_id}/reviews`, { 
                 comment: newComment, 
                 rating: newRating
             });
-            setReviews([{
-                id: Date.now(),
-                user_name: "Bạn",
-                user_avatar: null,
+            const newReview = {
+                id: response.data.id || Date.now(),
+                user_name: response.data.user_name || "Bạn",
+                user_avatar: response.data.user_avatar || null,
                 rating: newRating,
                 comment: newComment,
                 date: new Date().toISOString(),
                 likes: 0
-            }, ...reviews]);
+            };
+            setReviews([newReview, ...reviews]);
             setNewComment("");
             setNewRating(5);
         } catch (error) {
             console.error("Error submitting comment:", error);
+            alert(error.response?.data?.detail || "Có lỗi xảy ra");
         }
     };
 
-    const handleLikeReview = (reviewId) => {
-        setLikedReviews(prev => ({
-            ...prev,
-            [reviewId]: !prev[reviewId]
-        }));
+    const handleLikeReview = async (reviewId) => {
+        if (!token) {
+            alert("Vui lòng đăng nhập để thích bình luận");
+            navigate('/login');
+            return;
+        }
+        
+        try {
+            await api.post(`/api/v1/shop-reviews/${reviewId}/like`);
+            setLikedReviews(prev => ({
+                ...prev,
+                [reviewId]: !prev[reviewId]
+            }));
+            setReviews(prev => prev.map(review => 
+                review.id === reviewId 
+                    ? { ...review, likes: (review.likes || 0) + (likedReviews[reviewId] ? -1 : 1) }
+                    : review
+            ));
+        } catch (error) {
+            console.error("Error liking review:", error);
+        }
+    };
+
+    const formatNumber = (num) => {
+        if (!num) return "0";
+        if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+        if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
+        return num?.toString() || "0";
+    };
+
+    const formatCurrency = (amount) => {
+        return new Intl.NumberFormat('vi-VN', {
+            style: 'currency',
+            currency: 'VND'
+        }).format(amount || 0);
+    };
+
+    const formatDate = (dateString) => {
+        if (!dateString) return "Không rõ";
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+        if (diffDays === 0) return "Hôm nay";
+        if (diffDays === 1) return "Hôm qua";
+        if (diffDays < 7) return `${diffDays} ngày trước`;
+        return date.toLocaleDateString('vi-VN');
     };
 
     const renderStars = (rating) => {
@@ -332,6 +284,16 @@ const ShopDetailPage = () => {
         return stars;
     };
 
+    const getSortLabel = () => {
+        switch (sortOption) {
+            case "price_asc": return "Giá tăng dần";
+            case "price_desc": return "Giá giảm dần";
+            case "rating_desc": return "Đánh giá cao nhất";
+            case "sold_desc": return "Bán chạy nhất";
+            default: return "Mới nhất";
+        }
+    };
+
     const filteredReviews = reviews.filter(review => !ratingFilter || review.rating === ratingFilter);
     const ratingDistribution = { 
         5: reviews.filter(r => r.rating === 5).length, 
@@ -343,11 +305,9 @@ const ShopDetailPage = () => {
     const ratingOptions = [{ value: 5, label: "5 sao" }, { value: 4, label: "4 sao" }, { value: 3, label: "3 sao" }, { value: 2, label: "2 sao" }, { value: 1, label: "1 sao" }];
     const chatResponseRate = shop?.chat_response_rate !== undefined && shop?.chat_response_rate !== null ? shop.chat_response_rate : 0;
 
-    // Lấy số lượng sản phẩm hiển thị - ưu tiên từ products array nếu có
     const displayProductsCount = products.length > 0 ? products.length : (shop?.products_count || 0);
 
-    // Loading state
-    if (loading && !shop && !isCacheLoaded) return (
+    if (loading && !shop) return (
         <ShopDetailLayout shop={null}>
             <div style={{ textAlign: "center", padding: "80px 20px" }}>
                 <div style={{ width: "50px", height: "50px", border: "3px solid #f3f3f3", borderTop: "3px solid #4CAF50", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 20px" }} />
@@ -372,7 +332,7 @@ const ShopDetailPage = () => {
                 <div style={{ position: "relative", marginBottom: "60px" }}>
                     <div style={{
                         height: "320px",
-                        backgroundImage: `linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.6)), url(${shop?.banner_url})`,
+                        backgroundImage: `linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.6)), url(${shop?.banner_url || "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1200&h=400&fit=crop"})`,
                         backgroundSize: "cover",
                         backgroundPosition: "center",
                         borderRadius: "24px",
@@ -394,7 +354,7 @@ const ShopDetailPage = () => {
                                 <h1 style={{ fontSize: "36px", color: "white", margin: 0, textShadow: "0 2px 8px rgba(0,0,0,0.3)", fontWeight: "700" }}>{shop?.name}</h1>
                                 <div style={{ display: "flex", gap: "20px", marginTop: "12px", flexWrap: "wrap" }}>
                                     <span style={{ color: "rgba(255,255,255,0.95)", display: "flex", alignItems: "center", gap: "6px", fontSize: "15px", fontWeight: "500", background: "rgba(0,0,0,0.3)", padding: "4px 12px", borderRadius: "30px" }}>
-                                        <FaStar style={{ color: "#ffc107" }} /> {shop?.rating}
+                                        <FaStar style={{ color: "#ffc107" }} /> {shop?.rating || 0}
                                     </span>
                                     <span style={{ color: "rgba(255,255,255,0.95)", fontSize: "15px", fontWeight: "500", background: "rgba(0,0,0,0.3)", padding: "4px 12px", borderRadius: "30px" }}>
                                         {formatNumber(shop?.total_reviews)} đánh giá
@@ -475,9 +435,9 @@ const ShopDetailPage = () => {
                         </div>
                     </div>
 
-                    {/* Search Bar */}
-                    <div style={{ marginBottom: "30px" }}>
-                        <div style={{ position: "relative", maxWidth: "500px" }}>
+                    {/* Search Bar và Sort */}
+                    <div style={{ marginBottom: "30px", display: "flex", gap: "16px", flexWrap: "wrap" }}>
+                        <div style={{ position: "relative", flex: 1, maxWidth: "500px" }}>
                             <FaSearch style={{ position: "absolute", left: "18px", top: "50%", transform: "translateY(-50%)", color: "#999" }} />
                             <input 
                                 type="text" 
@@ -503,6 +463,84 @@ const ShopDetailPage = () => {
                                     borderRadius: "20px"
                                 }}>
                                     {filteredProducts.length} kết quả
+                                </div>
+                            )}
+                        </div>
+                        
+                        {/* Sort Button */}
+                        <div style={{ position: "relative" }}>
+                            <button 
+                                onClick={() => setShowSortMenu(!showSortMenu)}
+                                style={{
+                                    padding: "14px 24px",
+                                    borderRadius: "40px",
+                                    border: "1px solid #e0e0e0",
+                                    background: "white",
+                                    cursor: "pointer",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "8px",
+                                    fontSize: "14px",
+                                    fontWeight: "500",
+                                    transition: "all 0.3s ease"
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#2e7d32"; e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.1)"; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#e0e0e0"; e.currentTarget.style.boxShadow = "none"; }}
+                            >
+                                <FaFilter /> Sắp xếp: {getSortLabel()} 
+                                {sortOption === "price_asc" ? <FaSortAmountDown /> : 
+                                 sortOption === "price_desc" ? <FaSortAmountUp /> : 
+                                 <FaSortAmountDownAlt />}
+                            </button>
+                            
+                            {showSortMenu && (
+                                <div style={{
+                                    position: "absolute",
+                                    top: "55px",
+                                    right: 0,
+                                    background: "white",
+                                    borderRadius: "16px",
+                                    boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
+                                    padding: "8px",
+                                    zIndex: 100,
+                                    minWidth: "220px",
+                                    border: "1px solid #f0f0f0"
+                                }}>
+                                    {[
+                                        { value: "default", label: "Mới nhất", icon: <FaClock size={14} /> },
+                                        { value: "price_asc", label: "Giá tăng dần (thấp → cao)", icon: <FaSortAmountDown size={14} /> },
+                                        { value: "price_desc", label: "Giá giảm dần (cao → thấp)", icon: <FaSortAmountUp size={14} /> },
+                                        { value: "rating_desc", label: "Đánh giá cao nhất", icon: <FaStar size={14} /> },
+                                        { value: "sold_desc", label: "Bán chạy nhất", icon: <FaShoppingCart size={14} /> }
+                                    ].map(option => (
+                                        <button
+                                            key={option.value}
+                                            onClick={() => {
+                                                setSortOption(option.value);
+                                                setShowSortMenu(false);
+                                            }}
+                                            style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: "12px",
+                                                padding: "12px 16px",
+                                                width: "100%",
+                                                border: "none",
+                                                background: sortOption === option.value ? "#e8f5e9" : "white",
+                                                borderRadius: "12px",
+                                                cursor: "pointer",
+                                                transition: "all 0.2s",
+                                                color: sortOption === option.value ? "#2e7d32" : "#333",
+                                                fontWeight: sortOption === option.value ? "600" : "400"
+                                            }}
+                                            onMouseEnter={(e) => { if (sortOption !== option.value) e.currentTarget.style.background = "#f5f5f5"; }}
+                                            onMouseLeave={(e) => { if (sortOption !== option.value) e.currentTarget.style.background = "white"; }}
+                                        >
+                                            {option.icon}
+                                            <span style={{ flex: 1, textAlign: "left" }}>{option.label}</span>
+                                            {sortOption === option.value && <FaCheckCircle size={14} color="#2e7d32" />}
+                                        </button>
+                                    ))}
                                 </div>
                             )}
                         </div>
@@ -634,6 +672,8 @@ const ShopDetailPage = () => {
                                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "24px" }}>
                                     {filteredProducts.map(product => {
                                         const isHovered = hoveredProductId === product.id;
+                                        const productRating = productReviews[product.id]?.average_rating || product.rating || 0;
+                                        const productRatingCount = productReviews[product.id]?.total_reviews || 0;
                                         return (
                                             <div 
                                                 key={product.id} 
@@ -650,10 +690,10 @@ const ShopDetailPage = () => {
                                                     transform: isHovered ? "translateY(-6px) scale(1.02)" : "translateY(0) scale(1)",
                                                     willChange: "transform, box-shadow"
                                                 }}>
-                                                <div style={{ height: "220px", backgroundImage: `url(${product.image_url})`, backgroundSize: "cover", backgroundPosition: "center", position: "relative" }}>
-                                                    {product.sold_count > 0 && (
+                                                <div style={{ height: "220px", backgroundImage: `url(${product.image_url || "https://via.placeholder.com/300"})`, backgroundSize: "cover", backgroundPosition: "center", position: "relative" }}>
+                                                    {(product.sold_count || product.sold_quantity) > 0 && (
                                                         <span style={{ position: "absolute", top: "12px", right: "12px", background: "#ff4444", color: "white", padding: "4px 10px", borderRadius: "30px", fontSize: "12px", fontWeight: "500" }}>
-                                                            🔥 Đã bán {product.sold_count}
+                                                            🔥 Đã bán {product.sold_count || product.sold_quantity}
                                                         </span>
                                                     )}
                                                     {isHovered && (
@@ -665,8 +705,11 @@ const ShopDetailPage = () => {
                                                     )}
                                                 </div>
                                                 <div style={{ padding: "20px" }}>
-                                                    <h4 style={{ fontSize: "18px", marginBottom: "8px", fontWeight: "600", color: "#333" }}>{product.name}</h4>
-                                                    <div style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "10px" }}>{renderStars(product.rating || 4.5)}</div>
+                                                    <h4 style={{ fontSize: "18px", marginBottom: "8px", fontWeight: "600", color: "#333", lineHeight: "1.4", minHeight: "50px" }}>{product.name}</h4>
+                                                    <div style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "8px", flexWrap: "wrap" }}>
+                                                        {renderStars(productRating)}
+                                                        <span style={{ fontSize: "12px", color: "#666", marginLeft: "4px" }}>({productRatingCount})</span>
+                                                    </div>
                                                     <div style={{ fontSize: "22px", fontWeight: "bold", color: "#d32f2f", marginBottom: "12px" }}>{formatCurrency(product.price)}</div>
                                                     <button style={{ 
                                                         width: "100%", padding: "12px", background: isHovered ? "#2e7d32" : "#f5f5f5", 
@@ -780,6 +823,21 @@ const ShopDetailPage = () => {
                                                         </span>
                                                     </div>
                                                     <p style={{ color: "#555", lineHeight: "1.6", marginTop: "8px", fontSize: "15px" }}>{review.comment}</p>
+                                                    {review.reply && (
+                                                        <div style={{
+                                                            marginTop: "12px",
+                                                            padding: "12px 16px",
+                                                            background: "#f8f9fa",
+                                                            borderRadius: "12px",
+                                                            borderLeft: "3px solid #2e7d32"
+                                                        }}>
+                                                            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+                                                                <FaReply size={12} color="#2e7d32" />
+                                                                <strong style={{ fontSize: "13px", color: "#2e7d32" }}>Phản hồi từ shop</strong>
+                                                            </div>
+                                                            <p style={{ fontSize: "14px", color: "#555", margin: 0 }}>{review.reply}</p>
+                                                        </div>
+                                                    )}
                                                     <div style={{ display: "flex", gap: "16px", marginTop: "16px", paddingTop: "12px", borderTop: "1px solid #f0f0f0" }}>
                                                         <button onClick={() => handleLikeReview(review.id)} style={{
                                                             display: "flex", alignItems: "center", gap: "6px",
@@ -788,9 +846,6 @@ const ShopDetailPage = () => {
                                                             fontSize: "13px", transition: "color 0.2s"
                                                         }}>
                                                             <FaThumbsUp /> {likedReviews[review.id] ? (review.likes + 1) : review.likes}
-                                                        </button>
-                                                        <button style={{ display: "flex", alignItems: "center", gap: "6px", background: "none", border: "none", cursor: "pointer", color: "#999", fontSize: "13px" }}>
-                                                            <FaReply /> Trả lời
                                                         </button>
                                                     </div>
                                                 </div>

@@ -51,6 +51,7 @@ function Home() {
     const [confirmMessage, setConfirmMessage] = useState("");
     const [showShareModal, setShowShareModal] = useState(false);
     
+    
     const clearCache = () => {
         sessionStorage.removeItem(`home_posts_${category}`);
         sessionStorage.removeItem(`home_cache_time_${category}`);
@@ -83,6 +84,7 @@ function Home() {
 
     // Lưu cache khi posts thay đổi
     useEffect(() => {
+        
         if (posts.length > 0) {
             sessionStorage.setItem(`home_posts_${category}`, JSON.stringify(posts));
             sessionStorage.setItem(`home_cache_time_${category}`, Date.now().toString());
@@ -98,6 +100,7 @@ function Home() {
 
         // Sửa useEffect loadPosts
     useEffect(() => {
+        
         const loadPosts = async () => {
             setLoading(true);
            

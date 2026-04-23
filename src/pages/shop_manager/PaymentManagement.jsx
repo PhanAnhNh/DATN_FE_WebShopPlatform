@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   FaPlus, FaTrash, FaEdit, FaSave, FaTimes, 
   FaUniversity, FaQrcode, FaUpload, FaCheck,
-  FaSpinner, FaEye, FaEyeSlash, FaCopy
+  FaSpinner, FaEye, FaEyeSlash, FaCopy, FaLink,
+  FaTrashAlt
 } from 'react-icons/fa';
 import { shopApi } from '../../api/api';
 
@@ -20,8 +21,10 @@ const PaymentManagement = ({ settings, updateSettings, showToast }) => {
     branch: '',
     is_active: true
   });
-  const [uploadingQR, setUploadingQR] = useState(false);
+  const [uploadingQR, setUploadingQR] = useState({});
   const [showQRPreview, setShowQRPreview] = useState(null);
+  const [qrUploadMethod, setQrUploadMethod] = useState({});
+  const [qrUrlInput, setQrUrlInput] = useState({});
 
   // Danh sách ngân hàng Việt Nam
   const bankList = [
@@ -54,8 +57,153 @@ const PaymentManagement = ({ settings, updateSettings, showToast }) => {
   useEffect(() => {
     if (settings?.payment?.bank_accounts) {
       setBankAccounts(settings.payment.bank_accounts);
+      const initialUploadMethod = {};
+      const initialUrlInput = {};
+      settings.payment.bank_accounts.forEach(acc => {
+        initialUploadMethod[acc.id] = 'file';
+        initialUrlInput[acc.id] = acc.qr_code_url || '';
+      });
+      setQrUploadMethod(initialUploadMethod);
+      setQrUrlInput(initialUrlInput);
     }
   }, [settings]);
+
+  // ==================== QR CODE HANDLERS ====================
+  
+  const handleQRFileSelect = async (accountId, file) => {
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      showToast('Vui lòng chọn file ảnh', 'error');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Kích thước file không được vượt quá 5MB', 'error');
+      return;
+    }
+
+    setUploadingQR(prev => ({ ...prev, [accountId]: true }));
+    
+    try {
+      // Tạo FormData và gửi file trực tiếp
+      const formData = new FormData();
+      formData.append('account_id', accountId);
+      formData.append('file', file);
+
+      const response = await shopApi.post('/api/v1/shop/settings/payment/upload-qr', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      if (response.data?.qr_code_url) {
+        // Cập nhật ngay lập tức trên UI
+        setBankAccounts(prev => prev.map(acc => 
+          acc.id === accountId 
+            ? { ...acc, qr_code_url: response.data.qr_code_url }
+            : acc
+        ));
+        setQrUrlInput(prev => ({ ...prev, [accountId]: response.data.qr_code_url }));
+        showToast('Upload mã QR thành công', 'success');
+        
+        // Cập nhật settings
+        updateSettings('payment', {
+          ...settings.payment,
+          bank_accounts: bankAccounts.map(acc =>
+            acc.id === accountId
+              ? { ...acc, qr_code_url: response.data.qr_code_url }
+              : acc
+          )
+        });
+      }
+    } catch (error) {
+      console.error('Error uploading QR code:', error);
+      showToast(error.response?.data?.detail || 'Có lỗi xảy ra khi upload', 'error');
+    } finally {
+      setUploadingQR(prev => ({ ...prev, [accountId]: false }));
+    }
+  };
+
+  const handleQRUrlChange = (accountId, url) => {
+    setQrUrlInput(prev => ({ ...prev, [accountId]: url }));
+  };
+  const handleSaveQRUrl = async (accountId) => {
+    const url = qrUrlInput[accountId];
+    if (!url || !url.trim()) {
+      showToast('Vui lòng nhập URL mã QR', 'error');
+      return;
+    }
+
+    setUploadingQR(prev => ({ ...prev, [accountId]: true }));
+    
+    try {
+      // Dùng endpoint mới cho URL
+      const response = await shopApi.post('/api/v1/shop/settings/payment/save-qr-url', {
+        account_id: accountId,
+        qr_code_url: url.trim()
+      });
+
+      if (response.data?.qr_code_url) {
+        setBankAccounts(prev => prev.map(acc => 
+          acc.id === accountId 
+            ? { ...acc, qr_code_url: response.data.qr_code_url }
+            : acc
+        ));
+        setQrUrlInput(prev => ({ ...prev, [accountId]: response.data.qr_code_url }));
+        showToast('Cập nhật mã QR thành công', 'success');
+        
+        updateSettings('payment', {
+          ...settings.payment,
+          bank_accounts: bankAccounts.map(acc =>
+            acc.id === accountId
+              ? { ...acc, qr_code_url: response.data.qr_code_url }
+              : acc
+          )
+        });
+      }
+    } catch (error) {
+      console.error('Error saving QR URL:', error);
+      showToast(error.response?.data?.detail || 'Có lỗi xảy ra', 'error');
+    } finally {
+      setUploadingQR(prev => ({ ...prev, [accountId]: false }));
+    }
+  };
+
+  // ✅ CHỈ GIỮ LẠI MỘT HÀM handleDeleteQR
+  const handleDeleteQR = async (accountId) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa mã QR này?')) {
+      return;
+    }
+
+    setUploadingQR(prev => ({ ...prev, [accountId]: true }));
+    
+    try {
+      const response = await shopApi.delete(`/api/v1/shop/settings/payment/delete-qr/${accountId}`);
+
+      if (response.data) {
+        setBankAccounts(prev => prev.map(acc => 
+          acc.id === accountId 
+            ? { ...acc, qr_code_url: null }
+            : acc
+        ));
+        setQrUrlInput(prev => ({ ...prev, [accountId]: '' }));
+        showToast('Xóa mã QR thành công', 'success');
+        
+        updateSettings('payment', {
+          ...settings.payment,
+          bank_accounts: bankAccounts.map(acc =>
+            acc.id === accountId
+              ? { ...acc, qr_code_url: null }
+              : acc
+          )
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting QR code:', error);
+      showToast(error.response?.data?.detail || 'Có lỗi xảy ra', 'error');
+    } finally {
+      setUploadingQR(prev => ({ ...prev, [accountId]: false }));
+    }
+  };
 
   const handleOpenModal = (account = null) => {
     if (account) {
@@ -90,17 +238,14 @@ const PaymentManagement = ({ settings, updateSettings, showToast }) => {
 
     setLoading(true);
     try {
-      let response;
       if (editingAccount) {
-        // Cập nhật
-        response = await shopApi.put(
+        await shopApi.put(
           `/api/v1/shop/settings/payment/bank-accounts/${editingAccount.id}`,
           formData
         );
         showToast('Cập nhật tài khoản thành công', 'success');
       } else {
-        // Thêm mới
-        response = await shopApi.post('/api/v1/shop/settings/payment/bank-accounts', formData);
+        await shopApi.post('/api/v1/shop/settings/payment/bank-accounts', formData);
         showToast('Thêm tài khoản thành công', 'success');
       }
 
@@ -130,7 +275,6 @@ const PaymentManagement = ({ settings, updateSettings, showToast }) => {
       await shopApi.delete(`/api/v1/shop/settings/payment/bank-accounts/${accountId}`);
       showToast('Xóa tài khoản thành công', 'success');
 
-      // Refresh settings
       const settingsResponse = await shopApi.get('/api/v1/shop/settings');
       if (settingsResponse.data?.payment?.bank_accounts) {
         setBankAccounts(settingsResponse.data.payment.bank_accounts);
@@ -144,38 +288,121 @@ const PaymentManagement = ({ settings, updateSettings, showToast }) => {
     }
   };
 
-  const handleUploadQR = async (accountId, file) => {
-    if (!file) return;
-
-    setUploadingQR(true);
-    try {
-      const formData = new FormData();
-      formData.append('account_id', accountId);
-      formData.append('file', file);
-
-      const response = await shopApi.post('/api/v1/shop/settings/payment/upload-qr', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-
-      showToast('Upload QR code thành công', 'success');
-
-      // Refresh settings
-      const settingsResponse = await shopApi.get('/api/v1/shop/settings');
-      if (settingsResponse.data?.payment?.bank_accounts) {
-        setBankAccounts(settingsResponse.data.payment.bank_accounts);
-        updateSettings('payment', settingsResponse.data.payment);
-      }
-    } catch (error) {
-      console.error('Error uploading QR code:', error);
-      showToast(error.response?.data?.detail || 'Có lỗi xảy ra', 'error');
-    } finally {
-      setUploadingQR(false);
-    }
-  };
-
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
     showToast('Đã sao chép', 'success');
+  };
+
+  // Component upload QR cho từng tài khoản
+  const QRUploaSection = ({ account }) => {
+    const isUploading = uploadingQR[account.id];
+    const method = qrUploadMethod[account.id] || 'file';
+    const urlValue = qrUrlInput[account.id] || '';
+
+    return (
+      <div className="qr-code-section">
+        <div className="qr-header">
+          <FaQrcode /> Mã QR thanh toán
+          <div className="qr-method-selector">
+            <button
+              type="button"
+              className={`method-btn ${method === 'file' ? 'active' : ''}`}
+              onClick={() => setQrUploadMethod(prev => ({ ...prev, [account.id]: 'file' }))}
+            >
+              <FaUpload size={12} /> Tải ảnh
+            </button>
+            <button
+              type="button"
+              className={`method-btn ${method === 'url' ? 'active' : ''}`}
+              onClick={() => setQrUploadMethod(prev => ({ ...prev, [account.id]: 'url' }))}
+            >
+              <FaLink size={12} /> Nhập URL
+            </button>
+          </div>
+        </div>
+
+        {method === 'file' ? (
+          <div className="qr-upload-area">
+            {account.qr_code_url ? (
+              <div className="qr-preview">
+                <img 
+                  src={account.qr_code_url} 
+                  alt="QR Code" 
+                  onClick={() => setShowQRPreview(account.qr_code_url)}
+                />
+                <div className="qr-actions">
+                  <label className="upload-btn">
+                    <FaUpload />
+                    <input 
+                      type="file" 
+                      accept="image/*"
+                      onChange={(e) => handleQRFileSelect(account.id, e.target.files[0])}
+                      disabled={isUploading}
+                    />
+                    {isUploading ? <FaSpinner className="spinning" /> : 'Đổi QR'}
+                  </label>
+                  <button 
+                    className="delete-btn"
+                    onClick={() => handleDeleteQR(account.id)}
+                    disabled={isUploading}
+                  >
+                    <FaTrashAlt /> Xóa
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <label className="upload-qr-placeholder">
+                <FaUpload />
+                <span>Tải lên mã QR</span>
+                <input 
+                  type="file" 
+                  accept="image/*"
+                  onChange={(e) => handleQRFileSelect(account.id, e.target.files[0])}
+                  disabled={isUploading}
+                />
+                {isUploading && <FaSpinner className="spinning" />}
+              </label>
+            )}
+          </div>
+        ) : (
+          <div className="qr-url-input">
+            <div className="url-input-group">
+              <input
+                type="text"
+                placeholder="Nhập URL mã QR (https://example.com/qr.png)"
+                value={urlValue}
+                onChange={(e) => handleQRUrlChange(account.id, e.target.value)}
+                disabled={isUploading}
+              />
+              <button 
+                className="save-url-btn"
+                onClick={() => handleSaveQRUrl(account.id)}
+                disabled={isUploading}
+              >
+                {isUploading ? <FaSpinner className="spinning" /> : <FaSave />}
+                Lưu
+              </button>
+            </div>
+            {account.qr_code_url && (
+              <div className="qr-preview-small">
+                <img 
+                  src={account.qr_code_url} 
+                  alt="QR Code" 
+                  onClick={() => setShowQRPreview(account.qr_code_url)}
+                />
+                <button 
+                  className="delete-qr-btn"
+                  onClick={() => handleDeleteQR(account.id)}
+                  disabled={isUploading}
+                >
+                  <FaTrashAlt /> Xóa QR
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -247,45 +474,8 @@ const PaymentManagement = ({ settings, updateSettings, showToast }) => {
                 )}
               </div>
 
-              {/* QR Code Section */}
-              <div className="qr-code-section">
-                <div className="qr-header">
-                  <FaQrcode /> Mã QR thanh toán
-                </div>
-                {account.qr_code_url ? (
-                  <div className="qr-preview">
-                    <img 
-                      src={account.qr_code_url} 
-                      alt="QR Code" 
-                      onClick={() => setShowQRPreview(account.qr_code_url)}
-                    />
-                    <label className="upload-qr-btn">
-                      <FaUpload />
-                      <input 
-                        type="file" 
-                        accept="image/*"
-                        onChange={(e) => handleUploadQR(account.id, e.target.files[0])}
-                        disabled={uploadingQR}
-                      />
-                      {uploadingQR ? <FaSpinner className="spinning" /> : 'Đổi QR'}
-                    </label>
-                  </div>
-                ) : (
-                  <label className="upload-qr-placeholder">
-                    <FaUpload />
-                    <span>Tải lên mã QR</span>
-                    <input 
-                      type="file" 
-                      accept="image/*"
-                      onChange={(e) => handleUploadQR(account.id, e.target.files[0])}
-                      disabled={uploadingQR}
-                    />
-                    {uploadingQR && <FaSpinner className="spinning" />}
-                  </label>
-                )}
-              </div>
+              <QRUploaSection account={account} />
 
-              {/* Trạng thái */}
               <div className="bank-status">
                 <span className={`status-badge ${account.is_active ? 'active' : 'inactive'}`}>
                   {account.is_active ? 'Đang sử dụng' : 'Tạm dừng'}
@@ -591,13 +781,42 @@ const PaymentManagement = ({ settings, updateSettings, showToast }) => {
           margin-bottom: 12px;
           display: flex;
           align-items: center;
-          gap: 6px;
+          justify-content: space-between;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+
+        .qr-method-selector {
+          display: flex;
+          gap: 8px;
+        }
+
+        .method-btn {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          padding: 4px 8px;
+          background: #f0f0f0;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          font-size: 11px;
+        }
+
+        .method-btn.active {
+          background: #2e7d32;
+          color: white;
+        }
+
+        .qr-upload-area {
+          margin-top: 8px;
         }
 
         .qr-preview {
           display: flex;
           align-items: center;
           gap: 12px;
+          flex-wrap: wrap;
         }
 
         .qr-preview img {
@@ -608,20 +827,29 @@ const PaymentManagement = ({ settings, updateSettings, showToast }) => {
           cursor: pointer;
         }
 
-        .upload-qr-btn, .upload-qr-placeholder {
+        .qr-actions {
+          display: flex;
+          gap: 8px;
+        }
+
+        .upload-btn, .delete-btn {
           display: flex;
           align-items: center;
           gap: 6px;
           padding: 6px 12px;
-          background: #f5f5f5;
-          border: 1px solid #ddd;
+          border: none;
           border-radius: 6px;
           cursor: pointer;
           font-size: 12px;
           position: relative;
         }
 
-        .upload-qr-btn input, .upload-qr-placeholder input {
+        .upload-btn {
+          background: #2196f3;
+          color: white;
+        }
+
+        .upload-btn input {
           position: absolute;
           opacity: 0;
           width: 100%;
@@ -629,10 +857,93 @@ const PaymentManagement = ({ settings, updateSettings, showToast }) => {
           cursor: pointer;
         }
 
+        .delete-btn {
+          background: #f44336;
+          color: white;
+        }
+
         .upload-qr-placeholder {
+          display: flex;
+          align-items: center;
           justify-content: center;
-          width: 120px;
-          color: #999;
+          gap: 8px;
+          padding: 12px;
+          background: #f5f5f5;
+          border: 1px dashed #ddd;
+          border-radius: 8px;
+          cursor: pointer;
+          font-size: 13px;
+          color: #666;
+          position: relative;
+        }
+
+        .upload-qr-placeholder input {
+          position: absolute;
+          opacity: 0;
+          width: 100%;
+          height: 100%;
+          cursor: pointer;
+        }
+
+        .qr-url-input {
+          margin-top: 8px;
+        }
+
+        .url-input-group {
+          display: flex;
+          gap: 8px;
+          margin-bottom: 12px;
+        }
+
+        .url-input-group input {
+          flex: 1;
+          padding: 8px 12px;
+          border: 1px solid #ddd;
+          border-radius: 6px;
+          font-size: 13px;
+        }
+
+        .save-url-btn {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 8px 16px;
+          background: #2e7d32;
+          color: white;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+        }
+
+        .qr-preview-small {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin-top: 8px;
+          padding: 8px;
+          background: #f8f9fa;
+          border-radius: 8px;
+        }
+
+        .qr-preview-small img {
+          width: 50px;
+          height: 50px;
+          border: 1px solid #ddd;
+          border-radius: 6px;
+          cursor: pointer;
+        }
+
+        .delete-qr-btn {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 12px;
+          background: #f44336;
+          color: white;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 12px;
         }
 
         .bank-status {
@@ -659,7 +970,6 @@ const PaymentManagement = ({ settings, updateSettings, showToast }) => {
           color: #f44336;
         }
 
-        /* Modal styles */
         .bank-modal {
           max-width: 500px;
         }

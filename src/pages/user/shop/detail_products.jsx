@@ -1,4 +1,3 @@
-// pages/user/product/ProductDetailPage.jsx
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Layout from "../../../components/layout/Layout";
@@ -34,7 +33,12 @@ import {
   FaIndustry,
   FaShippingFast,
   FaWarehouse,
-  FaCogs
+  FaCogs,
+  FaThumbsUp,
+  FaEdit,
+  FaTrash,
+  FaCamera,
+  FaSpinner
 } from 'react-icons/fa';
 import { QRCodeCanvas } from 'qrcode.react';
 import ShopDetailLayout from "../../../components/layout/ShopDetailLayout";
@@ -58,6 +62,25 @@ const ProductDetailPage = () => {
     const [favoriteCount, setFavoriteCount] = useState(0);
     const [favoriteLoading, setFavoriteLoading] = useState(false);
 
+    // Review states
+    const [reviews, setReviews] = useState([]);
+    const [reviewStats, setReviewStats] = useState(null);
+    const [userReview, setUserReview] = useState(null);
+    const [showReviewForm, setShowReviewForm] = useState(false);
+    const [editingReview, setEditingReview] = useState(null);
+    const [reviewFormData, setReviewFormData] = useState({
+        rating: 5,
+        comment: '',
+        images: []
+    });
+    const [selectedRatingFilter, setSelectedRatingFilter] = useState(null);
+    const [reviewPagination, setReviewPagination] = useState({ skip: 0, limit: 10, total: 0 });
+    const [submittingReview, setSubmittingReview] = useState(false);
+    const [uploadingImage, setUploadingImage] = useState(false);
+    const [loadingReviews, setLoadingReviews] = useState(false);
+
+    const token = localStorage.getItem('user_token');
+
     const showToast = (message, type = 'success') => {
         const id = Date.now();
         setToast({ show: true, message, type, id });
@@ -76,9 +99,18 @@ const ProductDetailPage = () => {
             fetchProductDetail();
             fetchTraceability();
             checkFavoriteStatus();
-            getFavoriteCount();            
+            getFavoriteCount();
+            fetchReviews();
+            fetchReviewStats();
+            if (token) {
+                fetchUserReview();
+            }
         }
     }, [product_id]);
+
+    useEffect(() => {
+        fetchReviews();
+    }, [selectedRatingFilter, reviewPagination.skip]);
 
     const fetchTraceability = async () => {
         if (!product_id || product_id === 'undefined') {
@@ -178,7 +210,6 @@ const ProductDetailPage = () => {
         const token = localStorage.getItem('user_token');
         
         if (!token) {
-            // Nếu chưa đăng nhập, chuyển đến trang đăng nhập
             if (window.confirm('Bạn cần đăng nhập để sử dụng tính năng này. Đăng nhập ngay?')) {
                 navigate('/login');
             }
@@ -189,13 +220,11 @@ const ProductDetailPage = () => {
         
         try {
             if (isFavorite) {
-                // Xóa khỏi yêu thích
                 await api.delete(`/api/v1/favorites/${product_id}`);
                 setIsFavorite(false);
                 setFavoriteCount(prev => Math.max(0, prev - 1));
                 showToast('Đã xóa khỏi danh sách yêu thích', 'success');
             } else {
-                // Thêm vào yêu thích
                 await api.post(`/api/v1/favorites/${product_id}`);
                 setIsFavorite(true);
                 setFavoriteCount(prev => prev + 1);
@@ -213,6 +242,153 @@ const ProductDetailPage = () => {
         }
     };
 
+    // Review Functions
+    const fetchReviews = async () => {
+        setLoadingReviews(true);
+        try {
+            let url = `/api/v1/reviews/product/${product_id}?skip=${reviewPagination.skip}&limit=${reviewPagination.limit}`;
+            if (selectedRatingFilter) {
+                url += `&rating=${selectedRatingFilter}`;
+            }
+            const response = await api.get(url);
+            setReviews(response.data.reviews || []);
+            setReviewPagination(prev => ({
+                ...prev,
+                total: response.data.total || 0
+            }));
+        } catch (error) {
+            console.error('Error fetching reviews:', error);
+        } finally {
+            setLoadingReviews(false);
+        }
+    };
+
+    const fetchReviewStats = async () => {
+        try {
+            const response = await api.get(`/api/v1/reviews/product/${product_id}/stats`);
+            setReviewStats(response.data);
+        } catch (error) {
+            console.error('Error fetching review stats:', error);
+        }
+    };
+
+    const fetchUserReview = async () => {
+        try {
+            const response = await api.get(`/api/v1/reviews/product/${product_id}/user-review`);
+            if (response.data) {
+                setUserReview(response.data);
+            }
+        } catch (error) {
+            if (error.response?.status !== 404) {
+                console.error('Error fetching user review:', error);
+            }
+        }
+    };
+
+    const handleSubmitReview = async (e) => {
+        e.preventDefault();
+        if (!token) {
+            showToast('Vui lòng đăng nhập để đánh giá sản phẩm', 'error');
+            return;
+        }
+
+        setSubmittingReview(true);
+        try {
+            if (editingReview) {
+                await api.put(`/api/v1/reviews/${editingReview.id}`, reviewFormData);
+                showToast('Cập nhật đánh giá thành công!', 'success');
+            } else {
+                await api.post(`/api/v1/reviews/product/${product_id}`, reviewFormData);
+                showToast('Đánh giá thành công!', 'success');
+            }
+            
+            resetReviewForm();
+            fetchReviews();
+            fetchReviewStats();
+            fetchUserReview();
+            fetchProductDetail(); // Cập nhật lại product để lấy rating mới
+            
+        } catch (error) {
+            console.error('Error submitting review:', error);
+            showToast(error.response?.data?.detail || 'Có lỗi xảy ra, vui lòng thử lại', 'error');
+        } finally {
+            setSubmittingReview(false);
+        }
+    };
+
+    const handleDeleteReview = async (reviewId) => {
+        if (!window.confirm('Bạn có chắc chắn muốn xóa đánh giá này?')) return;
+        
+        try {
+            await api.delete(`/api/v1/reviews/${reviewId}`);
+            showToast('Xóa đánh giá thành công!', 'success');
+            fetchReviews();
+            fetchReviewStats();
+            fetchUserReview();
+            fetchProductDetail();
+        } catch (error) {
+            console.error('Error deleting review:', error);
+            showToast('Không thể xóa đánh giá', 'error');
+        }
+    };
+
+    const handleEditReview = (review) => {
+        setEditingReview(review);
+        setReviewFormData({
+            rating: review.rating,
+            comment: review.comment || '',
+            images: review.images || []
+        });
+        setShowReviewForm(true);
+    };
+
+    const handleMarkHelpful = async (reviewId) => {
+        try {
+            await api.post(`/api/v1/reviews/${reviewId}/helpful`);
+            fetchReviews();
+        } catch (error) {
+            console.error('Error marking helpful:', error);
+        }
+    };
+
+    const resetReviewForm = () => {
+        setReviewFormData({ rating: 5, comment: '', images: [] });
+        setEditingReview(null);
+        setShowReviewForm(false);
+    };
+
+    const handleImageUpload = async (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
+        
+        setUploadingImage(true);
+        try {
+            for (const file of files) {
+                const formDataImg = new FormData();
+                formDataImg.append('file', file);
+                const response = await api.post('/api/v1/upload/image', formDataImg, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                });
+                setReviewFormData(prev => ({
+                    ...prev,
+                    images: [...prev.images, response.data.url]
+                }));
+            }
+        } catch (error) {
+            console.error('Error uploading image:', error);
+            showToast('Không thể tải ảnh lên', 'error');
+        } finally {
+            setUploadingImage(false);
+        }
+    };
+
+    const removeImage = (index) => {
+        setReviewFormData(prev => ({
+            ...prev,
+            images: prev.images.filter((_, i) => i !== index)
+        }));
+    };
+
     const formatCurrency = (amount) => {
         return new Intl.NumberFormat('vi-VN', {
             style: 'currency',
@@ -225,16 +401,50 @@ const ProductDetailPage = () => {
         return new Date(dateString).toLocaleDateString('vi-VN');
     };
 
-    const renderStars = (rating) => {
+    const renderStars = (rating, interactive = false, onRatingChange = null, size = "default") => {
         const stars = [];
         const fullStars = Math.floor(rating);
         const hasHalfStar = rating % 1 >= 0.5;
+        const starSize = size === "large" ? 24 : 16;
+        
         for (let i = 1; i <= 5; i++) {
-            if (i <= fullStars) stars.push(<FaStar key={i} style={{ color: "#ffc107" }} />);
-            else if (i === fullStars + 1 && hasHalfStar) stars.push(<FaStarHalfAlt key={i} style={{ color: "#ffc107" }} />);
-            else stars.push(<FaRegStar key={i} style={{ color: "#ddd" }} />);
+            stars.push(
+                <FaStar
+                    key={i}
+                    className={interactive ? 'star-interactive' : ''}
+                    style={{
+                        color: i <= fullStars ? "#ffc107" : (i === fullStars + 1 && hasHalfStar && !interactive ? "#ffc107" : "#e4e5e9"),
+                        cursor: interactive ? 'pointer' : 'default',
+                        fontSize: interactive ? '24px' : `${starSize}px`,
+                        marginRight: '4px'
+                    }}
+                    onClick={() => interactive && onRatingChange && onRatingChange(i)}
+                />
+            );
+        }
+        if (hasHalfStar && !interactive) {
+            stars[fullStars] = <FaStarHalfAlt key="half" style={{ color: "#ffc107", fontSize: `${starSize}px`, marginRight: '4px' }} />;
         }
         return stars;
+    };
+
+    const renderRatingDistribution = () => {
+        if (!reviewStats) return null;
+        const total = reviewStats.total_reviews || 1;
+        
+        return [5, 4, 3, 2, 1].map(rating => {
+            const count = reviewStats.rating_distribution?.[rating] || 0;
+            const percentage = (count / total) * 100;
+            return (
+                <div key={rating} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                    <span style={{ width: '45px', fontSize: '14px' }}>{rating} <FaStar size={12} color="#ffc107" style={{ marginLeft: '4px' }} /></span>
+                    <div style={{ flex: 1, height: '8px', background: '#e0e0e0', borderRadius: '4px', overflow: 'hidden' }}>
+                        <div style={{ width: `${percentage}%`, height: '100%', background: '#ffc107', borderRadius: '4px' }} />
+                    </div>
+                    <span style={{ width: '45px', fontSize: '12px', color: '#666' }}>{count}</span>
+                </div>
+            );
+        });
     };
 
     const handleAddToCart = async () => {
@@ -447,8 +657,8 @@ const ProductDetailPage = () => {
                         <h1 style={{ fontSize: "32px", marginBottom: "12px", color: "#333" }}>{product.name}</h1>
                         
                         <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
-                            <div style={{ display: "flex", gap: "2px" }}>{renderStars(product.rating || 4.5)}</div>
-                            <span style={{ color: "#666" }}>({product.total_reviews || 0} đánh giá)</span>
+                            <div style={{ display: "flex", gap: "2px" }}>{renderStars(product.average_rating || 0)}</div>
+                            <span style={{ color: "#666" }}>({reviewStats?.total_reviews || 0} đánh giá)</span>
                         </div>
 
                         <div style={{ marginBottom: "20px" }}>
@@ -510,28 +720,28 @@ const ProductDetailPage = () => {
                                 onMouseEnter={(e) => { if (currentStock > 0) { e.currentTarget.style.background = "#1b5e20"; e.currentTarget.style.transform = "translateY(-2px)"; } }}
                                 onMouseLeave={(e) => { if (currentStock > 0) { e.currentTarget.style.background = "#2e7d32"; e.currentTarget.style.transform = "translateY(0)"; } }}>Mua ngay</button>
                             
-                             <button 
-        onClick={handleToggleFavorite} 
-        disabled={favoriteLoading}
-        style={{
-            width: "52px",
-            padding: "14px",
-            background: "white",
-            border: "1px solid #ddd",
-            borderRadius: "40px",
-            cursor: favoriteLoading ? "not-allowed" : "pointer",
-            transition: "all 0.3s",
-            opacity: favoriteLoading ? 0.6 : 1
-        }}
-        onMouseEnter={(e) => { if (!favoriteLoading) e.currentTarget.style.borderColor = "#ff4444"; }}
-        onMouseLeave={(e) => { if (!favoriteLoading) e.currentTarget.style.borderColor = "#ddd"; }}
-    >
-        {favoriteLoading ? (
-            <div style={{ width: "20px", height: "20px", border: "2px solid #ff4444", borderTop: "2px solid transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto" }} />
-        ) : (
-            isFavorite ? <FaHeart color="#ff4444" size={20} /> : <FaRegHeart size={20} />
-        )}
-    </button>    
+                            <button 
+                                onClick={handleToggleFavorite} 
+                                disabled={favoriteLoading}
+                                style={{
+                                    width: "52px",
+                                    padding: "14px",
+                                    background: "white",
+                                    border: "1px solid #ddd",
+                                    borderRadius: "40px",
+                                    cursor: favoriteLoading ? "not-allowed" : "pointer",
+                                    transition: "all 0.3s",
+                                    opacity: favoriteLoading ? 0.6 : 1
+                                }}
+                                onMouseEnter={(e) => { if (!favoriteLoading) e.currentTarget.style.borderColor = "#ff4444"; }}
+                                onMouseLeave={(e) => { if (!favoriteLoading) e.currentTarget.style.borderColor = "#ddd"; }}
+                            >
+                                {favoriteLoading ? (
+                                    <div style={{ width: "20px", height: "20px", border: "2px solid #ff4444", borderTop: "2px solid transparent", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto" }} />
+                                ) : (
+                                    isFavorite ? <FaHeart color="#ff4444" size={20} /> : <FaRegHeart size={20} />
+                                )}
+                            </button>    
                             
                             <div style={{ position: "relative" }}>
                                 <button onClick={() => setShowShareMenu(!showShareMenu)} style={{ width: "52px", padding: "14px", background: "white", border: "1px solid #ddd", borderRadius: "40px", cursor: "pointer" }}><FaShareAlt /></button>
@@ -558,10 +768,11 @@ const ProductDetailPage = () => {
 
                 {/* Product Details Tabs */}
                 <div style={{ marginBottom: "48px" }}>
-                    <div style={{ display: "flex", gap: "32px", borderBottom: "2px solid #eee", marginBottom: "24px" }}>
+                    <div style={{ display: "flex", gap: "32px", borderBottom: "2px solid #eee", marginBottom: "24px", flexWrap: "wrap" }}>
                         {[
                             { id: "description", label: "Mô tả sản phẩm" },
                             { id: "specifications", label: "Thông tin chi tiết" },
+                            { id: "reviews", label: `Đánh giá (${reviewStats?.total_reviews || 0})` },
                             { id: "traceability", label: "Truy xuất nguồn gốc" },
                             { id: "shop", label: "Thông tin shop" }
                         ].map(tab => (
@@ -596,6 +807,343 @@ const ProductDetailPage = () => {
                                         <span style={{ fontWeight: "500" }}>{formatDate(product.created_at)}</span>
                                     </div>
                                 </div>
+                            </div>
+                        )}
+
+                        {activeTab === "reviews" && (
+                            <div>
+                                {/* Rating Summary */}
+                                {reviewStats && reviewStats.total_reviews > 0 && (
+                                    <div style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: '1fr 1fr',
+                                        gap: '32px',
+                                        background: '#f8f9fa',
+                                        padding: '24px',
+                                        borderRadius: '16px',
+                                        marginBottom: '32px'
+                                    }}>
+                                        <div style={{ textAlign: 'center' }}>
+                                            <div style={{ fontSize: '48px', fontWeight: 'bold', color: '#ffc107' }}>
+                                                {reviewStats.average_rating || 0}
+                                            </div>
+                                            <div style={{ margin: '8px 0' }}>
+                                                {renderStars(Math.round(reviewStats.average_rating || 0))}
+                                            </div>
+                                            <div style={{ color: '#666', fontSize: '14px' }}>
+                                                {reviewStats.total_reviews} đánh giá
+                                            </div>
+                                        </div>
+                                        <div>
+                                            {renderRatingDistribution()}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* User Review Action */}
+                                {token && !userReview && !showReviewForm && (
+                                    <button
+                                        onClick={() => setShowReviewForm(true)}
+                                        style={{
+                                            padding: '12px 24px',
+                                            background: '#2e7d32',
+                                            color: 'white',
+                                            border: 'none',
+                                            borderRadius: '8px',
+                                            cursor: 'pointer',
+                                            marginBottom: '24px',
+                                            fontWeight: '500'
+                                        }}
+                                    >
+                                        Viết đánh giá
+                                    </button>
+                                )}
+
+                                {userReview && !showReviewForm && (
+                                    <div style={{
+                                        background: '#e8f5e9',
+                                        padding: '16px',
+                                        borderRadius: '12px',
+                                        marginBottom: '24px',
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        flexWrap: 'wrap',
+                                        gap: '16px'
+                                    }}>
+                                        <div>
+                                            <strong>Đánh giá của bạn:</strong>
+                                            <div style={{ marginTop: '8px' }}>{renderStars(userReview.rating)}</div>
+                                            {userReview.comment && <p style={{ marginTop: '8px', color: '#555' }}>{userReview.comment}</p>}
+                                        </div>
+                                        <div>
+                                            <button onClick={() => handleEditReview(userReview)} style={{ marginRight: '8px', padding: '6px 12px', cursor: 'pointer', background: 'none', border: '1px solid #ddd', borderRadius: '4px' }}>
+                                                <FaEdit /> Sửa
+                                            </button>
+                                            <button onClick={() => handleDeleteReview(userReview.id)} style={{ padding: '6px 12px', cursor: 'pointer', color: '#d32f2f', background: 'none', border: '1px solid #ddd', borderRadius: '4px' }}>
+                                                <FaTrash /> Xóa
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Review Form */}
+                                {showReviewForm && (
+                                    <form onSubmit={handleSubmitReview} style={{
+                                        background: 'white',
+                                        border: '1px solid #e0e0e0',
+                                        borderRadius: '16px',
+                                        padding: '24px',
+                                        marginBottom: '32px'
+                                    }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                                            <h4 style={{ margin: 0 }}>{editingReview ? 'Sửa đánh giá' : 'Viết đánh giá'}</h4>
+                                            <button type="button" onClick={resetReviewForm} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '20px' }}>
+                                                <FaTimes />
+                                            </button>
+                                        </div>
+
+                                        <div style={{ marginBottom: '20px' }}>
+                                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>Đánh giá của bạn *</label>
+                                            <div>{renderStars(reviewFormData.rating, true, (rating) => setReviewFormData({ ...reviewFormData, rating }), "large")}</div>
+                                        </div>
+
+                                        <div style={{ marginBottom: '20px' }}>
+                                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>Nhận xét</label>
+                                            <textarea
+                                                value={reviewFormData.comment}
+                                                onChange={(e) => setReviewFormData({ ...reviewFormData, comment: e.target.value })}
+                                                rows="4"
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '12px',
+                                                    border: '1px solid #ddd',
+                                                    borderRadius: '8px',
+                                                    resize: 'vertical',
+                                                    fontSize: '14px'
+                                                }}
+                                                placeholder="Chia sẻ trải nghiệm của bạn về sản phẩm..."
+                                            />
+                                        </div>
+
+                                        <div style={{ marginBottom: '20px' }}>
+                                            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>Hình ảnh</label>
+                                            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                                                {reviewFormData.images.map((img, index) => (
+                                                    <div key={index} style={{ position: 'relative' }}>
+                                                        <img src={img} alt={`review ${index}`} style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '8px' }} />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeImage(index)}
+                                                            style={{
+                                                                position: 'absolute',
+                                                                top: '-8px',
+                                                                right: '-8px',
+                                                                background: '#d32f2f',
+                                                                color: 'white',
+                                                                border: 'none',
+                                                                borderRadius: '50%',
+                                                                width: '20px',
+                                                                height: '20px',
+                                                                cursor: 'pointer',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                fontSize: '12px'
+                                                            }}
+                                                        >
+                                                            ×
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                                <label style={{
+                                                    width: '80px',
+                                                    height: '80px',
+                                                    border: '2px dashed #ddd',
+                                                    borderRadius: '8px',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    cursor: 'pointer',
+                                                    background: '#fafafa'
+                                                }}>
+                                                    {uploadingImage ? <FaSpinner className="spin" /> : <FaCamera size={24} color="#999" />}
+                                                    <input type="file" accept="image/*" multiple onChange={handleImageUpload} style={{ display: 'none' }} />
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <div style={{ display: 'flex', gap: '12px' }}>
+                                            <button
+                                                type="submit"
+                                                disabled={submittingReview}
+                                                style={{
+                                                    padding: '10px 24px',
+                                                    background: '#2e7d32',
+                                                    color: 'white',
+                                                    border: 'none',
+                                                    borderRadius: '8px',
+                                                    cursor: submittingReview ? 'not-allowed' : 'pointer',
+                                                    opacity: submittingReview ? 0.6 : 1
+                                                }}
+                                            >
+                                                {submittingReview ? 'Đang xử lý...' : (editingReview ? 'Cập nhật' : 'Gửi đánh giá')}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={resetReviewForm}
+                                                style={{
+                                                    padding: '10px 24px',
+                                                    background: '#f5f5f5',
+                                                    border: 'none',
+                                                    borderRadius: '8px',
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                Hủy
+                                            </button>
+                                        </div>
+                                    </form>
+                                )}
+
+                                {/* Rating Filter */}
+                                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '24px' }}>
+                                    <button
+                                        onClick={() => setSelectedRatingFilter(null)}
+                                        style={{
+                                            padding: '6px 16px',
+                                            borderRadius: '20px',
+                                            border: selectedRatingFilter === null ? '2px solid #2e7d32' : '1px solid #ddd',
+                                            background: selectedRatingFilter === null ? '#e8f5e9' : 'white',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        Tất cả
+                                    </button>
+                                    {[5, 4, 3, 2, 1].map(rating => (
+                                        <button
+                                            key={rating}
+                                            onClick={() => setSelectedRatingFilter(rating === selectedRatingFilter ? null : rating)}
+                                            style={{
+                                                padding: '6px 16px',
+                                                borderRadius: '20px',
+                                                border: selectedRatingFilter === rating ? '2px solid #2e7d32' : '1px solid #ddd',
+                                                background: selectedRatingFilter === rating ? '#e8f5e9' : 'white',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '4px'
+                                            }}
+                                        >
+                                            {rating} <FaStar size={12} color="#ffc107" />
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* Reviews List */}
+                                {loadingReviews ? (
+                                    <div style={{ textAlign: 'center', padding: '40px' }}>
+                                        <div className="spinner" />
+                                        <p>Đang tải đánh giá...</p>
+                                    </div>
+                                ) : reviews.length === 0 ? (
+                                    <div style={{ textAlign: 'center', padding: '60px', background: '#f8f9fa', borderRadius: '16px' }}>
+                                        <p style={{ color: '#999' }}>Chưa có đánh giá nào cho sản phẩm này</p>
+                                        {token && !userReview && !showReviewForm && (
+                                            <button onClick={() => setShowReviewForm(true)} style={{ marginTop: '16px', color: '#2e7d32', background: 'none', border: 'none', cursor: 'pointer' }}>
+                                                Hãy là người đầu tiên đánh giá!
+                                            </button>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                                        {reviews.map(review => (
+                                            <div key={review.id} style={{
+                                                background: 'white',
+                                                border: '1px solid #f0f0f0',
+                                                borderRadius: '16px',
+                                                padding: '20px'
+                                            }}>
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+                                                    <div style={{ display: 'flex', gap: '12px', flex: 1, minWidth: '200px' }}>
+                                                        <div style={{
+                                                            width: '48px',
+                                                            height: '48px',
+                                                            borderRadius: '50%',
+                                                            background: '#e0e0e0',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            overflow: 'hidden',
+                                                            flexShrink: 0
+                                                        }}>
+                                                            {review.user_avatar ? (
+                                                                <img src={review.user_avatar} alt={review.user_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                            ) : (
+                                                                <FaUser size={24} color="#999" />
+                                                            )}
+                                                        </div>
+                                                        <div style={{ flex: 1 }}>
+                                                            <div style={{ fontWeight: '500', marginBottom: '4px' }}>{review.user_name}</div>
+                                                            <div style={{ marginBottom: '8px' }}>{renderStars(review.rating)}</div>
+                                                            {review.comment && <p style={{ color: '#555', lineHeight: '1.6', marginBottom: '12px' }}>{review.comment}</p>}
+                                                            {review.images && review.images.length > 0 && (
+                                                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                                                                    {review.images.map((img, idx) => (
+                                                                        <img key={idx} src={img} alt={`review ${idx}`} style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '8px', cursor: 'pointer' }} 
+                                                                            onClick={() => window.open(img, '_blank')} />
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                            <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: '#999', flexWrap: 'wrap' }}>
+                                                                <span>{new Date(review.created_at).toLocaleDateString('vi-VN')}</span>
+                                                                <button
+                                                                    onClick={() => handleMarkHelpful(review.id)}
+                                                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#666', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                                >
+                                                                    <FaThumbsUp /> Hữu ích ({review.helpful_count || 0})
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    {token && userReview && review.user_id === userReview.user_id && (
+                                                        <div>
+                                                            <button onClick={() => handleEditReview(review)} style={{ marginRight: '8px', background: 'none', border: 'none', cursor: 'pointer', color: '#666', padding: '4px 8px' }}>
+                                                                <FaEdit />
+                                                            </button>
+                                                            <button onClick={() => handleDeleteReview(review.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#d32f2f', padding: '4px 8px' }}>
+                                                                <FaTrash />
+                                                            </button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Pagination */}
+                                {reviewPagination.total > reviewPagination.limit && (
+                                    <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '32px' }}>
+                                        <button
+                                            onClick={() => setReviewPagination(prev => ({ ...prev, skip: Math.max(0, prev.skip - prev.limit) }))}
+                                            disabled={reviewPagination.skip === 0}
+                                            style={{ padding: '8px 16px', cursor: reviewPagination.skip === 0 ? 'not-allowed' : 'pointer', border: '1px solid #ddd', borderRadius: '4px', background: 'white' }}
+                                        >
+                                            Trước
+                                        </button>
+                                        <span style={{ padding: '8px 16px' }}>
+                                            {Math.floor(reviewPagination.skip / reviewPagination.limit) + 1} / {Math.ceil(reviewPagination.total / reviewPagination.limit)}
+                                        </span>
+                                        <button
+                                            onClick={() => setReviewPagination(prev => ({ ...prev, skip: prev.skip + prev.limit }))}
+                                            disabled={reviewPagination.skip + reviewPagination.limit >= reviewPagination.total}
+                                            style={{ padding: '8px 16px', cursor: reviewPagination.skip + reviewPagination.limit >= reviewPagination.total ? 'not-allowed' : 'pointer', border: '1px solid #ddd', borderRadius: '4px', background: 'white' }}
+                                        >
+                                            Sau
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -669,7 +1217,8 @@ const ProductDetailPage = () => {
                                                             {event.images && event.images.length > 0 && (
                                                                 <div style={{ display: "flex", gap: "8px", marginTop: "12px", flexWrap: "wrap" }}>
                                                                     {event.images.map((img, imgIdx) => (
-                                                                        <img key={imgIdx} src={img} alt={`Hình ảnh ${imgIdx + 1}`} style={{ width: "80px", height: "80px", objectFit: "cover", borderRadius: "8px" }} />
+                                                                        <img key={imgIdx} src={img} alt={`Hình ảnh ${imgIdx + 1}`} style={{ width: "80px", height: "80px", objectFit: "cover", borderRadius: "8px", cursor: "pointer" }} 
+                                                                            onClick={() => window.open(img, '_blank')} />
                                                                     ))}
                                                                 </div>
                                                             )}
@@ -733,7 +1282,7 @@ const ProductDetailPage = () => {
                                     />
                                     <div style={{ padding: "12px" }}>
                                         <h4 style={{ fontSize: "14px", marginBottom: "8px", fontWeight: "600", color: "#333" }}>{relatedProduct.name}</h4>
-                                        <div style={{ display: "flex", gap: "2px", marginBottom: "8px" }}>{renderStars(relatedProduct.rating || 4.5)}</div>
+                                        <div style={{ display: "flex", gap: "2px", marginBottom: "8px" }}>{renderStars(relatedProduct.average_rating || 0)}</div>
                                         <div style={{ fontSize: "16px", fontWeight: "bold", color: "#d32f2f" }}>{formatCurrency(relatedProduct.price)}</div>
                                     </div>
                                 </div>
@@ -771,6 +1320,21 @@ const ProductDetailPage = () => {
                 .hide-arrows::-webkit-inner-spin-button, 
                 .hide-arrows::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
                 .hide-arrows { -moz-appearance: textfield; }
+                .star-interactive {
+                    transition: transform 0.2s ease;
+                }
+                .star-interactive:hover {
+                    transform: scale(1.1);
+                }
+                .spinner {
+                    width: 40px;
+                    height: 40px;
+                    border: 3px solid #f3f3f3;
+                    border-top: 3px solid #2e7d32;
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                    margin: 0 auto 16px;
+                }
             `}</style>
         </ShopDetailLayout>
     );

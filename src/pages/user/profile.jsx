@@ -1,7 +1,10 @@
-// src/pages/user/Profile.jsx (chỉ phần form tạo bài viết)
 import { useEffect, useState } from "react";
 import api from "../../api/api";
 import Layout from "../../components/layout/Layout";
+import Toast from "../../components/common/Toast";
+import ShareModal from "./ShareModal";
+import SharedPostCard from "./SharedPostCard";
+import ReportModal from "../admin/reportModal";
 
 function Profile() {
     // State cho dữ liệu
@@ -30,9 +33,61 @@ function Profile() {
     const [activePostMenu, setActivePostMenu] = useState(null);
     const [editingPost, setEditingPost] = useState(null);
     
-    // State cho upload ảnh
+    // State cho upload ảnh bài viết
     const [imageUrls, setImageUrls] = useState([]);
     const [uploadingImages, setUploadingImages] = useState(false);
+    
+    // State cho avatar
+    const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
+    const [avatarFile, setAvatarFile] = useState(null);
+    const [avatarPreview, setAvatarPreview] = useState(null);
+    const [uploadingAvatar, setUploadingAvatar] = useState(false);
+    const [avatarUrlInput, setAvatarUrlInput] = useState("");
+    const [avatarUploadMethod, setAvatarUploadMethod] = useState('file');
+
+    // State cho toast
+    const [toastConfig, setToastConfig] = useState({ show: false, message: '', type: 'success' });
+    
+    // State cho modal xem chi tiết bài viết
+    const [selectedPost, setSelectedPost] = useState(null);
+    const [isPostModalOpen, setIsPostModalOpen] = useState(false);
+    const [modalComments, setModalComments] = useState([]);
+    const [modalCommentInput, setModalCommentInput] = useState("");
+    const [modalLiked, setModalLiked] = useState(false);
+    const [commentPage, setCommentPage] = useState(1);
+    const [commentLimit] = useState(5);
+    const [totalComments, setTotalComments] = useState(0);
+    const [replyingTo, setReplyingTo] = useState(null);
+    const [replyInput, setReplyInput] = useState("");
+    const [expandedReplies, setExpandedReplies] = useState({});
+    const [allRepliesData, setAllRepliesData] = useState({});
+    const [activeCommentMenu, setActiveCommentMenu] = useState(null);
+    const [editingCommentId, setEditingCommentId] = useState(null);
+    const [editCommentContent, setEditCommentContent] = useState("");
+    
+    // State cho share modal
+    const [showShareModal, setShowShareModal] = useState(false);
+    const [sharePost, setSharePost] = useState(null);
+    
+    // State cho report modal
+    const [showReportModal, setShowReportModal] = useState(false);
+    const [selectedReportPost, setSelectedReportPost] = useState(null);
+    
+    // State cho confirm modal
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [confirmAction, setConfirmAction] = useState(null);
+    const [confirmMessage, setConfirmMessage] = useState("");
+
+    const showToast = (message, type = 'success') => {
+        setToastConfig({ show: true, message, type });
+        setTimeout(() => setToastConfig({ show: false, message: '', type: 'success' }), 3000);
+    };
+
+    const showConfirm = (message, onConfirm) => {
+        setConfirmMessage(message);
+        setConfirmAction(() => onConfirm);
+        setShowConfirmModal(true);
+    };
 
     useEffect(() => {
         const storedUserStr = localStorage.getItem("user");
@@ -42,9 +97,26 @@ function Profile() {
             const userId = parsedUser.id || parsedUser._id;
             if (userId) {
                 fetchUserPostsAndLikes(userId);
+                fetchUserProfile(userId);
             }
         }
     }, []);
+
+    const fetchUserProfile = async (userId) => {
+        try {
+            const response = await api.get(`/api/v1/users/${userId}`);
+            if (response.data) {
+                setCurrentUser(prev => ({
+                    ...prev,
+                    ...response.data
+                }));
+                const updatedUser = { ...currentUser, ...response.data };
+                localStorage.setItem("user", JSON.stringify(updatedUser));
+            }
+        } catch (error) {
+            console.error("Lỗi khi tải thông tin người dùng:", error);
+        }
+    };
 
     const fetchUserPostsAndLikes = async (userId) => {
         try {
@@ -69,38 +141,135 @@ function Profile() {
         }
     };
 
-    // Xử lý upload ảnh
+    const uploadImageToR2 = async (file) => {
+        if (!file) return null;
+
+        const formDataUpload = new FormData();
+        formDataUpload.append('file', file);
+
+        try {
+            const response = await api.post('/api/v1/upload/image', formDataUpload, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            
+            if (response.data.success) {
+                return response.data.image_url;
+            }
+            return null;
+        } catch (error) {
+            console.error('Error uploading to R2:', error);
+            return null;
+        }
+    };
+
+    const handleAvatarSelect = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            showToast('Vui lòng chọn file ảnh', 'error');
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            showToast('Kích thước file không được vượt quá 5MB', 'error');
+            return;
+        }
+
+        setAvatarFile(file);
+        setAvatarPreview(URL.createObjectURL(file));
+        setAvatarUrlInput('');
+        setAvatarUploadMethod('file');
+    };
+
+    const handleAvatarUrlChange = (e) => {
+        const url = e.target.value;
+        setAvatarPreview(url);
+        setAvatarFile(null);
+        setAvatarUrlInput(url);
+        setAvatarUploadMethod('url');
+    };
+
+    const handleUpdateAvatar = async () => {
+        setUploadingAvatar(true);
+        
+        try {
+            let finalAvatarUrl = null;
+            
+            if (avatarUploadMethod === 'file' && avatarFile) {
+                finalAvatarUrl = await uploadImageToR2(avatarFile);
+                if (!finalAvatarUrl) {
+                    showToast("Không thể upload ảnh. Vui lòng thử lại!", "error");
+                    setUploadingAvatar(false);
+                    return;
+                }
+            } else if (avatarUploadMethod === 'url' && avatarUrlInput) {
+                finalAvatarUrl = avatarUrlInput;
+            } else {
+                showToast("Vui lòng chọn ảnh hoặc nhập URL", "error");
+                setUploadingAvatar(false);
+                return;
+            }
+            
+            const response = await api.put(`/api/v1/users/${currentUser.id || currentUser._id}`, {
+                avatar_url: finalAvatarUrl
+            });
+            
+            if (response.data) {
+                setCurrentUser(prev => ({
+                    ...prev,
+                    avatar_url: finalAvatarUrl
+                }));
+                
+                const updatedUser = { ...currentUser, avatar_url: finalAvatarUrl };
+                localStorage.setItem("user", JSON.stringify(updatedUser));
+                
+                showToast("Cập nhật ảnh đại diện thành công!", "success");
+                setIsAvatarModalOpen(false);
+                resetAvatarState();
+            }
+        } catch (error) {
+            console.error("Lỗi khi cập nhật avatar:", error);
+            showToast("Không thể cập nhật ảnh đại diện. Vui lòng thử lại!", "error");
+        } finally {
+            setUploadingAvatar(false);
+        }
+    };
+
+    const resetAvatarState = () => {
+        setAvatarFile(null);
+        setAvatarPreview(null);
+        setAvatarUrlInput("");
+        setAvatarUploadMethod('file');
+    };
+
     const handleImageUpload = async (e) => {
         const files = Array.from(e.target.files);
         if (files.length === 0) return;
         
         setUploadingImages(true);
         try {
-            // Giả sử bạn có endpoint upload ảnh
-            const formData = new FormData();
-            files.forEach(file => {
-                formData.append('files', file);
-            });
+            const uploadedUrls = [];
+            for (const file of files) {
+                const url = await uploadImageToR2(file);
+                if (url) {
+                    uploadedUrls.push(url);
+                }
+            }
             
-            const response = await api.post('/api/v1/upload/images', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
-            
-            const urls = response.data.urls;
-            setImageUrls(prev => [...prev, ...urls]);
+            setImageUrls(prev => [...prev, ...uploadedUrls]);
             setNewPost(prev => ({
                 ...prev,
-                images: [...prev.images, ...urls]
+                images: [...prev.images, ...uploadedUrls]
             }));
         } catch (error) {
             console.error('Lỗi upload ảnh:', error);
-            alert('Không thể upload ảnh. Vui lòng thử lại!');
+            showToast('Không thể upload ảnh. Vui lòng thử lại!', "error");
         } finally {
             setUploadingImages(false);
         }
     };
 
-    // Xóa ảnh
     const removeImage = (indexToRemove) => {
         setImageUrls(prev => prev.filter((_, idx) => idx !== indexToRemove));
         setNewPost(prev => ({
@@ -109,7 +278,6 @@ function Profile() {
         }));
     };
 
-    // Xử lý tags
     const handleTagsChange = (e) => {
         const tagsString = e.target.value;
         const tagsArray = tagsString.split(',').map(tag => tag.trim()).filter(tag => tag);
@@ -155,7 +323,7 @@ function Profile() {
 
     const handleSubmitPost = async () => {
         if (!newPost.content.trim() && newPost.images.length === 0 && newPost.videos.length === 0) {
-            alert("Vui lòng nhập nội dung hoặc thêm ảnh/video");
+            showToast("Vui lòng nhập nội dung hoặc thêm ảnh/video", "error");
             return;
         }
         
@@ -175,13 +343,15 @@ function Profile() {
             };
             
             if (editingPost) {
-                const res = await api.put(`/api/v1/posts/${editingPost._id}`, postData);
+                await api.put(`/api/v1/posts/${editingPost._id}`, postData);
                 setPosts(posts.map(p => 
                     p._id === editingPost._id ? { ...p, ...postData } : p
                 ));
+                showToast("Cập nhật bài viết thành công!", "success");
             } else {
                 const res = await api.post("/api/v1/posts/", postData);
                 setPosts([res.data, ...posts]);
+                showToast("Đăng bài viết thành công!", "success");
             }
             
             setIsCreateModalOpen(false);
@@ -201,41 +371,344 @@ function Profile() {
             setEditingPost(null);
         } catch (error) {
             console.error("Lỗi khi đăng/sửa bài:", error);
-            alert("Không thể lưu bài viết. Hãy kiểm tra lại!");
+            showToast("Không thể lưu bài viết. Hãy kiểm tra lại!", "error");
         } finally {
             setIsSubmitting(false);
         }
     };
 
-    const handleDeletePost = async (postId) => {
-        if (window.confirm("Bạn có chắc chắn muốn xóa bài viết này không?")) {
+    const handleDeletePost = (postId) => {
+        showConfirm("Bạn có chắc chắn muốn xóa bài viết này không?", async () => {
             try {
                 await api.delete(`/api/v1/posts/${postId}`);
                 setPosts(posts.filter(p => p._id !== postId));
                 setActivePostMenu(null);
+                showToast("Đã xóa bài viết thành công", "success");
             } catch (error) {
                 console.error("Lỗi khi xóa bài:", error);
-                alert("Không thể xóa bài viết. Vui lòng thử lại!");
+                showToast("Không thể xóa bài viết. Vui lòng thử lại!", "error");
             }
+        });
+    };
+
+    // Mở modal xem chi tiết bài viết
+    const openPostModal = async (post) => {
+        try {
+            const res = await api.get(`/api/v1/posts/${post._id}`);
+            const updatedPost = res.data;
+            
+            setSelectedPost(updatedPost);
+            setIsPostModalOpen(true);
+            setModalCommentInput("");
+            setCommentPage(1);
+            setReplyingTo(null);
+            
+            try {
+                const likeRes = await api.get(`/api/v1/likes/check/${post._id}`);
+                setModalLiked(likeRes.data.liked);
+            } catch(e) { setModalLiked(false); }
+            
+            await fetchModalComments(post._id, 1);
+            
+        } catch (error) {
+            console.error("Lỗi khi mở bài viết:", error);
+            setSelectedPost(post);
+            setIsPostModalOpen(true);
         }
     };
 
-    // Các hàm khác giữ nguyên
-    const handleToggleComments = async (postId) => { /* ... */ };
-    const handlePostComment = async (postId) => { /* ... */ };
-    const handleToggleLike = async (postId) => { /* ... */ };
-    const handleSharePost = async (postId) => { /* ... */ };
+    const fetchModalComments = async (postId, page) => {
+        try {
+            const commentsRes = await api.get(`/api/v1/comments/${postId}`);
+            const allComments = commentsRes.data;
+            
+            const parentComments = allComments.filter(c => !c.parent_id);
+            const childComments = allComments.filter(c => c.parent_id);
+            
+            const repliesMap = {};
+            childComments.forEach(reply => {
+                const parentId = reply.parent_id;
+                if (!repliesMap[parentId]) {
+                    repliesMap[parentId] = [];
+                }
+                repliesMap[parentId].push(reply);
+            });
+            
+            setAllRepliesData(repliesMap);
+            
+            const start = (page - 1) * commentLimit;
+            const end = start + commentLimit;
+            const paginatedComments = parentComments.slice(start, end);
+            
+            setModalComments(paginatedComments);
+            setTotalComments(parentComments.length);
+            
+        } catch(e) { 
+            console.error("Lỗi tải bình luận:", e);
+            setModalComments([]);
+            setTotalComments(0);
+        }
+    };
+
+    const loadMoreComments = async () => {
+        const nextPage = commentPage + 1;
+        try {
+            const commentsRes = await api.get(`/api/v1/comments/${selectedPost._id}`);
+            const allComments = commentsRes.data;
+            
+            const parentComments = allComments.filter(c => !c.parent_id);
+            
+            const start = (nextPage - 1) * commentLimit;
+            const end = start + commentLimit;
+            const newComments = parentComments.slice(start, end);
+            
+            setModalComments(prev => [...prev, ...newComments]);
+            setCommentPage(nextPage);
+            setTotalComments(parentComments.length);
+            
+        } catch(e) {
+            console.error("Lỗi tải thêm bình luận:", e);
+        }
+    };
+
+    const handleModalComment = async (parentId = null) => {
+        const content = parentId ? replyInput : modalCommentInput;
+        if (!content.trim() || !selectedPost) return;
+        
+        try {
+            const commentData = {
+                post_id: selectedPost._id,
+                content: content
+            };
+            if (parentId) {
+                commentData.parent_id = parentId;
+            }
+            
+            await api.post("/api/v1/comments/", commentData);
+            
+            await fetchModalComments(selectedPost._id, 1);
+            setModalCommentInput("");
+            setReplyInput("");
+            setReplyingTo(null);
+            setCommentPage(1);
+            
+            setSelectedPost(prev => ({
+                ...prev,
+                stats: { ...prev.stats, comment_count: (prev.stats?.comment_count || 0) + 1 }
+            }));
+            
+            setPosts(posts.map(p => 
+                p._id === selectedPost._id 
+                    ? { ...p, stats: { ...p.stats, comment_count: (p.stats?.comment_count || 0) + 1 } }
+                    : p
+            ));
+            
+            showToast("Đã thêm bình luận", "success");
+        } catch(err) {
+            console.error(err);
+            showToast("Không thể đăng bình luận", "error");
+        }
+    };
+
+    const handleEditModalComment = (comment) => {
+        setEditingCommentId(comment._id);
+        setEditCommentContent(comment.content);
+        setActiveCommentMenu(null);
+    };
+
+    const handleSaveModalComment = async (postId, commentId) => {
+        if (!editCommentContent.trim()) return;
+        try {
+            await api.put(`/api/v1/comments/${commentId}`, { content: editCommentContent });
+            
+            await fetchModalComments(postId, 1);
+            setCommentPage(1);
+            
+            setEditingCommentId(null);
+            setEditCommentContent("");
+            
+            showToast("Đã sửa bình luận thành công", "success");
+        } catch (error) {
+            console.error("Lỗi khi sửa bình luận:", error);
+            showToast("Không thể sửa bình luận. Vui lòng thử lại!", "error");
+        }
+    };
+
+    const handleDeleteModalComment = (postId, commentId) => {
+        showConfirm("Bạn có chắc chắn muốn xóa bình luận này không?", async () => {
+            try {
+                await api.delete(`/api/v1/comments/${commentId}`);
+            
+                await fetchModalComments(postId, 1);
+                setCommentPage(1);
+            
+                setSelectedPost(prev => ({
+                    ...prev,
+                    stats: { ...prev.stats, comment_count: Math.max(0, (prev.stats?.comment_count || 1) - 1) }
+                }));
+            
+                setPosts(prevPosts => prevPosts.map(p =>
+                    p._id === postId
+                        ? { ...p, stats: { ...p.stats, comment_count: Math.max(0, (p.stats?.comment_count || 1) - 1) } }
+                        : p
+                ));
+            
+                setActiveCommentMenu(null);
+                showToast("Đã xóa bình luận thành công", "success");
+            } catch (error) {
+                console.error("Lỗi khi xóa bình luận:", error);
+                showToast("Không thể xóa bình luận!", "error");
+            }
+        });
+    };
+
+    const toggleReplies = (commentId) => {
+        setExpandedReplies(prev => ({
+            ...prev,
+            [commentId]: !prev[commentId]
+        }));
+    };
+
+    const getRepliesForComment = (commentId) => {
+        return allRepliesData[commentId] || [];
+    };
+
+    const handleToggleLike = async (postId) => {
+        const isCurrentlyLiked = likedPosts[postId];
+        
+        setLikedPosts(prev => ({ ...prev, [postId]: !isCurrentlyLiked }));
+        
+        setPosts(prevPosts => prevPosts.map(p => {
+            if (p._id === postId) {
+                const currentLikes = p.stats?.like_count || 0;
+                return {
+                    ...p,
+                    stats: { 
+                        ...p.stats, 
+                        like_count: isCurrentlyLiked ? Math.max(0, currentLikes - 1) : currentLikes + 1 
+                    }
+                };
+            }
+            return p;
+        }));
+
+        try {
+            await api.post(`/api/v1/likes/${postId}`);
+        } catch (error) {
+            console.error("Lỗi khi like bài viết:", error);
+            setLikedPosts(prev => ({ ...prev, [postId]: isCurrentlyLiked }));
+            setPosts(prevPosts => prevPosts.map(p => {
+                if (p._id === postId) {
+                    const currentLikes = p.stats?.like_count || 0;
+                    return {
+                        ...p,
+                        stats: { 
+                            ...p.stats, 
+                            like_count: isCurrentlyLiked ? currentLikes + 1 : Math.max(0, currentLikes - 1) 
+                        }
+                    };
+                }
+                return p;
+            }));
+            showToast("Không thể thực hiện. Vui lòng thử lại!", "error");
+        }
+    };
+
+    const handleSharePost = (post) => {
+        setSharePost(post);
+        setShowShareModal(true);
+    };
+
+    const handleOpenReport = (post) => {
+        setSelectedReportPost(post);
+        setShowReportModal(true);
+        setActivePostMenu(null);
+    };
+
+    const handleReportSuccess = () => {
+        showToast("Đã gửi báo cáo thành công. Cảm ơn bạn đã đóng góp!", "success");
+    };
+
+    const goToUserProfile = (userId) => {
+        window.location.href = `/profile/${userId}`;
+    };
+
+    const menuButtonStyle = {
+        padding: "12px 15px",
+        border: "none",
+        background: "white",
+        textAlign: "left",
+        cursor: "pointer",
+        fontSize: "14px",
+        borderBottom: "1px solid #eee",
+        fontWeight: "500",
+        transition: "background 0.2s"
+    };
 
     if (!currentUser) return <Layout><div style={{ textAlign: "center", marginTop: "50px" }}>Đang tải dữ liệu người dùng...</div></Layout>;
 
     return (
         <Layout>
             {/* Header Profile */}
-            <div style={{ display: "flex", alignItems: "center", gap: "20px", background: "white", padding: "20px", borderRadius: "12px", marginBottom: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
-                <div style={{ width: "80px", height: "80px", background: "#e4e6eb", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "30px" }}>
-                    {currentUser?.avatar_url ? <img src={currentUser.avatar_url} alt="avatar" style={{width: "100%", height:"100%", borderRadius:"50%", objectFit:"cover"}}/> : "👤"}
+            <div style={{ 
+                display: "flex", 
+                alignItems: "center", 
+                gap: "20px", 
+                background: "white", 
+                padding: "20px", 
+                borderRadius: "12px", 
+                marginBottom: "20px", 
+                boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                position: "relative"
+            }}>
+                <div 
+                    onClick={() => setIsAvatarModalOpen(true)}
+                    style={{ 
+                        width: "80px", 
+                        height: "80px", 
+                        background: "#e4e6eb", 
+                        borderRadius: "50%", 
+                        display: "flex", 
+                        alignItems: "center", 
+                        justifyContent: "center", 
+                        fontSize: "30px",
+                        cursor: "pointer",
+                        overflow: "hidden",
+                        position: "relative",
+                        transition: "opacity 0.2s"
+                    }}
+                    onMouseOver={(e) => e.currentTarget.style.opacity = "0.8"}
+                    onMouseOut={(e) => e.currentTarget.style.opacity = "1"}
+                >
+                    {currentUser?.avatar_url ? (
+                        <img 
+                            src={currentUser.avatar_url} 
+                            alt="avatar" 
+                            style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }}
+                            onError={(e) => { e.target.style.display = "none"; e.target.parentElement.innerHTML = "👤"; }}
+                        />
+                    ) : (
+                        "👤"
+                    )}
+                    <div style={{
+                        position: "absolute",
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        background: "rgba(0,0,0,0.6)",
+                        color: "white",
+                        fontSize: "10px",
+                        textAlign: "center",
+                        padding: "2px",
+                        borderRadius: "0 0 50% 50%"
+                    }}>
+                        📷
+                    </div>
                 </div>
-                <h2 style={{ margin: 0 }}>{currentUser?.full_name || currentUser?.username || "Tên Người Dùng"}</h2>
+                <div>
+                    <h2 style={{ margin: 0 }}>{currentUser?.full_name || currentUser?.username || "Tên Người Dùng"}</h2>
+                    <p style={{ margin: "5px 0 0", color: "#666", fontSize: "14px" }}>@{currentUser?.username}</p>
+                </div>
             </div>
 
             {/* Bố cục chính */}
@@ -245,8 +718,25 @@ function Profile() {
                     {/* Form tạo bài viết */}
                     <div style={{ background: "white", borderRadius: "12px", padding: "15px 20px", marginBottom: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
                         <div style={{ display: "flex", gap: "10px", alignItems: "center", borderBottom: "1px solid #eee", paddingBottom: "15px", marginBottom: "15px" }}>
-                            <div style={{ width: "40px", height: "40px", background: "#e4e6eb", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-                                {currentUser?.avatar_url ? <img src={currentUser.avatar_url} alt="avatar" style={{width: "100%", height:"100%", objectFit:"cover"}}/> : "👤"}
+                            <div 
+                                onClick={() => setIsAvatarModalOpen(true)}
+                                style={{ 
+                                    width: "40px", 
+                                    height: "40px", 
+                                    background: "#e4e6eb", 
+                                    borderRadius: "50%", 
+                                    display: "flex", 
+                                    alignItems: "center", 
+                                    justifyContent: "center", 
+                                    overflow: "hidden",
+                                    cursor: "pointer"
+                                }}
+                            >
+                                {currentUser?.avatar_url ? (
+                                    <img src={currentUser.avatar_url} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                                ) : (
+                                    "👤"
+                                )}
                             </div>
                             <div 
                                 onClick={handleOpenCreateModal}
@@ -258,7 +748,6 @@ function Profile() {
                             </div>
                         </div>
 
-                        {/* Các nút tiện ích */}
                         <div style={{ display: "flex", justifyContent: "space-around" }}>
                             <div onClick={handleOpenCreateModal} style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", color: "#65676B", fontWeight: "500", padding: "8px", borderRadius: "8px", transition: "0.2s" }} onMouseOver={(e) => e.currentTarget.style.background = "#f0f2f5"} onMouseOut={(e) => e.currentTarget.style.background = "transparent"}>
                                 <span style={{ fontSize: "20px" }}>📷</span> Ảnh/Video
@@ -272,20 +761,27 @@ function Profile() {
                         </div>
                     </div>
 
-                    {/* Danh sách bài viết - giữ nguyên */}
+                    {/* Danh sách bài viết */}
                     {posts.length === 0 ? (
                         <div style={{ textAlign: "center", padding: "30px", background: "white", borderRadius: "12px" }}>Bạn chưa có bài viết nào.</div>
                     ) : (
                         posts.map((post) => (
                             <div key={post._id} style={{ background: "white", borderRadius: "12px", padding: "20px", marginBottom: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)" }}>
-                                {/* Header bài viết - giữ nguyên */}
                                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "15px", position: "relative" }}>
                                     <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                                        <div style={{ width: "40px", height: "40px", background: "#ddd", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                                        <div 
+                                            onClick={() => goToUserProfile(post.author_id)}
+                                            style={{ width: "40px", height: "40px", background: "#ddd", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", cursor: "pointer" }}
+                                        >
                                             {post.author_avatar ? <img src={post.author_avatar} alt="avatar" style={{width:"100%", height:"100%", objectFit:"cover"}}/> : "👤"}
                                         </div>
                                         <div>
-                                            <h4 style={{ margin: 0, fontSize: "16px" }}>{post.author_name}</h4>
+                                            <h4 
+                                                onClick={() => goToUserProfile(post.author_id)}
+                                                style={{ margin: 0, fontSize: "16px", cursor: "pointer", color: "#2e7d32" }}
+                                            >
+                                                {post.author_name}
+                                            </h4>
                                             <span style={{ fontSize: "12px", color: "#888" }}>{new Date(post.created_at).toLocaleDateString() || "Vừa xong"}</span>
                                         </div>
                                     </div>
@@ -314,7 +810,7 @@ function Profile() {
                                         }}>
                                             <button 
                                                 onClick={() => handleEditPost(post)}
-                                                style={{ padding: "10px", border: "none", background: "white", textAlign: "left", cursor: "pointer", fontSize: "14px", borderBottom: "1px solid #eee" }}
+                                                style={menuButtonStyle}
                                                 onMouseOver={(e) => e.target.style.background = "#f0f2f5"}
                                                 onMouseOut={(e) => e.target.style.background = "white"}
                                             >
@@ -322,22 +818,28 @@ function Profile() {
                                             </button>
                                             <button 
                                                 onClick={() => handleDeletePost(post._id)}
-                                                style={{ padding: "10px", border: "none", background: "white", textAlign: "left", cursor: "pointer", fontSize: "14px", color: "#dc3545" }}
+                                                style={{ ...menuButtonStyle, color: "#dc3545" }}
                                                 onMouseOver={(e) => e.target.style.background = "#f0f2f5"}
                                                 onMouseOut={(e) => e.target.style.background = "white"}
                                             >
                                                 🗑️ Xóa bài viết
                                             </button>
+                                            <button 
+                                                onClick={() => handleOpenReport(post)}
+                                                style={{ ...menuButtonStyle, color: "#dc3545" }}
+                                                onMouseOver={(e) => e.target.style.background = "#f0f2f5"}
+                                                onMouseOut={(e) => e.target.style.background = "white"}
+                                            >
+                                                ⚠️ Báo cáo
+                                            </button>
                                         </div>
                                     )}
                                 </div>
 
-                                {/* Nội dung bài viết */}
-                                <div style={{ marginBottom: "15px", fontSize: "15px" }}>
+                                <div onClick={() => openPostModal(post)} style={{ marginBottom: "15px", fontSize: "15px", cursor: "pointer" }}>
                                     {post.content && <p style={{ margin: "5px 0", whiteSpace: "pre-wrap" }}>{post.content}</p>}
                                 </div>
 
-                                {/* Hiển thị tags */}
                                 {post.tags && post.tags.length > 0 && (
                                     <div style={{ marginBottom: "10px", display: "flex", flexWrap: "wrap", gap: "5px" }}>
                                         {post.tags.map((tag, idx) => (
@@ -348,14 +850,12 @@ function Profile() {
                                     </div>
                                 )}
 
-                                {/* Hiển thị vị trí */}
                                 {post.location && (
                                     <div style={{ marginBottom: "10px", fontSize: "12px", color: "#888", display: "flex", alignItems: "center", gap: "4px" }}>
                                         📍 {post.location}
                                     </div>
                                 )}
 
-                                {/* Hình ảnh */}
                                 {post.images && post.images.length > 0 && (
                                     <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(post.images.length, 3)}, 1fr)`, gap: "4px", marginBottom: "15px" }}>
                                         {post.images.map((img, idx) => (
@@ -364,7 +864,13 @@ function Profile() {
                                     </div>
                                 )}
 
-                                {/* Thống kê Like/Comment/Share */}
+                                {post.post_type === 'share' && post.shared_post && (
+                                    <SharedPostCard 
+                                        sharedPost={post.shared_post}
+                                        onClick={() => openPostModal(post.shared_post)}
+                                    />
+                                )}
+
                                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", fontSize: "14px", color: "#65676B" }}>
                                     <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
                                         <span style={{ color: likedPosts[post._id] ? "#1877F2" : "inherit" }}>👍</span>
@@ -376,25 +882,17 @@ function Profile() {
                                     </div>
                                 </div>
 
-                                {/* Các nút hành động */}
                                 <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #eee", borderBottom: "1px solid #eee", padding: "10px 0", color: "#555", fontWeight: "500", fontSize: "14px" }}>
                                     <div onClick={() => handleToggleLike(post._id)} style={{ display: "flex", alignItems: "center", gap: "5px", cursor: "pointer", flex: 1, justifyContent: "center", color: likedPosts[post._id] ? "#1877F2" : "#555" }}>
                                         👍 Thích
                                     </div>
-                                    <div onClick={() => handleToggleComments(post._id)} style={{ display: "flex", alignItems: "center", gap: "5px", cursor: "pointer", flex: 1, justifyContent: "center", color: showComments[post._id] ? "#2e7d32" : "#555" }}>
+                                    <div onClick={() => openPostModal(post)} style={{ display: "flex", alignItems: "center", gap: "5px", cursor: "pointer", flex: 1, justifyContent: "center", color: "#555" }}>
                                         💬 Bình luận
                                     </div>
-                                    <div onClick={() => handleSharePost(post._id)} style={{ display: "flex", alignItems: "center", gap: "5px", cursor: "pointer", flex: 1, justifyContent: "center" }}>
+                                    <div onClick={() => handleSharePost(post)} style={{ display: "flex", alignItems: "center", gap: "5px", cursor: "pointer", flex: 1, justifyContent: "center" }}>
                                         ↗️ Chia sẻ
                                     </div>
                                 </div>
-
-                                {/* Khu vực bình luận - giữ nguyên */}
-                                {showComments[post._id] && (
-                                    <div style={{ marginTop: "15px", borderTop: "1px solid #eee", paddingTop: "15px" }}>
-                                        {/* ... phần bình luận giữ nguyên ... */}
-                                    </div>
-                                )}
                             </div>
                         ))
                     )}
@@ -413,7 +911,6 @@ function Profile() {
                         background: "white", width: "600px", maxWidth: "90%", maxHeight: "90vh",
                         borderRadius: "12px", display: "flex", flexDirection: "column", overflow: "hidden"
                     }}>
-                        {/* Header Modal */}
                         <div style={{ position: "relative", padding: "15px", borderBottom: "1px solid #e4e6eb", textAlign: "center" }}>
                             <h3 style={{ margin: 0, fontSize: "20px", fontWeight: "bold" }}>{editingPost ? "Sửa bài viết" : "Tạo bài viết mới"}</h3>
                             <button 
@@ -424,7 +921,6 @@ function Profile() {
                             </button>
                         </div>
 
-                        {/* Thông tin User */}
                         <div style={{ padding: "15px", display: "flex", alignItems: "center", gap: "10px" }}>
                             <div style={{ width: "40px", height: "40px", background: "#e4e6eb", borderRadius: "50%", overflow: "hidden" }}>
                                 {currentUser?.avatar_url ? <img src={currentUser.avatar_url} alt="avatar" style={{width: "100%", height:"100%", objectFit:"cover"}}/> : <div style={{width:"100%", height:"100%", display:"flex", alignItems:"center", justifyContent:"center"}}>👤</div>}
@@ -445,7 +941,6 @@ function Profile() {
                             </div>
                         </div>
 
-                        {/* Nội dung bài viết */}
                         <div style={{ padding: "0 15px", flex: 1, overflowY: "auto" }}>
                             <textarea
                                 placeholder="Bạn đang nghĩ gì?"
@@ -456,7 +951,6 @@ function Profile() {
                                 style={{ width: "100%", border: "none", outline: "none", resize: "none", fontSize: "16px", fontFamily: "inherit" }}
                             />
                             
-                            {/* Tags */}
                             <input
                                 type="text"
                                 placeholder="Thêm tag (cách nhau bằng dấu phẩy, VD: cafe, bạn bè)"
@@ -465,7 +959,6 @@ function Profile() {
                                 style={{ width: "100%", padding: "8px 12px", border: "1px solid #ddd", borderRadius: "8px", marginBottom: "10px", fontSize: "14px" }}
                             />
                             
-                            {/* Location */}
                             <input
                                 type="text"
                                 placeholder="Thêm địa điểm"
@@ -474,7 +967,6 @@ function Profile() {
                                 style={{ width: "100%", padding: "8px 12px", border: "1px solid #ddd", borderRadius: "8px", marginBottom: "10px", fontSize: "14px" }}
                             />
                             
-                            {/* Loại bài viết & Danh mục */}
                             <div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
                                 <select 
                                     value={newPost.post_type}
@@ -498,7 +990,6 @@ function Profile() {
                                 </select>
                             </div>
                             
-                            {/* Upload ảnh */}
                             <div style={{ marginBottom: "10px" }}>
                                 <label style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "8px 16px", background: "#f0f2f5", borderRadius: "8px", cursor: "pointer" }}>
                                     <span>📷</span> Thêm ảnh
@@ -507,7 +998,6 @@ function Profile() {
                                 {uploadingImages && <span style={{ marginLeft: "10px", fontSize: "12px", color: "#666" }}>Đang upload...</span>}
                             </div>
                             
-                            {/* Hiển thị ảnh đã chọn */}
                             {imageUrls.length > 0 && (
                                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px", marginBottom: "10px" }}>
                                     {imageUrls.map((url, idx) => (
@@ -524,7 +1014,6 @@ function Profile() {
                                 </div>
                             )}
                             
-                            {/* Tùy chọn */}
                             <div style={{ display: "flex", gap: "20px", marginBottom: "15px" }}>
                                 <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", cursor: "pointer" }}>
                                     <input type="checkbox" checked={newPost.allow_comment} onChange={(e) => setNewPost(prev => ({ ...prev, allow_comment: e.target.checked }))} />
@@ -537,7 +1026,6 @@ function Profile() {
                             </div>
                         </div>
 
-                        {/* Nút Đăng */}
                         <div style={{ padding: "15px", borderTop: "1px solid #eee" }}>
                             <button 
                                 onClick={handleSubmitPost}
@@ -549,6 +1037,887 @@ function Profile() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Modal cập nhật avatar */}
+            {isAvatarModalOpen && (
+                <div style={{
+                    position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
+                    backgroundColor: "rgba(0, 0, 0, 0.5)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    zIndex: 1000
+                }}>
+                    <div style={{
+                        background: "white", width: "500px", maxWidth: "90%",
+                        borderRadius: "12px", display: "flex", flexDirection: "column", overflow: "hidden"
+                    }}>
+                        <div style={{ position: "relative", padding: "15px", borderBottom: "1px solid #e4e6eb", textAlign: "center" }}>
+                            <h3 style={{ margin: 0, fontSize: "20px", fontWeight: "bold" }}>Cập nhật ảnh đại diện</h3>
+                            <button 
+                                onClick={() => {
+                                    setIsAvatarModalOpen(false);
+                                    resetAvatarState();
+                                }}
+                                style={{ position: "absolute", top: "10px", right: "15px", width: "36px", height: "36px", borderRadius: "50%", border: "none", background: "#e4e6eb", cursor: "pointer", fontSize: "16px", fontWeight: "bold", color: "#606770" }}
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div style={{ padding: "20px", textAlign: "center" }}>
+                            <div style={{
+                                width: "150px",
+                                height: "150px",
+                                margin: "0 auto 20px",
+                                borderRadius: "50%",
+                                overflow: "hidden",
+                                backgroundColor: "#f0f0f0",
+                                border: "3px solid #558b2f"
+                            }}>
+                                <img 
+                                    src={avatarPreview || currentUser?.avatar_url || "https://cdn2.fptshop.com.vn/small/avatar_trang_1_cd729c335b.jpg"} 
+                                    alt="Avatar preview" 
+                                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                                    onError={(e) => { e.target.src = "https://cdn2.fptshop.com.vn/small/avatar_trang_1_cd729c335b.jpg"; }}
+                                />
+                            </div>
+
+                            <div style={{ display: "flex", gap: "10px", justifyContent: "center", marginBottom: "20px" }}>
+                                <button
+                                    type="button"
+                                    onClick={() => setAvatarUploadMethod('file')}
+                                    style={{
+                                        padding: "8px 16px",
+                                        background: avatarUploadMethod === 'file' ? "#1976d2" : "#e0e0e0",
+                                        color: avatarUploadMethod === 'file' ? "white" : "#333",
+                                        border: "none",
+                                        borderRadius: "20px",
+                                        cursor: "pointer"
+                                    }}
+                                >
+                                    📷 Tải ảnh lên
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setAvatarUploadMethod('url')}
+                                    style={{
+                                        padding: "8px 16px",
+                                        background: avatarUploadMethod === 'url' ? "#1976d2" : "#e0e0e0",
+                                        color: avatarUploadMethod === 'url' ? "white" : "#333",
+                                        border: "none",
+                                        borderRadius: "20px",
+                                        cursor: "pointer"
+                                    }}
+                                >
+                                    🔗 Nhập URL
+                                </button>
+                            </div>
+
+                            {avatarUploadMethod === 'file' && (
+                                <div style={{ marginBottom: "20px" }}>
+                                    <label style={{
+                                        display: "inline-block",
+                                        padding: "10px 20px",
+                                        background: "#4caf50",
+                                        color: "white",
+                                        borderRadius: "8px",
+                                        cursor: "pointer"
+                                    }}>
+                                        Chọn ảnh từ máy
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleAvatarSelect}
+                                            style={{ display: "none" }}
+                                        />
+                                    </label>
+                                    <p style={{ fontSize: "12px", color: "#666", marginTop: "8px" }}>
+                                        Hỗ trợ: JPG, PNG, GIF, WebP (Tối đa 5MB)
+                                    </p>
+                                </div>
+                            )}
+
+                            {avatarUploadMethod === 'url' && (
+                                <div style={{ marginBottom: "20px" }}>
+                                    <input
+                                        type="text"
+                                        placeholder="Nhập URL ảnh đại diện"
+                                        value={avatarUrlInput}
+                                        onChange={handleAvatarUrlChange}
+                                        style={{ width: "100%", padding: "10px", border: "1px solid #ddd", borderRadius: "8px", fontSize: "14px" }}
+                                    />
+                                </div>
+                            )}
+
+                            <div style={{ display: "flex", gap: "10px", justifyContent: "center" }}>
+                                <button
+                                    onClick={() => {
+                                        setIsAvatarModalOpen(false);
+                                        resetAvatarState();
+                                    }}
+                                    style={{ padding: "10px 20px", background: "#e0e0e0", border: "none", borderRadius: "8px", cursor: "pointer" }}
+                                >
+                                    Hủy
+                                </button>
+                                <button
+                                    onClick={handleUpdateAvatar}
+                                    disabled={uploadingAvatar}
+                                    style={{ padding: "10px 20px", background: "#558b2f", color: "white", border: "none", borderRadius: "8px", cursor: uploadingAvatar ? "not-allowed" : "pointer" }}
+                                >
+                                    {uploadingAvatar ? "Đang cập nhật..." : "Cập nhật"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal xem chi tiết bài viết */}
+            {isPostModalOpen && selectedPost && (
+                <div style={{
+                    position: "fixed",
+                    top: 0,
+                    left: 0,
+                    width: "100vw",
+                    height: "100vh",
+                    backgroundColor: "rgba(0,0,0,0.8)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    zIndex: 2000,
+                    overflowY: "auto"
+                }} onClick={() => setIsPostModalOpen(false)}>
+                    <div style={{
+                        background: "white",
+                        width: "700px",
+                        maxWidth: "90%",
+                        maxHeight: "90vh",
+                        borderRadius: "16px",
+                        display: "flex",
+                        flexDirection: "column",
+                        overflow: "hidden",
+                        position: "relative"
+                    }} onClick={(e) => e.stopPropagation()}>
+                        
+                        <div style={{
+                            padding: "12px 16px",
+                            borderBottom: "1px solid #e4e6eb",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            flexShrink: 0
+                        }}>
+                            <h3 style={{ margin: 0, fontSize: "18px" }}>Chi tiết bài viết</h3>
+                            <button
+                                onClick={() => setIsPostModalOpen(false)}
+                                style={{
+                                    background: "transparent",
+                                    border: "none",
+                                    fontSize: "24px",
+                                    cursor: "pointer",
+                                    width: "36px",
+                                    height: "36px",
+                                    borderRadius: "50%",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center"
+                                }}
+                            >✕</button>
+                        </div>
+
+                        <div style={{ flex: 1, overflowY: "auto", padding: "16px" }}>
+                            <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "15px" }}>
+                                <div style={{ 
+                                    width: "48px", 
+                                    height: "48px", 
+                                    background: "#e4e6eb", 
+                                    borderRadius: "50%", 
+                                    display: "flex", 
+                                    alignItems: "center", 
+                                    justifyContent: "center", 
+                                    overflow: "hidden",
+                                    flexShrink: 0
+                                }}>
+                                    {selectedPost.author_avatar ? (
+                                        <img src={selectedPost.author_avatar} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }}/>
+                                    ) : (
+                                        <span style={{ fontSize: "24px" }}>👤</span>
+                                    )}
+                                </div>
+                                <div style={{ flex: 1 }}>
+                                    <h4 style={{ margin: 0, fontSize: "16px", fontWeight: "600" }}>{selectedPost.author_name}</h4>
+                                    <span style={{ fontSize: "12px", color: "#888" }}>{new Date(selectedPost.created_at).toLocaleString()}</span>
+                                </div>
+                            </div>
+
+                            <div style={{ marginBottom: "15px" }}>
+                                {selectedPost.content && <p style={{ margin: "5px 0", fontSize: "15px", whiteSpace: "pre-wrap" }}>{selectedPost.content}</p>}
+                                {selectedPost.location && (
+                                    <p style={{ margin: "5px 0", color: "#666", fontSize: "14px" }}>
+                                        📍 <strong>Vị trí:</strong> {selectedPost.location}
+                                    </p>
+                                )}
+                                {selectedPost.tags && selectedPost.tags.length > 0 && (
+                                    <p style={{ margin: "5px 0", color: "#2e7d32", fontSize: "14px", fontWeight: "500" }}>
+                                        {selectedPost.tags.map(tag => `#${tag}`).join(" ")}
+                                    </p>
+                                )}
+                            </div>
+
+                            {selectedPost.images && selectedPost.images.length > 0 && (
+                                <div style={{
+                                    display: "grid",
+                                    gridTemplateColumns: selectedPost.images.length > 1 ? "repeat(2, 1fr)" : "1fr",
+                                    gap: "10px",
+                                    marginBottom: "15px"
+                                }}>
+                                    {selectedPost.images.map((img, idx) => (
+                                        <img key={idx} src={img} alt="post" style={{ width: "100%", borderRadius: "8px", objectFit: "cover" }} />
+                                    ))}
+                                </div>
+                            )}
+
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", fontSize: "14px", color: "#65676B" }}>
+                                <div>👍 {selectedPost.stats?.like_count || 0} lượt thích</div>
+                                <div>{selectedPost.stats?.comment_count || 0} bình luận</div>
+                            </div>
+
+                            <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid #eee", borderBottom: "1px solid #eee", padding: "8px 0", marginBottom: "15px" }}>
+                                <div
+                                    onClick={async () => {
+                                        const newLiked = !modalLiked;
+                                        setModalLiked(newLiked);
+                                        setSelectedPost(prev => ({
+                                            ...prev,
+                                            stats: { ...prev.stats, like_count: (prev.stats?.like_count || 0) + (newLiked ? 1 : -1) }
+                                        }));
+                                        try {
+                                            await api.post(`/api/v1/likes/${selectedPost._id}`);
+                                        } catch(e) {
+                                            setModalLiked(!newLiked);
+                                            setSelectedPost(prev => ({
+                                                ...prev,
+                                                stats: { ...prev.stats, like_count: (prev.stats?.like_count || 0) + (newLiked ? -1 : 1) }
+                                            }));
+                                        }
+                                    }}
+                                    style={{ flex: 1, textAlign: "center", cursor: "pointer", color: modalLiked ? "#1877F2" : "#555", fontWeight: "500", padding: "6px 0", borderRadius: "6px" }}
+                                >
+                                    👍 Thích
+                                </div>
+                                <div style={{ flex: 1, textAlign: "center", color: "#555", fontWeight: "500", padding: "6px 0" }}>💬 Bình luận</div>
+                                <div style={{ flex: 1, textAlign: "center", cursor: "pointer", color: "#555", fontWeight: "500", padding: "6px 0", borderRadius: "6px" }}
+                                    onClick={() => handleSharePost(selectedPost)}
+                                >↗️ Chia sẻ</div>
+                            </div>
+
+                            <div style={{ marginTop: "15px" }}>
+                                <h4 style={{ fontSize: "15px", marginBottom: "12px" }}>Bình luận</h4>
+                                
+                                {replyingTo && (
+                                    <div style={{ 
+                                        background: "#f0f2f5", 
+                                        padding: "12px", 
+                                        borderRadius: "12px", 
+                                        marginBottom: "12px",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "10px",
+                                        flexWrap: "wrap"
+                                    }}>
+                                        <span style={{ fontSize: "14px", color: "#65676B" }}>
+                                            Trả lời <strong>{replyingTo.author_name}</strong>:
+                                        </span>
+                                        <input
+                                            type="text"
+                                            placeholder="Viết câu trả lời..."
+                                            value={replyInput}
+                                            onChange={(e) => setReplyInput(e.target.value)}
+                                            onKeyDown={(e) => e.key === "Enter" && handleModalComment(replyingTo._id)}
+                                            style={{
+                                                flex: 1,
+                                                minWidth: "200px",
+                                                padding: "8px 12px",
+                                                borderRadius: "20px",
+                                                border: "1px solid #ddd",
+                                                background: "white",
+                                                outline: "none",
+                                                fontSize: "14px"
+                                            }}
+                                            autoFocus
+                                        />
+                                        <button
+                                            onClick={() => handleModalComment(replyingTo._id)}
+                                            style={{ border: "none", background: "#2e7d32", color: "white", padding: "6px 12px", borderRadius: "6px", cursor: "pointer" }}
+                                        >
+                                            Trả lời
+                                        </button>
+                                        <button
+                                            onClick={() => setReplyingTo(null)}
+                                            style={{ border: "none", background: "#e4e6eb", color: "#333", padding: "6px 12px", borderRadius: "6px", cursor: "pointer" }}
+                                        >
+                                            Hủy
+                                        </button>
+                                    </div>
+                                )}
+
+                                {modalComments.length === 0 ? (
+                                    <div style={{ textAlign: "center", color: "#888", padding: "20px 0" }}>Chưa có bình luận nào.</div>
+                                ) : (
+                                    <>                                        
+                                        {modalComments.map(cmt => {
+                                            const isCommentOwner = currentUser && String(currentUser._id || currentUser.id) === String(cmt.author_id);
+                                            const replies = getRepliesForComment(cmt._id);
+                                            const isExpanded = expandedReplies[cmt._id] || false;
+                                            
+                                            return (
+                                                <div key={cmt._id} style={{ marginBottom: "20px" }}>
+                                                    <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+                                                        <div style={{ 
+                                                            width: "40px", 
+                                                            height: "40px", 
+                                                            background: "#2e7d32", 
+                                                            borderRadius: "50%", 
+                                                            display: "flex", 
+                                                            alignItems: "center", 
+                                                            justifyContent: "center", 
+                                                            color: "white", 
+                                                            fontSize: "16px", 
+                                                            fontWeight: "bold", 
+                                                            flexShrink: 0 
+                                                        }}>
+                                                            {cmt.author_name ? cmt.author_name.charAt(0).toUpperCase() : "U"}
+                                                        </div>
+                                                        <div style={{ flex: 1 }}>
+                                                            {editingCommentId === cmt._id ? (
+                                                                <div style={{ background: "#f0f2f5", padding: "10px 14px", borderRadius: "18px" }}>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={editCommentContent}
+                                                                        onChange={(e) => setEditCommentContent(e.target.value)}
+                                                                        style={{
+                                                                            width: "100%",
+                                                                            padding: "8px 12px",
+                                                                            borderRadius: "8px",
+                                                                            border: "1px solid #2e7d32",
+                                                                            outline: "none",
+                                                                            fontSize: "14px",
+                                                                            background: "white"
+                                                                        }}
+                                                                        autoFocus
+                                                                        onKeyDown={(e) => {
+                                                                            if (e.key === "Enter") {
+                                                                                handleSaveModalComment(selectedPost._id, cmt._id);
+                                                                            }
+                                                                        }}
+                                                                    />
+                                                                    <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+                                                                        <button
+                                                                            onClick={() => handleSaveModalComment(selectedPost._id, cmt._id)}
+                                                                            style={{
+                                                                                padding: "4px 12px",
+                                                                                background: "#2e7d32",
+                                                                                color: "white",
+                                                                                border: "none",
+                                                                                borderRadius: "6px",
+                                                                                cursor: "pointer",
+                                                                                fontSize: "12px"
+                                                                            }}
+                                                                        >
+                                                                            Lưu
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => {
+                                                                                setEditingCommentId(null);
+                                                                                setEditCommentContent("");
+                                                                            }}
+                                                                            style={{
+                                                                                padding: "4px 12px",
+                                                                                background: "#e4e6eb",
+                                                                                color: "#333",
+                                                                                border: "none",
+                                                                                borderRadius: "6px",
+                                                                                cursor: "pointer",
+                                                                                fontSize: "12px"
+                                                                            }}
+                                                                        >
+                                                                            Hủy
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <>
+                                                                    <div style={{ background: "#f0f2f5", padding: "10px 14px", borderRadius: "18px", position: "relative" }}>
+                                                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                                                            <strong style={{ fontSize: "14px", display: "block", marginBottom: "4px", color: "#1c1e21" }}>
+                                                                                {cmt.author_name}
+                                                                            </strong>
+                                                                            {isCommentOwner && (
+                                                                                <div style={{ position: "relative" }}>
+                                                                                    <button
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            setActiveCommentMenu(activeCommentMenu === cmt._id ? null : cmt._id);
+                                                                                        }}
+                                                                                        style={{
+                                                                                            background: "transparent",
+                                                                                            border: "none",
+                                                                                            cursor: "pointer",
+                                                                                            color: "#65676B",
+                                                                                            fontSize: "18px",
+                                                                                            padding: "0 8px",
+                                                                                            fontWeight: "bold"
+                                                                                        }}
+                                                                                    >
+                                                                                        •••
+                                                                                    </button>
+                                                                                    {activeCommentMenu === cmt._id && (
+                                                                                        <div style={{
+                                                                                            position: "absolute",
+                                                                                            top: "24px",
+                                                                                            right: "0",
+                                                                                            background: "white",
+                                                                                            border: "1px solid #ddd",
+                                                                                            borderRadius: "8px",
+                                                                                            boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
+                                                                                            width: "120px",
+                                                                                            zIndex: 20,
+                                                                                            overflow: "hidden"
+                                                                                        }}>
+                                                                                            <button
+                                                                                                onClick={() => handleEditModalComment(cmt)}
+                                                                                                style={{
+                                                                                                    padding: "10px 12px",
+                                                                                                    border: "none",
+                                                                                                    background: "white",
+                                                                                                    textAlign: "left",
+                                                                                                    cursor: "pointer",
+                                                                                                    fontSize: "13px",
+                                                                                                    width: "100%",
+                                                                                                    borderBottom: "1px solid #eee"
+                                                                                                }}
+                                                                                                onMouseOver={(e) => e.target.style.background = "#f0f2f5"}
+                                                                                                onMouseOut={(e) => e.target.style.background = "white"}
+                                                                                            >
+                                                                                                ✏️ Sửa
+                                                                                            </button>
+                                                                                            <button
+                                                                                                onClick={() => handleDeleteModalComment(selectedPost._id, cmt._id)}
+                                                                                                style={{
+                                                                                                    padding: "10px 12px",
+                                                                                                    border: "none",
+                                                                                                    background: "white",
+                                                                                                    textAlign: "left",
+                                                                                                    cursor: "pointer",
+                                                                                                    fontSize: "13px",
+                                                                                                    color: "#dc3545",
+                                                                                                    width: "100%"
+                                                                                                }}
+                                                                                                onMouseOver={(e) => e.target.style.background = "#f0f2f5"}
+                                                                                                onMouseOut={(e) => e.target.style.background = "white"}
+                                                                                            >
+                                                                                                🗑️ Xóa
+                                                                                            </button>
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                        <span style={{ fontSize: "14px", color: "#1c1e21", wordBreak: "break-word" }}>
+                                                                            {cmt.content}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div style={{ display: "flex", gap: "16px", marginTop: "6px", marginLeft: "8px", fontSize: "12px", color: "#65676B" }}>
+                                                                        <span>{new Date(cmt.created_at).toLocaleString()}</span>
+                                                                        <button 
+                                                                            onClick={() => setReplyingTo(cmt)}
+                                                                            style={{ border: "none", background: "transparent", color: "#2e7d32", cursor: "pointer", fontSize: "12px", fontWeight: "500" }}
+                                                                        >
+                                                                            Trả lời
+                                                                        </button>
+                                                                    </div>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {replies && replies.length > 0 && (
+                                                        <div style={{ marginLeft: "52px", marginTop: "8px" }}>
+                                                            {!isExpanded ? (
+                                                                <button
+                                                                    onClick={() => toggleReplies(cmt._id)}
+                                                                    style={{
+                                                                        background: "transparent",
+                                                                        border: "none",
+                                                                        color: "#2e7d32",
+                                                                        fontSize: "13px",
+                                                                        fontWeight: "500",
+                                                                        cursor: "pointer",
+                                                                        padding: "4px 0",
+                                                                        display: "flex",
+                                                                        alignItems: "center",
+                                                                        gap: "6px"
+                                                                    }}
+                                                                >
+                                                                    💬 Xem {replies.length} câu trả lời
+                                                                </button>
+                                                            ) : (
+                                                                <>
+                                                                    <button
+                                                                        onClick={() => toggleReplies(cmt._id)}
+                                                                        style={{
+                                                                            background: "transparent",
+                                                                            border: "none",
+                                                                            color: "#65676B",
+                                                                            fontSize: "13px",
+                                                                            cursor: "pointer",
+                                                                            padding: "4px 0",
+                                                                            marginBottom: "8px",
+                                                                            display: "flex",
+                                                                            alignItems: "center",
+                                                                            gap: "6px"
+                                                                        }}
+                                                                    >
+                                                                        🔽 Ẩn câu trả lời
+                                                                    </button>
+                                                                    <div style={{ paddingLeft: "12px", borderLeft: "2px solid #e4e6eb" }}>
+                                                                        {replies.map(reply => {
+                                                                            const isReplyOwner = currentUser && String(currentUser._id || currentUser.id) === String(reply.author_id);
+                                                                            
+                                                                            return (
+                                                                                <div key={reply._id} style={{ display: "flex", gap: "10px", marginBottom: "12px", alignItems: "flex-start" }}>
+                                                                                    <div style={{ 
+                                                                                        width: "32px", 
+                                                                                        height: "32px", 
+                                                                                        background: "#e4e6eb", 
+                                                                                        borderRadius: "50%", 
+                                                                                        display: "flex", 
+                                                                                        alignItems: "center", 
+                                                                                        justifyContent: "center", 
+                                                                                        fontSize: "12px", 
+                                                                                        fontWeight: "bold",
+                                                                                        flexShrink: 0,
+                                                                                        color: "#333"
+                                                                                    }}>
+                                                                                        {reply.author_name ? reply.author_name.charAt(0).toUpperCase() : "U"}
+                                                                                    </div>
+                                                                                    <div style={{ flex: 1 }}>
+                                                                                        {editingCommentId === reply._id ? (
+                                                                                            <div style={{ background: "#f0f2f5", padding: "8px 12px", borderRadius: "16px" }}>
+                                                                                                <input
+                                                                                                    type="text"
+                                                                                                    value={editCommentContent}
+                                                                                                    onChange={(e) => setEditCommentContent(e.target.value)}
+                                                                                                    style={{
+                                                                                                        width: "100%",
+                                                                                                        padding: "6px 10px",
+                                                                                                        borderRadius: "6px",
+                                                                                                        border: "1px solid #2e7d32",
+                                                                                                        outline: "none",
+                                                                                                        fontSize: "13px"
+                                                                                                    }}
+                                                                                                    autoFocus
+                                                                                                    onKeyDown={(e) => e.key === "Enter" && handleSaveModalComment(selectedPost._id, reply._id)}
+                                                                                                />
+                                                                                                <div style={{ display: "flex", gap: "6px", marginTop: "6px" }}>
+                                                                                                    <button onClick={() => handleSaveModalComment(selectedPost._id, reply._id)} style={{ padding: "2px 10px", background: "#2e7d32", color: "white", border: "none", borderRadius: "4px", cursor: "pointer", fontSize: "11px" }}>Lưu</button>
+                                                                                                    <button onClick={() => { setEditingCommentId(null); setEditCommentContent(""); }} style={{ padding: "2px 10px", background: "#e4e6eb", border: "none", borderRadius: "4px", cursor: "pointer", fontSize: "11px" }}>Hủy</button>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        ) : (
+                                                                                            <>
+                                                                                                <div style={{ background: "#f0f2f5", padding: "8px 12px", borderRadius: "16px", position: "relative" }}>
+                                                                                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                                                                                        <strong style={{ fontSize: "12px", display: "block", marginBottom: "2px", color: "#1c1e21" }}>
+                                                                                                            {reply.author_name}
+                                                                                                        </strong>
+                                                                                                        {isReplyOwner && (
+                                                                                                            <div style={{ position: "relative" }}>
+                                                                                                                <button
+                                                                                                                    onClick={(e) => {
+                                                                                                                        e.stopPropagation();
+                                                                                                                        setActiveCommentMenu(activeCommentMenu === reply._id ? null : reply._id);
+                                                                                                                    }}
+                                                                                                                    style={{ 
+                                                                                                                        background: "transparent", 
+                                                                                                                        border: "none", 
+                                                                                                                        cursor: "pointer", 
+                                                                                                                        color: "#65676B", 
+                                                                                                                        fontSize: "16px",
+                                                                                                                        padding: "0 4px"
+                                                                                                                    }}
+                                                                                                                >
+                                                                                                                    •••
+                                                                                                                </button>
+                                                                                                                {activeCommentMenu === reply._id && (
+                                                                                                                    <div style={{
+                                                                                                                        position: "absolute",
+                                                                                                                        top: "20px",
+                                                                                                                        right: "0",
+                                                                                                                        background: "white",
+                                                                                                                        border: "1px solid #ddd",
+                                                                                                                        borderRadius: "8px",
+                                                                                                                        boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
+                                                                                                                        width: "100px",
+                                                                                                                        zIndex: 20,
+                                                                                                                        overflow: "hidden"
+                                                                                                                    }}>
+                                                                                                                        <button 
+                                                                                                                            onClick={() => handleEditModalComment(reply)} 
+                                                                                                                            style={{ 
+                                                                                                                                padding: "8px 12px", 
+                                                                                                                                border: "none", 
+                                                                                                                                background: "white", 
+                                                                                                                                textAlign: "left", 
+                                                                                                                                cursor: "pointer", 
+                                                                                                                                fontSize: "12px", 
+                                                                                                                                width: "100%",
+                                                                                                                                borderBottom: "1px solid #eee"
+                                                                                                                            }}
+                                                                                                                        >
+                                                                                                                            ✏️ Sửa
+                                                                                                                        </button>
+                                                                                                                        <button 
+                                                                                                                            onClick={() => handleDeleteModalComment(selectedPost._id, reply._id)} 
+                                                                                                                            style={{ 
+                                                                                                                                padding: "8px 12px", 
+                                                                                                                                border: "none", 
+                                                                                                                                background: "white", 
+                                                                                                                                textAlign: "left", 
+                                                                                                                                cursor: "pointer", 
+                                                                                                                                fontSize: "12px", 
+                                                                                                                                color: "#dc3545", 
+                                                                                                                                width: "100%" 
+                                                                                                                            }}
+                                                                                                                        >
+                                                                                                                            🗑️ Xóa
+                                                                                                                        </button>
+                                                                                                                    </div>
+                                                                                                                )}
+                                                                                                            </div>
+                                                                                                        )}
+                                                                                                    </div>
+                                                                                                    <span style={{ fontSize: "13px", color: "#1c1e21", wordBreak: "break-word" }}>
+                                                                                                        {reply.content}
+                                                                                                    </span>
+                                                                                                </div>
+                                                                                                <div style={{ marginTop: "4px", marginLeft: "8px", fontSize: "11px", color: "#65676B" }}>
+                                                                                                    {new Date(reply.created_at).toLocaleString()}
+                                                                                                </div>
+                                                                                            </>
+                                                                                        )}
+                                                                                    </div>
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+
+                                        {modalComments.length < totalComments && totalComments > commentLimit && (
+                                            <div style={{ textAlign: "center", marginTop: "16px" }}>
+                                                <button
+                                                    onClick={loadMoreComments}
+                                                    style={{
+                                                        padding: "8px 24px",
+                                                        background: "transparent",
+                                                        border: "1px solid #2e7d32",
+                                                        borderRadius: "20px",
+                                                        cursor: "pointer",
+                                                        fontSize: "13px",
+                                                        fontWeight: "500",
+                                                        color: "#2e7d32",
+                                                        transition: "all 0.2s"
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        e.target.style.background = "#2e7d32";
+                                                        e.target.style.color = "white";
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        e.target.style.background = "transparent";
+                                                        e.target.style.color = "#2e7d32";
+                                                    }}
+                                                >
+                                                    Xem thêm {totalComments - modalComments.length} bình luận
+                                                </button>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        </div>
+
+                        <div style={{ padding: "12px 16px", borderTop: "1px solid #e4e6eb", display: "flex", gap: "10px", alignItems: "center", flexShrink: 0 }}>
+                            <div style={{ 
+                                width: "32px", 
+                                height: "32px", 
+                                background: "#ddd", 
+                                borderRadius: "50%", 
+                                display: "flex", 
+                                alignItems: "center", 
+                                justifyContent: "center", 
+                                flexShrink: 0 
+                            }}>
+                                {currentUser?.avatar_url ? (
+                                    <img src={currentUser.avatar_url} alt="avatar" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }}/>
+                                ) : "👤"}
+                            </div>
+                            <input
+                                type="text"
+                                placeholder={replyingTo ? `Trả lời ${replyingTo.author_name}...` : "Viết bình luận..."}
+                                value={modalCommentInput}
+                                onChange={(e) => setModalCommentInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter" && modalCommentInput.trim()) {
+                                        handleModalComment();
+                                    }
+                                }}
+                                style={{
+                                    flex: 1,
+                                    padding: "10px 14px",
+                                    borderRadius: "20px",
+                                    border: "none",
+                                    background: "#f0f2f5",
+                                    outline: "none",
+                                    fontSize: "14px"
+                                }}
+                            />
+                            <button
+                                onClick={() => handleModalComment()}
+                                style={{ border: "none", background: "transparent", color: "#1877F2", fontWeight: "bold", cursor: "pointer" }}
+                            >
+                                Gửi
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal chia sẻ */}
+            {showShareModal && sharePost && (
+                <ShareModal
+                    post={sharePost}
+                    onClose={() => {
+                        setShowShareModal(false);
+                        setSharePost(null);
+                    }}
+                    onShareSuccess={() => {
+                        setPosts(prevPosts => prevPosts.map(p => 
+                            p._id === sharePost._id 
+                                ? { ...p, stats: { ...p.stats, share_count: (p.stats?.share_count || 0) + 1 } }
+                                : p
+                        ));
+                        showToast("Đã chia sẻ bài viết thành công!", "success");
+                    }}
+                />
+            )}
+
+            {/* Modal báo cáo */}
+            {showReportModal && selectedReportPost && (
+                <ReportModal
+                    post={selectedReportPost}
+                    onClose={() => {
+                        setShowReportModal(false);
+                        setSelectedReportPost(null);
+                    }}
+                    onReportSuccess={handleReportSuccess}
+                />
+            )}
+
+            {/* Modal xác nhận xóa */}
+            {showConfirmModal && (
+                <div 
+                    style={{
+                        position: "fixed", 
+                        top: 0, left: 0, 
+                        width: "100vw", height: "100vh",
+                        backgroundColor: "rgba(0, 0, 0, 0.6)",
+                        display: "flex", 
+                        alignItems: "center", 
+                        justifyContent: "center",
+                        zIndex: 3000
+                    }}
+                    onClick={() => setShowConfirmModal(false)}
+                >
+                    <div 
+                        style={{
+                            background: "white",
+                            width: "420px",
+                            maxWidth: "90%",
+                            borderRadius: "16px",
+                            padding: "28px 24px",
+                            textAlign: "center",
+                            boxShadow: "0 10px 30px rgba(0,0,0,0.2)"
+                        }}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div style={{ fontSize: "48px", marginBottom: "12px" }}>🗑️</div>
+                        <h3 style={{ margin: "0 0 12px", fontSize: "20px", color: "#333" }}>
+                            Xác nhận xóa
+                        </h3>
+                        <p style={{ 
+                            margin: "0 0 28px", 
+                            fontSize: "15.5px", 
+                            color: "#555", 
+                            lineHeight: "1.5" 
+                        }}>
+                            {confirmMessage}
+                        </p>
+                        
+                        <div style={{ display: "flex", gap: "12px" }}>
+                            <button
+                                onClick={() => setShowConfirmModal(false)}
+                                style={{
+                                    flex: 1,
+                                    padding: "12px",
+                                    borderRadius: "10px",
+                                    border: "1px solid #ddd",
+                                    background: "#f8f9fa",
+                                    color: "#333",
+                                    fontSize: "15px",
+                                    fontWeight: "600",
+                                    cursor: "pointer"
+                                }}
+                            >
+                                Hủy
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (confirmAction) confirmAction();
+                                    setShowConfirmModal(false);
+                                }}
+                                style={{
+                                    flex: 1,
+                                    padding: "12px",
+                                    borderRadius: "10px",
+                                    border: "none",
+                                    background: "#dc3545",
+                                    color: "white",
+                                    fontSize: "15px",
+                                    fontWeight: "600",
+                                    cursor: "pointer"
+                                }}
+                            >
+                                Xóa ngay
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Toast thông báo */}
+            {toastConfig.show && (
+                <Toast
+                    message={toastConfig.message}
+                    type={toastConfig.type}
+                    onClose={() => setToastConfig({ show: false, message: '', type: 'success' })}
+                    duration={3000}
+                />
             )}
         </Layout>
     );
