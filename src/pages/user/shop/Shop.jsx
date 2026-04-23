@@ -54,7 +54,7 @@ const ShopPage = () => {
         }
     };
 
-    const fetchHotProducts = async () => {
+const fetchHotProducts = async () => {
     try {
         const cachedHot = sessionStorage.getItem('shop_hotProducts');
         const cacheTime = sessionStorage.getItem('shop_full_cache_timestamp');
@@ -67,14 +67,28 @@ const ShopPage = () => {
             return;
         }
 
-        // DÙNG userApi thay vì api
         const res = await userApi.get("/api/v1/products/hot", {
             params: { limit: 3 }
         });
         
-        console.log("🔥 Hot products API response:", res.data);
-        
-        const formatted = (res.data || []).map(product => ({
+        console.log("🔥 Full API response object:", res);
+        console.log("🔥 Hot products API response data:", res.data);
+
+        // *** QUAN TRỌNG: Linh hoạt lấy dữ liệu mảng sản phẩm ***
+        let productsData = null;
+        if (Array.isArray(res.data)) {
+            productsData = res.data;
+        } else if (res.data && Array.isArray(res.data.data)) {
+            productsData = res.data.data;
+        } else if (res.data && Array.isArray(res.data.products)) {
+            productsData = res.data.products;
+        } else {
+            console.error("❌ Unexpected data structure from API:", res.data);
+            setHotProducts([]);
+            return;
+        }
+
+        const formatted = productsData.map(product => ({
             id: product.id || product._id,
             name: product.name,
             price: product.price,
@@ -85,12 +99,12 @@ const ShopPage = () => {
             sold_quantity: product.sold_quantity || 0
         }));
         
+        console.log("🔥 Formatted hot products:", formatted);
         setHotProducts(formatted);
         sessionStorage.setItem('shop_hotProducts', JSON.stringify(formatted));
         
     } catch (error) {
         console.error("Error fetching hot products:", error);
-        console.error("Error details:", error.message);
         if (error.response) {
             console.error("Response status:", error.response.status);
             console.error("Response data:", error.response.data);
