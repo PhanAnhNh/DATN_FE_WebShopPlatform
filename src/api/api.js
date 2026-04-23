@@ -1,8 +1,10 @@
 // src/api/api.js
 import axios from 'axios';
 
+const BACKEND_URL = 'https://datnwebshopplatform-production.up.railway.app';
+
 const api = axios.create({
-  baseURL: 'http://localhost:8000',
+  baseURL: BACKEND_URL,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -10,21 +12,21 @@ const api = axios.create({
 
 // Tạo các instance riêng biệt
 export const userApi = axios.create({
-  baseURL: 'http://localhost:8000',
+  baseURL: BACKEND_URL,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
 export const shopApi = axios.create({
-  baseURL: 'http://localhost:8000',
+  baseURL: BACKEND_URL,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
 export const adminApi = axios.create({
-  baseURL: 'http://localhost:8000',
+  baseURL: BACKEND_URL,
   headers: {
     'Content-Type': 'application/json',
   },
