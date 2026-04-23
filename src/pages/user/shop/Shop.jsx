@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Layout from "../../../components/layout/Layout";
-import {userApi} from "../../../api/api";
+import api, {userApi} from "../../../api/api";
 import locationApi from "../../../api/locationApi";
 import { useUserLocation } from "../../../components/Hooks/useUserLocation";
 
@@ -67,14 +67,15 @@ const fetchHotProducts = async () => {
             return;
         }
 
-        const res = await userApi.get("/api/v1/products/hot", {
+        // 👈 THAY ĐỔI: DÙNG api THAY VÌ userApi
+        const res = await api.get("/api/v1/products/hot", {
             params: { limit: 3 }
         });
         
-        console.log("🔥 Full API response object:", res);
-        console.log("🔥 Hot products API response data:", res.data);
+        console.log("🔥 [api - no token] Full response:", res);
+        console.log("🔥 [api - no token] Response data:", res.data);
 
-        // *** QUAN TRỌNG: Linh hoạt lấy dữ liệu mảng sản phẩm ***
+        // Logic lấy mảng sản phẩm (giữ nguyên)
         let productsData = null;
         if (Array.isArray(res.data)) {
             productsData = res.data;
@@ -83,7 +84,7 @@ const fetchHotProducts = async () => {
         } else if (res.data && Array.isArray(res.data.products)) {
             productsData = res.data.products;
         } else {
-            console.error("❌ Unexpected data structure from API:", res.data);
+            console.error("❌ Unexpected data structure:", res.data);
             setHotProducts([]);
             return;
         }
@@ -104,7 +105,7 @@ const fetchHotProducts = async () => {
         sessionStorage.setItem('shop_hotProducts', JSON.stringify(formatted));
         
     } catch (error) {
-        console.error("Error fetching hot products:", error);
+        console.error("❌ Error fetching hot products with api:", error);
         if (error.response) {
             console.error("Response status:", error.response.status);
             console.error("Response data:", error.response.data);

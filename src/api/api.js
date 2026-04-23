@@ -118,4 +118,4 @@ adminApi.interceptors.response.use(
 );
 
 // Export mặc định là userApi để không break code cũ
-export default userApi;
+export default api;
