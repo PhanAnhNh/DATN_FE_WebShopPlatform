@@ -26,56 +26,54 @@ function Login() {
   };
 
   const handleLogin = async (e) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
+  e.preventDefault();
+  setError("");
+  setLoading(true);
 
-    try {
-      const formData = new URLSearchParams();
-      formData.append("username", email);
-      formData.append("password", password);
+  try {
+    const formData = new URLSearchParams();
+    formData.append("username", email);
+    formData.append("password", password);
 
-      const response = await userApi.post("/api/v1/auth/login", formData.toString(), {
+    // DÙNG userApi (axios) - KHÔNG cần .json()
+    const response = await userApi.post("/api/v1/auth/login", formData.toString(), {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
       },
     });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || "Email hoặc mật khẩu không chính xác!");
-      }
+    // VỚI AXIOS: data nằm trong response.data, KHÔNG cần response.json()
+    const data = response.data;
+    console.log("User login response:", data);
 
-      const data = await response.json();
-      console.log("User login response:", data);
-
-      // Kiểm tra role - user không được đăng nhập vào shop hoặc admin
-      if (data.user && data.user.role === "shop_owner") {
-        throw new Error("Vui lòng đăng nhập qua cổng dành cho shop");
-      }
-      
-      if (data.user && data.user.role === "admin") {
-        throw new Error("Vui lòng đăng nhập qua cổng dành cho admin");
-      }
-
-      // Lưu token với key RIÊNG cho user
-      localStorage.setItem("user_token", data.access_token);
-      localStorage.setItem("user_data", JSON.stringify(data.user));
-      localStorage.setItem("user", JSON.stringify(data.user));
-
-      showToast("Đăng nhập thành công!", "success");
-      
-      setTimeout(() => {
-        navigate("/");
-      }, 1500);
-
-    } catch (err) {
-      setError(err.message);
-      showToast(err.message, "error");
-    } finally {
-      setLoading(false);
+    // Kiểm tra role
+    if (data.user && data.user.role === "shop_owner") {
+      throw new Error("Vui lòng đăng nhập qua cổng dành cho shop");
     }
-  };
+    
+    if (data.user && data.user.role === "admin") {
+      throw new Error("Vui lòng đăng nhập qua cổng dành cho admin");
+    }
+
+    // Lưu token
+    localStorage.setItem("user_token", data.access_token);
+    localStorage.setItem("user_data", JSON.stringify(data.user));
+    localStorage.setItem("user", JSON.stringify(data.user));
+
+    showToast("Đăng nhập thành công!", "success");
+    
+    setTimeout(() => {
+      navigate("/");
+    }, 1500);
+
+  } catch (err) {
+    const errorMsg = err.response?.data?.detail || err.message || "Đăng nhập thất bại";
+    setError(errorMsg);
+    showToast(errorMsg, "error");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div style={styles.container}>
