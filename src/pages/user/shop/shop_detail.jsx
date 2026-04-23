@@ -389,12 +389,19 @@ const ShopDetailPage = () => {
                         </div>
                         <div style={{ display: "flex", gap: "12px" }}>
                             <button onClick={handleFollow} disabled={followLoading} style={{
-                                padding: "12px 28px", borderRadius: "40px", border: "none", fontWeight: "600", fontSize: "14px",
-                                background: isFollowing ? "#fff" : "#2e7d32", color: isFollowing ? "#2e7d32" : "white",
-                                border: isFollowing ? "2px solid #2e7d32" : "none", cursor: followLoading ? "not-allowed" : "pointer",
-                                display: "flex", alignItems: "center", gap: "8px", transition: "all 0.3s ease",
+                                padding: "12px 28px",
+                                borderRadius: "40px",
+                                fontWeight: "600",
+                                background: isFollowing ? "#fff" : "#2e7d32",
+                                color: isFollowing ? "#2e7d32" : "white",  // ← sửa lại color
+                                border: isFollowing ? "2px solid #2e7d32" : "none",  // ← chỉ 1 border
+                                cursor: followLoading ? "not-allowed" : "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "8px",
+                                transition: "all 0.3s ease",
                                 boxShadow: "0 2px 8px rgba(0,0,0,0.1)"
-                            }}
+                                }}
                             onMouseEnter={(e) => { if (!followLoading) { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)"; } }}
                             onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.1)"; }}>
                                 {isFollowing ? <FaHeart style={{ color: "#ff4444" }} /> : <FaRegHeart />}
