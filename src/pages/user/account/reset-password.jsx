@@ -92,7 +92,7 @@ function ResetPassword() {
     setLoading(true);
 
     try {
-      const response = await fetch("http://localhost:8000/api/v1/password/reset-password", {
+      const response = await fetch(`${BACKEND_URL}/api/v1/password/reset-password`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

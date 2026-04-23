@@ -37,7 +37,7 @@ function ShopLogin() {
       formData.append('username', loginIdentifier);
       formData.append('password', password);
 
-      const response = await fetch("http://localhost:8000/api/v1/shop/auth/login", {
+      const response = await fetch(`${BACKEND_URL}/api/v1/shop/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded"

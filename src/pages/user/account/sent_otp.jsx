@@ -124,7 +124,7 @@ function VerifyOTP() {
     setLoading(true);
 
     try {
-      const response = await fetch("http://localhost:8000/api/v1/password/verify-otp", {
+      const response = await fetch(`${BACKEND_URL}/api/v1/password/verify-otp`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

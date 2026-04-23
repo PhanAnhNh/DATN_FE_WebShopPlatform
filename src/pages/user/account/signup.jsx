@@ -122,7 +122,7 @@ function Register() {
       const { confirmPassword, street, ward, district, city, country, ...payload } = formData;
       payload.address = fullAddress;
       payload.avatar_url = finalAvatarUrl;
-      const response = await fetch("http://localhost:8000/api/v1/users/", {
+      const response = await fetch(`${BACKEND_URL}/api/v1/users/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
