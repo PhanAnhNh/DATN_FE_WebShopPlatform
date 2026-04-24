@@ -68,7 +68,7 @@ const ShopPage = () => {
         }
 
         // ✅ DÙNG userApi (có baseURL và interceptor)
-        const res = await userApi.get("/api/v1/products/hot", {
+        const res = await userApi.get("/api/v1/products/hot/", {
             params: { limit: 3 }
         });
         
@@ -225,7 +225,7 @@ const ShopPage = () => {
         setLoading(true);
         try {
             // Fetch products thường
-            const productsRes = await userApi.get("/api/v1/products", {
+            const productsRes = await userApi.get("/api/v1/products/", {
                 params: {
                     category: activeCategory !== "all" ? activeCategory : undefined,
                     sub_category: selectedSubCategory || undefined
