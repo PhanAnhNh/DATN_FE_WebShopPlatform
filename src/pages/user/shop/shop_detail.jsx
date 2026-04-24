@@ -84,59 +84,61 @@ const ShopDetailPage = () => {
     }, [shop_id]);
 
     const fetchShopData = async () => {
-        setLoading(true);
+    setLoading(true);
+    try {
+        // Lấy thông tin shop
+        const shopRes = await api.get(`/api/v1/shops/${shop_id}`);
+        setShop(shopRes.data);
+
+        let normalizedProducts = []; // Khai báo ở đây
+        
+        // Lấy sản phẩm của shop
         try {
-            // Lấy thông tin shop
-            const shopRes = await api.get(`/api/v1/shops/${shop_id}`);
-            setShop(shopRes.data);
-
-            // Lấy sản phẩm của shop
-            try {
-                const productsRes = await api.get(`/api/v1/shops/${shop_id}/products`);
-                const normalizedProducts = (productsRes.data || []).map(product => ({
-                    ...product,
-                    id: product.id || product._id,
-                    rating: product.average_rating || product.rating || 0,
-                    sold_count: product.sold_count || product.sold_quantity || 0
-                }));
-                setProducts(normalizedProducts);
-                
-                // Cập nhật số lượng sản phẩm
-                if (shopRes.data && normalizedProducts.length !== shopRes.data.products_count) {
-                    setShop(prev => ({
-                        ...prev,
-                        products_count: normalizedProducts.length
-                    }));
-                }
-            } catch (productsError) {
-                console.error("Error fetching products:", productsError);
-                setProducts([]);
-            }
-
-            // Lấy đánh giá của shop
-            try {
-                const reviewsRes = await api.get(`/api/v1/shops/${shop_id}/reviews`);
-                const normalizedReviews = (reviewsRes.data || []).map(review => ({
-                    ...review,
-                    id: review.id || review._id,
-                    date: review.created_at || review.date,
-                    likes: review.helpful_count || review.likes || 0
-                }));
-                setReviews(normalizedReviews);
-            } catch (reviewsError) {
-                console.error("Error fetching reviews:", reviewsError);
-                setReviews([]);
-            }
+            const productsRes = await api.get(`/api/v1/shops/${shop_id}/products`);
+            normalizedProducts = (productsRes.data || []).map(product => ({
+                ...product,
+                id: product.id || product._id,
+                rating: product.average_rating || product.rating || 0,
+                sold_count: product.sold_count || product.sold_quantity || 0
+            }));
+            setProducts(normalizedProducts);
             
-            // Lấy đánh giá cho từng sản phẩm
-            await fetchProductsRatings(normalizedProducts);
-            
-        } catch (error) {
-            console.error("Error fetching shop data:", error);
-        } finally {
-            setLoading(false);
+            // Cập nhật số lượng sản phẩm
+            if (shopRes.data && normalizedProducts.length !== shopRes.data.products_count) {
+                setShop(prev => ({
+                    ...prev,
+                    products_count: normalizedProducts.length
+                }));
+            }
+        } catch (productsError) {
+            console.error("Error fetching products:", productsError);
+            setProducts([]);
         }
-    };
+
+        // Lấy đánh giá của shop
+        try {
+            const reviewsRes = await api.get(`/api/v1/shops/${shop_id}/reviews`);
+            const normalizedReviews = (reviewsRes.data || []).map(review => ({
+                ...review,
+                id: review.id || review._id,
+                date: review.created_at || review.date,
+                likes: review.helpful_count || review.likes || 0
+            }));
+            setReviews(normalizedReviews);
+        } catch (reviewsError) {
+            console.error("Error fetching reviews:", reviewsError);
+            setReviews([]);
+        }
+        
+        // Lấy đánh giá cho từng sản phẩm - SỬ DỤNG normalizedProducts đã được khai báo
+        await fetchProductsRatings(normalizedProducts);
+        
+    } catch (error) {
+        console.error("Error fetching shop data:", error);
+    } finally {
+        setLoading(false);
+    }
+};
     
     const fetchProductsRatings = async (productsList) => {
         if (!productsList || productsList.length === 0) return;
