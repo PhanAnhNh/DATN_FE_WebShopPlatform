@@ -1,14 +1,25 @@
+// frontend/src/config.js
 export const BACKEND_URL = (() => {
   // ĐẢM BẢO DÙNG HTTPS
   const url = 'https://datnwebshopplatform-production.up.railway.app';
   const envUrl = import.meta.env.VITE_BACKEND_URL;
   
+  let finalUrl = url;
   if (envUrl) {
-    // Force HTTPS
-    return envUrl.replace('http://', 'https://');
+    finalUrl = envUrl;
   }
-  return url;
+  
+  // Force HTTPS
+  if (finalUrl.startsWith('http://')) {
+    finalUrl = finalUrl.replace('http://', 'https://');
+  }
+  
+  // Đảm bảo không có trailing slash
+  finalUrl = finalUrl.replace(/\/$/, '');
+  
+  console.log('🔧 Backend URL (secure):', finalUrl);
+  return finalUrl;
 })();
 
-// Log để debug
-console.log('🔧 Backend URL:', BACKEND_URL);
+// Export URL để dùng ở nhiều nơi
+export const SECURE_BACKEND_URL = BACKEND_URL;
