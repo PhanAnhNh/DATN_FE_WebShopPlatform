@@ -28,56 +28,58 @@ function ShopLogin() {
   };
 
   const handleLogin = async (e) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
+  e.preventDefault();
+  setError("");
+  setLoading(true);
 
-    try {
-      // Tạo FormData cho OAuth2 form
-      const formData = new URLSearchParams();
-      formData.append('username', loginIdentifier);
-      formData.append('password', password);
+  try {
+    const formData = new URLSearchParams();
+    formData.append('username', loginIdentifier);
+    formData.append('password', password);
 
-      const response = await shopApi.post("/api/v1/shop/auth/login", formData.toString(), {
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded"
-        }
-      });
-      
-      const data = await response.json();
-      console.log("Shop login response:", data);
-
-      if (!response.ok) {
-        throw new Error(data.detail || "Đăng nhập thất bại");
+    const response = await shopApi.post("/api/v1/shop/auth/login", formData.toString(), {
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded"
       }
+    });
+    
+    // ✅ Axios trả về data ở response.data
+    const data = response.data;
+    console.log("Shop login response:", data);
 
-      // Kiểm tra role có phải shop_owner không
-      if (data.user && data.user.role !== "shop_owner") {
-        throw new Error("Tài khoản không phải là chủ shop");
-      }
-
-      // Lưu token và user data với key RIÊNG cho shop
-      localStorage.setItem("shop_token", data.access_token);
-      localStorage.setItem("shop_data", JSON.stringify(data.user));
-      
-      // Lưu thông tin shop nếu có
-      if (data.shop) {
-        localStorage.setItem("shop_info", JSON.stringify(data.shop));
-      }
-
-      showToast("Đăng nhập vào trang quản lý shop thành công!", "success");
-      
-      setTimeout(() => {
-        navigate("/shop/dashboard");
-      }, 1500);
-
-    } catch (err) {
-      setError(err.message);
-      showToast(err.message, "error");
-    } finally {
-      setLoading(false);
+    // Kiểm tra response status
+    if (response.status !== 200) {
+      throw new Error(data.detail || "Đăng nhập thất bại");
     }
-  };
+
+    // Kiểm tra role có phải shop_owner không
+    if (data.user && data.user.role !== "shop_owner") {
+      throw new Error("Tài khoản không phải là chủ shop");
+    }
+
+    // Lưu token và user data
+    localStorage.setItem("shop_token", data.access_token);
+    localStorage.setItem("shop_data", JSON.stringify(data.user));
+    
+    if (data.shop) {
+      localStorage.setItem("shop_info", JSON.stringify(data.shop));
+    }
+
+    showToast("Đăng nhập thành công!", "success");
+    
+    setTimeout(() => {
+      navigate("/shop/dashboard");
+    }, 1500);
+
+  } catch (err) {
+    console.error("Login error:", err);
+    const errorMessage = err.response?.data?.detail || err.message || "Đăng nhập thất bại";
+    setError(errorMessage);
+    showToast(errorMessage, "error");
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Hàm đăng nhập demo
   const handleDemoLogin = () => {

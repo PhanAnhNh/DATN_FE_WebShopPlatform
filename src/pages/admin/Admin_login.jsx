@@ -27,45 +27,47 @@ function AdminLogin() {
   };
 
   const handleLogin = async (e) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
+  e.preventDefault();
+  setError("");
+  setLoading(true);
 
-    try {
-       const response = await adminApi.post("/api/v1/admin/login", {
-        login_identifier: username,
-        password: password
-      });
+  try {
+    const response = await adminApi.post("/api/v1/admin/login", {
+      login_identifier: username,
+      password: password
+    });
 
-      const data = await response.json();
-      console.log("Admin login response:", data);
+    // ✅ Axios trả về data ở response.data
+    const data = response.data;
+    console.log("Admin login response:", data);
 
-      if (!response.ok) {
-        throw new Error(data.detail || "Đăng nhập thất bại");
-      }
-
-      // Kiểm tra role
-      if (data.user && data.user.role !== "admin") {
-        throw new Error("Tài khoản không phải là admin");
-      }
-
-      // Lưu token với key RIÊNG cho admin
-      localStorage.setItem("admin_token", data.access_token);
-      localStorage.setItem("admin_data", JSON.stringify(data.user));
-
-      showToast("Đăng nhập Admin thành công!", "success");
-      
-      setTimeout(() => {
-        navigate("/admin/dashboard");
-      }, 1500);
-
-    } catch (err) {
-      setError(err.message);
-      showToast(err.message, "error");
-    } finally {
-      setLoading(false);
+    if (response.status !== 200) {
+      throw new Error(data.detail || "Đăng nhập thất bại");
     }
-  };
+
+    // Kiểm tra role
+    if (data.user && data.user.role !== "admin") {
+      throw new Error("Tài khoản không phải là admin");
+    }
+
+    localStorage.setItem("admin_token", data.access_token);
+    localStorage.setItem("admin_data", JSON.stringify(data.user));
+
+    showToast("Đăng nhập Admin thành công!", "success");
+    
+    setTimeout(() => {
+      navigate("/admin/dashboard");
+    }, 1500);
+
+  } catch (err) {
+    console.error("Login error:", err);
+    const errorMessage = err.response?.data?.detail || err.message || "Đăng nhập thất bại";
+    setError(errorMessage);
+    showToast(errorMessage, "error");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleDemoLogin = () => {
     setUsername("admin");
