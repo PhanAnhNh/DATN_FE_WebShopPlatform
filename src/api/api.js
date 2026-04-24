@@ -1,53 +1,62 @@
-// src/api/api.js
 import axios from 'axios';
-import {BACKEND_URL} from '../config' 
+import { BACKEND_URL } from '../config';
 
 const ensureHttps = (url) => {
-  if (url && url.startsWith('http://')) {
-    console.warn(`⚠️ Converting HTTP to HTTPS: ${url}`);
-    return url.replace('http://', 'https://');
+  if (!url) return url;
+  if (url.startsWith('http://')) {
+    const httpsUrl = url.replace('http://', 'https://');
+    console.warn(`⚠️ Converting HTTP to HTTPS: ${url} -> ${httpsUrl}`);
+    return httpsUrl;
   }
   return url;
 };
 
+// ✅ QUAN TRỌNG: DÙNG secureBackendUrl cho tất cả instances
 const secureBackendUrl = ensureHttps(BACKEND_URL);
+console.log('🔐 API Base URL:', secureBackendUrl);
 
-const api = axios.create({
-  baseURL: BACKEND_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Tạo các instance riêng biệt
+// Tạo các instance với URL đã được secure
 export const userApi = axios.create({
-  baseURL: BACKEND_URL,
+  baseURL: secureBackendUrl,  // ← SỬA: DÙNG secureBackendUrl
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: false,
 });
 
 export const shopApi = axios.create({
-  baseURL: BACKEND_URL,
+  baseURL: secureBackendUrl,  // ← SỬA
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: false,
 });
 
 export const adminApi = axios.create({
-  baseURL: BACKEND_URL,
+  baseURL: secureBackendUrl,  // ← SỬA
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: false,
 });
 
-// Interceptor cho userApi
+// Interceptor để đảm bảo URL luôn là HTTPS
 userApi.interceptors.request.use(
   (config) => {
+    // Kiểm tra và sửa URL nếu cần
+    if (config.baseURL?.startsWith('http://')) {
+      config.baseURL = config.baseURL.replace('http://', 'https://');
+    }
+    if (config.url?.startsWith('http://')) {
+      config.url = config.url.replace('http://', 'https://');
+    }
+    
     const token = localStorage.getItem('user_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    console.log('📡 Request URL:', config.baseURL + config.url);
     return config;
   },
   (error) => Promise.reject(error)
