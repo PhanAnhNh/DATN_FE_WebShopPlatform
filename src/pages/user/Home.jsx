@@ -203,6 +203,28 @@ function Home() {
         }
     }, [posts, currentUser]);
 
+    useEffect(() => {
+    // Set title dựa trên category hiện tại
+    if (category === "general") {
+        document.title = "Trang chủ | Tên Website Của Bạn";
+    } else {
+        // Nếu có category cụ thể
+        const categoryNames = {
+            "agriculture": "Nông sản",
+            "seafood": "Hải sản", 
+            "specialty": "Đặc sản"
+        };
+        const categoryName = categoryNames[category] || category;
+        document.title = `${categoryName} | Tên Website Của Bạn`;
+    }
+    
+    // Cleanup function (không bắt buộc nhưng tốt để dọn dẹp)
+    return () => {
+        // Có thể reset về title mặc định nếu cần
+         document.title = "Home";
+    };
+}, [category]);
+
     const handleOpenShare = (post) => {
         setSharePost(post);
         setShowShareModal(true);
