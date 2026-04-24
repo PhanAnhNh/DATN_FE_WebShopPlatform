@@ -215,7 +215,7 @@ function Home() {
             "specialty": "Đặc sản"
         };
         const categoryName = categoryNames[category] || category;
-        document.title = `${categoryName} | Tên Website Của Bạn`;
+        document.title = `${categoryName}`;
     }
     
     // Cleanup function (không bắt buộc nhưng tốt để dọn dẹp)
