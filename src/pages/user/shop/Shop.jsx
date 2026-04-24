@@ -54,7 +54,7 @@ const ShopPage = () => {
         }
     };
 
-const fetchHotProducts = async () => {
+    const fetchHotProducts = async () => {
     try {
         const cachedHot = sessionStorage.getItem('shop_hotProducts');
         const cacheTime = sessionStorage.getItem('shop_full_cache_timestamp');
@@ -67,15 +67,14 @@ const fetchHotProducts = async () => {
             return;
         }
 
-        // 👈 THAY ĐỔI: DÙNG api THAY VÌ userApi
-        const res = await api.get("/api/v1/products/hot", {
+        // ✅ DÙNG userApi (có baseURL và interceptor)
+        const res = await userApi.get("/api/v1/products/hot", {
             params: { limit: 3 }
         });
         
-        console.log("🔥 [api - no token] Full response:", res);
-        console.log("🔥 [api - no token] Response data:", res.data);
+        console.log("🔥 API Response:", res.data);
 
-        // Logic lấy mảng sản phẩm (giữ nguyên)
+        // Xử lý response (giữ nguyên logic cũ)
         let productsData = null;
         if (Array.isArray(res.data)) {
             productsData = res.data;
@@ -100,15 +99,14 @@ const fetchHotProducts = async () => {
             sold_quantity: product.sold_quantity || 0
         }));
         
-        console.log("🔥 Formatted hot products:", formatted);
         setHotProducts(formatted);
         sessionStorage.setItem('shop_hotProducts', JSON.stringify(formatted));
         
     } catch (error) {
-        console.error("❌ Error fetching hot products with api:", error);
+        console.error("❌ Error fetching hot products:", error);
         if (error.response) {
-            console.error("Response status:", error.response.status);
-            console.error("Response data:", error.response.data);
+            console.error("Status:", error.response.status);
+            console.error("Data:", error.response.data);
         }
         setHotProducts([]);
     }
