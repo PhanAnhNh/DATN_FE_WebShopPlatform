@@ -1,5 +1,3 @@
-// ShopPage.jsx - ĐÃ THÊM SẢN PHẨM HOT
-
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Layout from "../../../components/layout/Layout";
@@ -13,8 +11,8 @@ const ShopPage = () => {
     const [selectedSubCategory, setSelectedSubCategory] = useState("");
     const [priceRange, setPriceRange] = useState({ from: "", to: "" });
     const [featuredProducts, setFeaturedProducts] = useState([]);
-    const [hotProducts, setHotProducts] = useState([]); // 👈 THÊM STATE MỚI
-    const [featuredShops, setFeaturedShops] = useState([]);
+    const [hotProducts, setHotProducts] = useState([]);
+    const [allShops, setAllShops] = useState([]); // 👈 ĐỔI TÊN từ featuredShops thành allShops
     const [provinces, setProvinces] = useState([]);
     const [loading, setLoading] = useState(true);
     const [imageErrors, setImageErrors] = useState({});
@@ -55,68 +53,66 @@ const ShopPage = () => {
     };
 
     const fetchHotProducts = async () => {
-    try {
-        const cachedHot = sessionStorage.getItem('shop_hotProducts');
-        const cacheTime = sessionStorage.getItem('shop_full_cache_timestamp');
-        const now = Date.now();
-        const isCacheValid = cacheTime && (now - parseInt(cacheTime) < 300000);
+        try {
+            const cachedHot = sessionStorage.getItem('shop_hotProducts');
+            const cacheTime = sessionStorage.getItem('shop_full_cache_timestamp');
+            const now = Date.now();
+            const isCacheValid = cacheTime && (now - parseInt(cacheTime) < 300000);
 
-        if (cachedHot && isCacheValid) {
-            setHotProducts(JSON.parse(cachedHot));
-            console.log("✅ Loaded hot products from cache");
-            return;
-        }
+            if (cachedHot && isCacheValid) {
+                setHotProducts(JSON.parse(cachedHot));
+                console.log("✅ Loaded hot products from cache");
+                return;
+            }
 
-        // ✅ DÙNG userApi (có baseURL và interceptor)
-        const res = await userApi.get("/api/v1/products/hot/", {
-            params: { limit: 3 }
-        });
-        
-        console.log("🔥 API Response:", res.data);
+            const res = await userApi.get("/api/v1/products/hot/", {
+                params: { limit: 3 }
+            });
+            
+            console.log("🔥 API Response:", res.data);
 
-        // Xử lý response (giữ nguyên logic cũ)
-        let productsData = null;
-        if (Array.isArray(res.data)) {
-            productsData = res.data;
-        } else if (res.data && Array.isArray(res.data.data)) {
-            productsData = res.data.data;
-        } else if (res.data && Array.isArray(res.data.products)) {
-            productsData = res.data.products;
-        } else {
-            console.error("❌ Unexpected data structure:", res.data);
+            let productsData = null;
+            if (Array.isArray(res.data)) {
+                productsData = res.data;
+            } else if (res.data && Array.isArray(res.data.data)) {
+                productsData = res.data.data;
+            } else if (res.data && Array.isArray(res.data.products)) {
+                productsData = res.data.products;
+            } else {
+                console.error("❌ Unexpected data structure:", res.data);
+                setHotProducts([]);
+                return;
+            }
+
+            const formatted = productsData.map(product => ({
+                id: product.id || product._id,
+                name: product.name,
+                price: product.price,
+                unit: product.unit || "kg",
+                shop_name: product.shop_name || product.shop?.name || "Cửa hàng",
+                image: product.image_url || product.image || "https://via.placeholder.com/300?text=No+Image",
+                fallbackIcon: "🔥",
+                sold_quantity: product.sold_quantity || 0
+            }));
+            
+            setHotProducts(formatted);
+            sessionStorage.setItem('shop_hotProducts', JSON.stringify(formatted));
+            
+        } catch (error) {
+            console.error("❌ Error fetching hot products:", error);
+            if (error.response) {
+                console.error("Status:", error.response.status);
+                console.error("Data:", error.response.data);
+            }
             setHotProducts([]);
-            return;
         }
-
-        const formatted = productsData.map(product => ({
-            id: product.id || product._id,
-            name: product.name,
-            price: product.price,
-            unit: product.unit || "kg",
-            shop_name: product.shop_name || product.shop?.name || "Cửa hàng",
-            image: product.image_url || product.image || "https://via.placeholder.com/300?text=No+Image",
-            fallbackIcon: "🔥",
-            sold_quantity: product.sold_quantity || 0
-        }));
-        
-        setHotProducts(formatted);
-        sessionStorage.setItem('shop_hotProducts', JSON.stringify(formatted));
-        
-    } catch (error) {
-        console.error("❌ Error fetching hot products:", error);
-        if (error.response) {
-            console.error("Status:", error.response.status);
-            console.error("Data:", error.response.data);
-        }
-        setHotProducts([]);
-    }
-};
+    };
 
     // Hàm đọc cache đầy đủ khi component mount
     const loadFullCache = () => {
         const cachedProducts = sessionStorage.getItem('shop_featuredProducts');
-        const cachedHot = sessionStorage.getItem('shop_hotProducts'); // 👈 THÊM
-        const cachedShops = sessionStorage.getItem('shop_featuredShops');
+        const cachedHot = sessionStorage.getItem('shop_hotProducts');
+        const cachedShops = sessionStorage.getItem('shop_allShops'); // 👈 SỬA TÊN KEY
         const cacheTime = sessionStorage.getItem('shop_full_cache_timestamp');
         const cachedCategory = sessionStorage.getItem('shop_activeCategory');
         const cachedSubCategory = sessionStorage.getItem('shop_selectedSubCategory');
@@ -137,7 +133,6 @@ const ShopPage = () => {
             }
         }
         
-        // 👈 THÊM: Load hot products từ cache
         if (cachedHot && isCacheValid) {
             try {
                 setHotProducts(JSON.parse(cachedHot));
@@ -150,7 +145,7 @@ const ShopPage = () => {
         
         if (cachedShops && isCacheValid) {
             try {
-                setFeaturedShops(JSON.parse(cachedShops));
+                setAllShops(JSON.parse(cachedShops));
                 hasValidCache = true;
                 console.log("✅ Loaded shops from cache");
             } catch (e) {
@@ -180,11 +175,11 @@ const ShopPage = () => {
         if (featuredProducts.length > 0) {
             sessionStorage.setItem('shop_featuredProducts', JSON.stringify(featuredProducts));
         }
-        if (hotProducts.length > 0) { // 👈 THÊM
+        if (hotProducts.length > 0) {
             sessionStorage.setItem('shop_hotProducts', JSON.stringify(hotProducts));
         }
-        if (featuredShops.length > 0) {
-            sessionStorage.setItem('shop_featuredShops', JSON.stringify(featuredShops));
+        if (allShops.length > 0) { // 👈 SỬA
+            sessionStorage.setItem('shop_allShops', JSON.stringify(allShops));
         }
         sessionStorage.setItem('shop_activeCategory', activeCategory);
         sessionStorage.setItem('shop_selectedSubCategory', selectedSubCategory);
@@ -194,16 +189,16 @@ const ShopPage = () => {
 
     // Effect để lưu cache khi có thay đổi dữ liệu
     useEffect(() => {
-        if (!isInitialLoad && (featuredProducts.length > 0 || hotProducts.length > 0 || featuredShops.length > 0)) {
+        if (!isInitialLoad && (featuredProducts.length > 0 || hotProducts.length > 0 || allShops.length > 0)) {
             saveFullCache();
         }
-    }, [featuredProducts, hotProducts, featuredShops, activeCategory, selectedSubCategory, priceRange]);
+    }, [featuredProducts, hotProducts, allShops, activeCategory, selectedSubCategory, priceRange]);
 
     // Effect chính - load dữ liệu khi mount
     useEffect(() => {
         const hasCache = loadFullCache();
         
-        if (hasCache && (featuredProducts.length > 0 || hotProducts.length > 0 || featuredShops.length > 0)) {
+        if (hasCache && (featuredProducts.length > 0 || hotProducts.length > 0 || allShops.length > 0)) {
             console.log("Using cached data - no API calls made");
             setLoading(false);
             setIsInitialLoad(false);
@@ -215,8 +210,8 @@ const ShopPage = () => {
 
     // Khi có location thay đổi
     useEffect(() => {
-        if (location && isInitialLoad === false && featuredShops.length === 0) {
-            fetchNearbyShops();
+        if (location && isInitialLoad === false && allShops.length === 0) {
+            fetchAllShops(); // 👈 GỌI HÀM MỚI
         }
     }, [location]);
 
@@ -245,15 +240,16 @@ const ShopPage = () => {
             setFeaturedProducts(products);
             console.log("✅ Loaded products from API:", products.length);
             
-            // 👈 THÊM: Fetch sản phẩm hot
             await fetchHotProducts();
             
             // Fetch shops nếu có location
             if (location) {
-                await fetchNearbyShops();
+                await fetchAllShops(); // 👈 GỌI HÀM MỚI
+            } else {
+                // Nếu chưa có location, vẫn fetch tất cả shop (không có distance)
+                await fetchAllShopsWithoutLocation();
             }
             
-            // Lưu cache timestamp
             sessionStorage.setItem('shop_full_cache_timestamp', Date.now().toString());
             
         } catch (error) {
@@ -265,57 +261,107 @@ const ShopPage = () => {
         }
     };
 
-    const fetchNearbyShops = async () => {
-        if (!location) return;
-        
+    // 👈 HÀM MỚI: Fetch tất cả shop (có tính khoảng cách nếu có location)
+    const fetchAllShops = async () => {
         setNearbyLoading(true);
         try {
-            const locationKey = `${location.lat}_${location.lng}`;
-            const cachedShopsWithLocation = sessionStorage.getItem(`shop_nearby_${locationKey}`);
+            const locationKey = location ? `${location.lat}_${location.lng}` : 'no_location';
+            const cachedShops = sessionStorage.getItem(`shop_all_${locationKey}`);
             const cacheTime = sessionStorage.getItem('shop_full_cache_timestamp');
             const now = Date.now();
             const isCacheValid = cacheTime && (now - parseInt(cacheTime) < 300000);
             
-            if (cachedShopsWithLocation && isCacheValid) {
-                setFeaturedShops(JSON.parse(cachedShopsWithLocation));
-                console.log("✅ Loaded nearby shops from cache");
+            if (cachedShops && isCacheValid) {
+                setAllShops(JSON.parse(cachedShops));
+                console.log("✅ Loaded all shops from cache");
                 setNearbyLoading(false);
                 return;
             }
             
+            // Gọi API lấy danh sách tất cả shop (hoặc shop trong bán kính lớn)
             const res = await userApi.get("/api/v1/shops/nearby", {
-                params: {
+                params: location ? {
                     lat: location.lat,
                     lng: location.lng,
-                    radius_km: 10,
-                    limit: 20
+                    radius_km: 100, // Tăng bán kính lên 100km để lấy nhiều shop hơn
+                    limit: 100
+                } : {
+                    limit: 100
                 }
             });
             
-            console.log("Nearby shops response:", res.data);
+            console.log("All shops response:", res.data);
             
-            const formatted = (res.data.data || []).map(shop => ({
+            let shops = (res.data.data || []);
+            
+            // Format và sắp xếp theo khoảng cách (gần lên trước)
+            const formatted = shops.map(shop => ({
                 id: shop._id || shop.id,
                 name: shop.name,
+                address: shop.address || shop.location?.address || "Đang cập nhật", // 👈 THÊM địa chỉ
                 rating: shop.rating || 4.5,
-                distance_km: shop.distance_km,
-                distance_text: shop.distance_km < 1 
-                    ? `${Math.round(shop.distance_km * 1000)}m` 
-                    : `${shop.distance_km.toFixed(1)}km`,
+                distance_km: shop.distance_km || null,
+                distance_text: shop.distance_km ? (
+                    shop.distance_km < 1 
+                        ? `${Math.round(shop.distance_km * 1000)}m` 
+                        : `${shop.distance_km.toFixed(1)}km`
+                ) : null,
                 avatar: shop.logo_url,
                 banner_url: shop.banner_url,
                 cover_image: shop.banner_url || "https://via.placeholder.com/300x160?text=Shop"
             }));
             
-            console.log("Formatted shops:", formatted);
-            setFeaturedShops(formatted);
+            // Sắp xếp: shop có distance_km (gần) lên trước, sau đó đến shop không có distance
+            const sortedShops = formatted.sort((a, b) => {
+                if (a.distance_km === null && b.distance_km === null) return 0;
+                if (a.distance_km === null) return 1;
+                if (b.distance_km === null) return -1;
+                return a.distance_km - b.distance_km;
+            });
             
-            sessionStorage.setItem(`shop_nearby_${locationKey}`, JSON.stringify(formatted));
+            console.log("Formatted and sorted shops:", sortedShops);
+            setAllShops(sortedShops);
+            
+            sessionStorage.setItem(`shop_all_${locationKey}`, JSON.stringify(sortedShops));
             
         } catch (error) {
-            console.error("Lỗi lấy shop gần đây:", error);
+            console.error("Lỗi lấy danh sách shop:", error);
+            // Nếu lỗi, thử fetch không có location
+            await fetchAllShopsWithoutLocation();
         } finally {
             setNearbyLoading(false);
+        }
+    };
+
+    // 👈 HÀM MỚI: Fetch tất cả shop khi chưa có location (không tính khoảng cách)
+    const fetchAllShopsWithoutLocation = async () => {
+        try {
+            const res = await userApi.get("/api/v1/shops/", {
+                params: { limit: 100 }
+            });
+            
+            console.log("All shops without location response:", res.data);
+            
+            const shopsData = res.data.data || res.data || [];
+            const formatted = shopsData.map(shop => ({
+                id: shop._id || shop.id,
+                name: shop.name,
+                address: shop.address || shop.location?.address || "Đang cập nhật",
+                rating: shop.rating || 4.5,
+                distance_km: null,
+                distance_text: null,
+                avatar: shop.logo_url,
+                banner_url: shop.banner_url,
+                cover_image: shop.banner_url || "https://via.placeholder.com/300x160?text=Shop"
+            }));
+            
+            setAllShops(formatted);
+            
+            sessionStorage.setItem(`shop_all_no_location`, JSON.stringify(formatted));
+            
+        } catch (error) {
+            console.error("Lỗi lấy danh sách shop (không location):", error);
+            setAllShops([]);
         }
     };
 
@@ -392,7 +438,6 @@ const ShopPage = () => {
 
     const isLoadingShops = nearbyLoading || (locationLoading && !location);
 
-    // 👈 Xác định sản phẩm hiển thị: ưu tiên hot products, nếu không có thì dùng featured
     const displayProducts = hotProducts.length > 0 ? hotProducts : featuredProducts.slice(0, 3);
 
     return (
@@ -521,7 +566,7 @@ const ShopPage = () => {
                 <div style={{ display: "flex", gap: "20px" }}>
                     {/* Nội dung chính bên phải */}
                     <div style={{ flex: 1 }}>
-                        {/* 👈 SẢN PHẨM HOT - BÁN CHẠY NHẤT */}
+                        {/* SẢN PHẨM HOT - BÁN CHẠY NHẤT */}
                         <div style={{
                             background: "white",
                             borderRadius: "12px",
@@ -568,7 +613,6 @@ const ShopPage = () => {
                                             onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-4px)"}
                                             onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}
                                         >
-                                            {/* 👈 Badge xếp hạng */}
                                             <div style={{
                                                 position: "absolute",
                                                 top: "-10px",
@@ -608,7 +652,6 @@ const ShopPage = () => {
                                                 {product.shop_name}
                                             </div>
                                             
-                                            {/* 👈 Hiển thị số lượng đã bán */}
                                             {product.sold_quantity !== undefined && (
                                                 <div style={{ 
                                                     fontSize: "11px", 
@@ -625,20 +668,18 @@ const ShopPage = () => {
                             </div>
                         </div>
 
-                        {/* Danh sách shop gần bạn */}
+                        {/* 👈 DANH SÁCH TẤT CẢ CỬA HÀNG (đã sửa theo yêu cầu) */}
                         <div style={{
                             background: "white",
                             borderRadius: "12px",
                             padding: "20px",
                             boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
                         }}>
-                            <h3 style={{ margin: "0 0 15px 0", fontSize: "18px", color: "#333" }}>Shop gần bạn</h3>
+                            <h3 style={{ margin: "0 0 15px 0", fontSize: "18px", color: "#333" }}>
+                                🏪 Danh sách cửa hàng
+                            </h3>
                             
-                            {!location && !locationLoading ? (
-                                <div style={{ textAlign: "center", padding: "40px", color: "#999" }}>
-                                    🌍 Cho phép truy cập vị trí để xem shop gần bạn
-                                </div>
-                            ) : isLoadingShops ? (
+                            {isLoadingShops && allShops.length === 0 ? (
                                 <div style={{ textAlign: "center", padding: "40px" }}>
                                     <div style={{ 
                                         width: "30px", 
@@ -649,7 +690,7 @@ const ShopPage = () => {
                                         animation: "spin 1s linear infinite",
                                         margin: "0 auto 10px"
                                     }}></div>
-                                    <p>Đang tìm shop gần bạn...</p>
+                                    <p>Đang tải danh sách cửa hàng...</p>
                                     <style>{`
                                         @keyframes spin {
                                             0% { transform: rotate(0deg); }
@@ -657,9 +698,9 @@ const ShopPage = () => {
                                         }
                                     `}</style>
                                 </div>
-                            ) : featuredShops.length === 0 ? (
+                            ) : allShops.length === 0 ? (
                                 <div style={{ textAlign: "center", padding: "40px", color: "#999" }}>
-                                    🏪 Không tìm thấy shop nào trong bán kính 10km
+                                    🏪 Không tìm thấy cửa hàng nào
                                 </div>
                             ) : (
                                 <div style={{
@@ -667,66 +708,106 @@ const ShopPage = () => {
                                     gridTemplateColumns: "repeat(3, 1fr)",
                                     gap: "20px"
                                 }}>
-                                    {featuredShops.map(shop => (
-                                        <div
-                                            key={shop.id}
-                                            style={{
-                                                background: "white",
-                                                borderRadius: "16px",
-                                                overflow: "hidden",
-                                                boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-                                                cursor: "pointer",
-                                                transition: "0.3s"
-                                            }}
-                                            onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-5px)"}
-                                            onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}
-                                        >
-                                            <div style={{
-                                                height: "160px",
-                                                backgroundImage: `url(${shop.banner_url || shop.cover_image || "https://via.placeholder.com/300x160?text=Shop"})`,
-                                                backgroundSize: "cover",
-                                                backgroundPosition: "center",
-                                                backgroundColor: "#f5f5f5"
-                                            }} />
+                                    {allShops.map(shop => {
+                                        // Kiểm tra xem có hiển thị khoảng cách không (chỉ hiển thị nếu distance_km <= 10)
+                                        const showDistance = shop.distance_km !== null && shop.distance_km <= 10;
+                                        
+                                        return (
+                                            <div
+                                                key={shop.id}
+                                                style={{
+                                                    background: "white",
+                                                    borderRadius: "16px",
+                                                    overflow: "hidden",
+                                                    boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                                                    cursor: "pointer",
+                                                    transition: "0.3s"
+                                                }}
+                                                onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-5px)"}
+                                                onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}
+                                            >
+                                                <div style={{
+                                                    height: "160px",
+                                                    backgroundImage: `url(${shop.banner_url || shop.cover_image || "https://via.placeholder.com/300x160?text=Shop"})`,
+                                                    backgroundSize: "cover",
+                                                    backgroundPosition: "center",
+                                                    backgroundColor: "#f5f5f5"
+                                                }} />
 
-                                            <div style={{ padding: "15px" }}>
-                                                <div style={{ fontWeight: "bold", fontSize: "16px", whiteSpace: "nowrap",
+                                                <div style={{ padding: "15px" }}>
+                                                    <div style={{ 
+                                                        fontWeight: "bold", 
+                                                        fontSize: "16px", 
+                                                        whiteSpace: "nowrap",
                                                         overflow: "hidden",
                                                         textOverflow: "ellipsis",
-                                                        maxWidth: "100%" }}>
-                                                    {shop.name}
-                                                </div>
+                                                        maxWidth: "100%" 
+                                                    }}>
+                                                        {shop.name}
+                                                    </div>
 
-                                                <div style={{ marginTop: "8px", color: "#f5b042" }}>
-                                                    ⭐ {shop.rating}
-                                                </div>
+                                                    {/* 👈 HIỂN THỊ ĐỊA CHỈ */}
+                                                    <div style={{ 
+                                                        marginTop: "8px", 
+                                                        color: "#666", 
+                                                        fontSize: "13px",
+                                                        display: "flex",
+                                                        alignItems: "flex-start", // Đổi từ center thành flex-start
+                                                        gap: "4px"
+                                                    }}>
+                                                        <span>📍</span>
+                                                        <span style={{ 
+                                                            wordBreak: "break-word", 
+                                                            whiteSpace: "normal",
+                                                            lineHeight: "1.4",
+                                                            display: "-webkit-box",
+                                                            WebkitLineClamp: 1, // Giới hạn 1 dòng
+                                                            WebkitBoxOrient: "vertical",
+                                                            overflow: "hidden",
+                                                            textOverflow: "ellipsis"
+                                                        }}>
+                                                            {shop.address}
+                                                        </span>
+                                                    </div>
 
-                                                <div style={{ color: "#666", fontSize: "14px", marginTop: "5px" }}>
-                                                    <div>📍 Cách bạn: <strong>{shop.distance_text || "Đang tính..."}</strong></div>
-                                                    {shop.duration_min && (
-                                                        <div>⏱️ Ước tính: <strong>{shop.duration_min} phút</strong></div>
+                                                    <div style={{ marginTop: "5px", color: "#f5b042" }}>
+                                                        ⭐ {shop.rating}
+                                                    </div>
+
+                                                    {/* 👈 CHỈ HIỂN THỊ KHOẢNG CÁCH NẾU <= 10KM */}
+                                                    {showDistance && (
+                                                        <div style={{ color: "#4CAF50", fontSize: "14px", marginTop: "5px", fontWeight: "500" }}>
+                                                            🚗 Cách bạn: <strong>{shop.distance_text}</strong>
+                                                        </div>
                                                     )}
-                                                </div>
+                                                    
+                                                    {/* 👈 NẾU CÓ KHOẢNG CÁCH NHƯNG > 10KM, KHÔNG HIỂN THỊ GÌ THÊM */}
+                                                    {shop.distance_km !== null && shop.distance_km > 10 && (
+                                                        <div style={{ color: "#999", fontSize: "12px", marginTop: "5px", fontStyle: "italic" }}>
+                                                            (Xa hơn 10km)
+                                                        </div>
+                                                    )}
 
-                                                <button
-                                                    style={{
-                                                        marginTop: "12px",
-                                                        width: "100%",
-                                                        padding: "10px",
-                                                        borderRadius: "20px",
-                                                        background: "#4CAF50",
-                                                        color: "white",
-                                                        border: "none",
-                                                        fontWeight: "bold",
-                                                        cursor: "pointer"
-                                                    }}
-                                                    onClick={() => handleShopClick(shop.id)}
-                                                >
-                                                    Xem cửa hàng
-                                                </button>
+                                                    <button
+                                                        style={{
+                                                            marginTop: "12px",
+                                                            width: "100%",
+                                                            padding: "10px",
+                                                            borderRadius: "20px",
+                                                            background: "#4CAF50",
+                                                            color: "white",
+                                                            border: "none",
+                                                            fontWeight: "bold",
+                                                            cursor: "pointer"
+                                                        }}
+                                                        onClick={() => handleShopClick(shop.id)}
+                                                    >
+                                                        Xem cửa hàng
+                                                    </button>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>
