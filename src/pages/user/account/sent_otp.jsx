@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import Toast from '../../../components/common/Toast';
 import { BACKEND_URL } from '../../../config'
+import { userApi } from '../../api/api';
 
 function VerifyOTP() {
   const [otpCode, setOtpCode] = useState(["", "", "", "", "", ""]);
@@ -160,20 +161,12 @@ function VerifyOTP() {
     setLoading(true);
     
     try {
-      const response = await fetch("http://localhost:8000/api/v1/password/forgot-password", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email }),
+      // ✅ Dùng API instance thay vì fetch
+      const response = await userApi.post("/password/forgot-password", {
+        email: email
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || "Có lỗi xảy ra");
-      }
-
+      // response.data đã được axios parse sẵn
       showToast("Đã gửi lại mã OTP mới!", "success");
       
       setTimeLeft(300);
@@ -191,15 +184,16 @@ function VerifyOTP() {
         });
       }, 1000);
       
-      // Focus vào ô đầu tiên
       inputRefs.current[0]?.focus();
       
     } catch (err) {
-      showToast(err.message, "error");
+      // Axios error handling
+      const message = err.response?.data?.detail || err.message || "Có lỗi xảy ra";
+      showToast(message, "error");
     } finally {
       setLoading(false);
     }
-  };
+};
 
   return (
     <div style={styles.container}>
