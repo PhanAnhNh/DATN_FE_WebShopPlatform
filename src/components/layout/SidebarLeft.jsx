@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import api from "../../api/api";
+import Toast from "../../components/common/Toast"; // Import Toast component
 
 function SidebarLeft({ userProfile = null }) {
     const [user, setUser] = useState(() => {
@@ -34,6 +35,9 @@ function SidebarLeft({ userProfile = null }) {
     const [isEditing, setIsEditing] = useState(false);
     const [editData, setEditData] = useState({});
     const [loading, setLoading] = useState(false);
+    
+    // Thêm state cho toast
+    const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
     const location = useLocation();
     const navigate = useNavigate();
@@ -43,6 +47,15 @@ function SidebarLeft({ userProfile = null }) {
     const isProfilePage = location.pathname === "/profile"; 
     const isUserProfilePage = location.pathname.startsWith("/profile/");
     const currentCategory = searchParams.get("category") || "general";
+
+    // Helper function để hiển thị toast
+    const showToast = (message, type = 'success') => {
+        setToast({ show: true, message, type });
+    };
+
+    const closeToast = () => {
+        setToast({ show: false, message: '', type: 'success' });
+    };
 
     // Lưu cache khi user thay đổi
     useEffect(() => {
@@ -82,6 +95,7 @@ function SidebarLeft({ userProfile = null }) {
                 setEditData(res.data);
             } catch (error) {
                 console.error("Lỗi khi lấy thông tin cá nhân:", error);
+                showToast("Không thể tải thông tin cá nhân", "error");
             }
         };
 
@@ -108,13 +122,14 @@ function SidebarLeft({ userProfile = null }) {
     const handleSave = async () => {
         setLoading(true);
         try {
-            const res = await api.put("/api/v1/auth/update", editData);
-            setUser(res.data);
+            const res = await api.put("/api/v1/auth/update-profile", editData);
+            setUser(res.data.user);
             setIsEditing(false);
-            alert("Cập nhật thành công!");
+            showToast("Cập nhật thành công!", "success");
         } catch (error) {
             console.error("Lỗi cập nhật:", error);
-            alert("Không thể lưu thông tin. Vui lòng thử lại.");
+            const errorMessage = error.response?.data?.detail || "Không thể lưu thông tin. Vui lòng thử lại.";
+            showToast(errorMessage, "error");
         } finally {
             setLoading(false);
         }
@@ -217,6 +232,15 @@ function SidebarLeft({ userProfile = null }) {
 
     return (
         <div style={{ width: "280px", flexShrink: 0, fontFamily: "Segoe UI, Tahoma, Geneva, Verdana, sans-serif" }}>
+            {/* Toast Notification */}
+            {toast.show && (
+                <Toast 
+                    message={toast.message} 
+                    type={toast.type} 
+                    onClose={closeToast} 
+                />
+            )}
+
             {shouldShowProfileInfo ? (
                 <div style={cardStyle}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px" }}>
@@ -264,6 +288,16 @@ function SidebarLeft({ userProfile = null }) {
                             <label style={labelStyle}>Họ và tên</label>
                             <input style={inputStyle} name="full_name" value={editData.full_name || ""} onChange={handleChange} placeholder="Nhập họ tên..." />
                             
+                            <label style={labelStyle}>Email</label>
+                            <input 
+                                style={inputStyle} 
+                                name="email" 
+                                value={editData.email || ""} 
+                                onChange={handleChange} 
+                                placeholder="Nhập email..."
+                                type="email"
+                            />
+
                             <label style={labelStyle}>Giới tính</label>
                             <select style={inputStyle} name="gender" value={editData.gender || ""} onChange={handleChange}>
                                 <option value="">Chọn giới tính</option>
@@ -276,10 +310,10 @@ function SidebarLeft({ userProfile = null }) {
                             <input type="date" style={inputStyle} name="dob" value={editData.dob ? editData.dob.split('T')[0] : ""} onChange={handleChange} />
 
                             <label style={labelStyle}>Số điện thoại</label>
-                            <input style={inputStyle} name="phone" value={editData.phone || ""} onChange={handleChange} />
+                            <input style={inputStyle} name="phone" value={editData.phone || ""} onChange={handleChange} placeholder="Nhập số điện thoại..." />
 
                             <label style={labelStyle}>Địa chỉ</label>
-                            <input style={inputStyle} name="address" value={editData.address || ""} onChange={handleChange} />
+                            <input style={inputStyle} name="address" value={editData.address || ""} onChange={handleChange} placeholder="Nhập địa chỉ..." />
 
                             <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
                                 <button 
