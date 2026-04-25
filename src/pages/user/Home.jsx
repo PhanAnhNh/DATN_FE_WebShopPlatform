@@ -206,7 +206,7 @@ function Home() {
     useEffect(() => {
     // Set title dựa trên category hiện tại
     if (category === "general") {
-        document.title = "Trang chủ | Tên Website Của Bạn";
+        document.title = "Trang chủ";
     } else {
         // Nếu có category cụ thể
         const categoryNames = {
