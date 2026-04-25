@@ -25,6 +25,7 @@ import {
 } from 'react-icons/fa';
 import api from '../../../api/api';
 import ShopDetailLayout from "../../../components/layout/ShopDetailLayout";
+import Toast from '../../../components/common/Toast'; // Import Toast component
 import "../../../css/orderDetail.css";
 
 const OrderDetail = () => {
@@ -34,7 +35,10 @@ const OrderDetail = () => {
   const [order, setOrder] = useState(null);
   const [cancelling, setCancelling] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
-  const [returnInfo, setReturnInfo] = useState(null); // Thêm state để lưu thông tin hoàn trả
+  const [returnInfo, setReturnInfo] = useState(null);
+  
+  // Thêm state cho toast notifications
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
   const statusConfig = {
     pending: {
@@ -122,9 +126,18 @@ const OrderDetail = () => {
     }
   };
 
+  // Helper function to show toast
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+  };
+
+  const closeToast = () => {
+    setToast({ show: false, message: '', type: 'success' });
+  };
+
   useEffect(() => {
     fetchOrderDetail();
-    checkReturnStatus(); // Thêm kiểm tra trạng thái hoàn trả
+    checkReturnStatus();
   }, [orderId]);
 
   const fetchOrderDetail = async () => {
@@ -135,13 +148,13 @@ const OrderDetail = () => {
     } catch (error) {
       console.error('Error fetching order detail:', error);
       if (error.response?.status === 404) {
-        alert('Không tìm thấy đơn hàng');
+        showToast('Không tìm thấy đơn hàng', 'error');
         navigate('/orders');
       } else if (error.response?.status === 403) {
-        alert('Bạn không có quyền xem đơn hàng này');
+        showToast('Bạn không có quyền xem đơn hàng này', 'error');
         navigate('/orders');
       } else {
-        alert('Có lỗi xảy ra khi tải thông tin đơn hàng');
+        showToast('Có lỗi xảy ra khi tải thông tin đơn hàng', 'error');
       }
     } finally {
       setLoading(false);
@@ -153,7 +166,7 @@ const OrderDetail = () => {
     try {
       const response = await api.get(`/api/v1/returns/my?order_id=${orderId}`);
       if (response.data.data && response.data.data.length > 0) {
-        setReturnInfo(response.data.data[0]); // Lấy yêu cầu hoàn trả đầu tiên
+        setReturnInfo(response.data.data[0]);
       }
     } catch (error) {
       console.error('Error checking return status:', error);
@@ -166,12 +179,12 @@ const OrderDetail = () => {
     try {
       setCancelling(true);
       await api.post(`/api/v1/orders/${orderId}/cancel`);
-      alert('Đơn hàng đã được hủy thành công!');
+      showToast('Đơn hàng đã được hủy thành công!', 'success');
       await fetchOrderDetail();
       setShowCancelConfirm(false);
     } catch (error) {
       console.error('Error cancelling order:', error);
-      alert(error.response?.data?.detail || 'Không thể hủy đơn hàng này');
+      showToast(error.response?.data?.detail || 'Không thể hủy đơn hàng này', 'error');
     } finally {
       setCancelling(false);
     }
@@ -215,7 +228,6 @@ const OrderDetail = () => {
 
   const canCancel = () => {
     if (!order) return false;
-    // Không thể hủy nếu đã có yêu cầu hoàn trả
     if (returnInfo && ['pending', 'approved'].includes(returnInfo.status)) return false;
     return order.status === 'pending' || order.status === 'paid';
   };
@@ -290,6 +302,15 @@ const OrderDetail = () => {
 
   return (
     <ShopDetailLayout>
+      {/* Toast Notification */}
+      {toast.show && (
+        <Toast 
+          message={toast.message} 
+          type={toast.type} 
+          onClose={closeToast} 
+        />
+      )}
+
       <div className="order-detail-container">
         {/* Header */}
         <div className="order-detail-header">
