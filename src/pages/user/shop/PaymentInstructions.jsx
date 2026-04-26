@@ -1,7 +1,6 @@
-// pages/user/payment/PaymentInstructions.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { FaCopy, FaCheck, FaQrcode, FaBuilding, FaUser, FaExclamationTriangle } from 'react-icons/fa';
+import { FaCopy, FaCheck, FaBuilding, FaUser, FaExclamationTriangle, FaSpinner } from 'react-icons/fa';
 import api from '../../../api/api';
 import ShopDetailLayout from '../../../components/layout/ShopDetailLayout';
 
@@ -15,19 +14,43 @@ const PaymentInstructions = () => {
     const [error, setError] = useState(null);
     const [copied, setCopied] = useState(false);
     const [copiedAccount, setCopiedAccount] = useState(false);
+    const [paymentConfirmed, setPaymentConfirmed] = useState(false);
+    const pollingInterval = useRef(null);
 
     const shopId = location.state?.shopId;
 
     useEffect(() => {
         fetchOrderAndPaymentInfo();
-    }, [orderId, shopId]);
+        startPolling();
+        return () => {
+            if (pollingInterval.current) clearInterval(pollingInterval.current);
+        };
+    }, [orderId]);
+
+    const startPolling = () => {
+        if (pollingInterval.current) clearInterval(pollingInterval.current);
+        pollingInterval.current = setInterval(async () => {
+            if (paymentConfirmed) return;
+            try {
+                const response = await api.get(`/api/v1/orders/${orderId}`);
+                if (response.data.payment_status === 'paid') {
+                    setPaymentConfirmed(true);
+                    clearInterval(pollingInterval.current);
+                    setTimeout(() => {
+                        navigate(`/orders/${orderId}`);
+                    }, 2000);
+                }
+            } catch (err) {
+                console.error("Polling error", err);
+            }
+        }, 5000);
+    };
 
     const fetchOrderAndPaymentInfo = async () => {
         try {
             setLoading(true);
             setError(null);
             
-            // Lấy thông tin đơn hàng
             const orderResponse = await api.get(`/api/v1/orders/${orderId}`);
             const orderData = orderResponse.data;
             setOrder(orderData);
@@ -39,26 +62,14 @@ const PaymentInstructions = () => {
             
             if (targetShopId) {
                 try {
-                    // Lấy cài đặt công khai của shop
                     const settingsResponse = await api.get(`/api/v1/shop/settings/public/${targetShopId}`);
                     setShopPaymentInfo(settingsResponse.data);
                 } catch (settingsError) {
                     console.error('Error fetching shop settings:', settingsError);
-                    // Fallback: tạo thông tin mặc định
                     setShopPaymentInfo({
                         shop_id: targetShopId,
                         shop_name: "Cửa hàng",
-                        payment: {
-                            bank_accounts: [
-                                {
-                                    id: "default",
-                                    bank_name: "Vietcombank",
-                                    account_number: "123456789",
-                                    account_name: "CHU TAI KHOAN",
-                                    branch: "Hội sở"
-                                }
-                            ]
-                        }
+                        payment: { bank_accounts: [] }
                     });
                 }
             } else {
@@ -130,6 +141,7 @@ const PaymentInstructions = () => {
 
     const orderCode = order?.id?.slice(-8).toUpperCase();
     const bankAccounts = shopPaymentInfo?.payment?.bank_accounts || [];
+    const qrCodeUrl = bankAccounts[0]?.qr_code_url;
 
     return (
         <ShopDetailLayout>
@@ -182,6 +194,21 @@ const PaymentInstructions = () => {
                             </span>
                         </p>
                     </div>
+
+                    {/* QR Code nếu có */}
+                    {qrCodeUrl && (
+                        <div style={{ textAlign: "center", marginBottom: "24px" }}>
+                            <h3>📱 Quét mã QR để thanh toán nhanh</h3>
+                            <img 
+                                src={qrCodeUrl} 
+                                alt="QR Code thanh toán" 
+                                style={{ width: 180, height: 180, marginTop: 12, border: "1px solid #ddd", borderRadius: 12 }}
+                            />
+                            <p style={{ fontSize: 13, color: "#666", marginTop: 8 }}>
+                                Mở ứng dụng ngân hàng, chọn quét mã QR và kiểm tra lại số tiền
+                            </p>
+                        </div>
+                    )}
 
                     {/* Thông tin chuyển khoản */}
                     <div style={{ marginBottom: "24px" }}>
@@ -258,7 +285,7 @@ const PaymentInstructions = () => {
                             padding: "12px",
                             marginTop: "16px"
                         }}>
-                            <p><strong>📝 Nội dung chuyển khoản:</strong></p>
+                            <p><strong>📝 Nội dung chuyển khoản BẮT BUỘC:</strong></p>
                             <code style={{
                                 background: "#e9ecef",
                                 padding: "8px 12px",
@@ -282,11 +309,22 @@ const PaymentInstructions = () => {
                             >
                                 {copied ? <FaCheck /> : <FaCopy />}
                             </button>
-                            <p style={{ fontSize: "12px", color: "#666", marginTop: "8px" }}>
-                                * Vui lòng nhập đúng nội dung để hệ thống xác nhận thanh toán tự động
+                            <p style={{ fontSize: "12px", color: "#d32f2f", marginTop: "8px" }}>
+                                * Sao chép nội dung trên và dán vào ô "Nội dung chuyển khoản" khi thanh toán.
                             </p>
                         </div>
                     </div>
+
+                    {/* Trạng thái thanh toán */}
+                    {paymentConfirmed ? (
+                        <div style={{ background: "#e8f5e9", padding: "12px", borderRadius: "8px", marginBottom: "16px", textAlign: "center" }}>
+                            <FaCheck color="#2e7d32" size={20} /> Đã nhận được thanh toán! Chuyển đến đơn hàng...
+                        </div>
+                    ) : (
+                        <div style={{ background: "#e3f2fd", padding: "12px", borderRadius: "8px", marginBottom: "16px", textAlign: "center" }}>
+                            <FaSpinner className="spinning" style={{ marginRight: 8 }} /> Đang chờ thanh toán...
+                        </div>
+                    )}
 
                     {/* Lưu ý */}
                     <div style={{
@@ -297,14 +335,14 @@ const PaymentInstructions = () => {
                     }}>
                         <h4 style={{ color: "#ed6c02", marginBottom: "12px" }}>⚠️ Lưu ý:</h4>
                         <ul style={{ margin: 0, paddingLeft: "20px", color: "#666" }}>
-                            <li>Sau khi chuyển khoản, vui lòng đợi 5-10 phút để hệ thống cập nhật</li>
+                            <li>Sau khi chuyển khoản, hệ thống sẽ tự động cập nhật trong vòng 30 giây</li>
                             <li>Vui lòng giữ lại ảnh chụp màn hình chuyển khoản để đối chiếu nếu cần</li>
                             <li>Đơn hàng sẽ được xử lý ngay sau khi xác nhận thanh toán</li>
+                            <li>Không đóng trình duyệt cho đến khi thấy thông báo thành công</li>
                         </ul>
                     </div>
 
                     <div style={{ display: "flex", gap: "12px" }}>
-                        {/* SỬA: Chuyển đến trang chi tiết đơn hàng với orderId */}
                         <button
                             onClick={() => navigate(`/orders/${orderId}`)}
                             style={{
@@ -352,6 +390,10 @@ const PaymentInstructions = () => {
                     border-radius: 50%;
                     animation: spin 1s linear infinite;
                     margin: 0 auto 20px;
+                }
+                .spinning {
+                    animation: spin 1s linear infinite;
+                    display: inline-block;
                 }
             `}</style>
         </ShopDetailLayout>
