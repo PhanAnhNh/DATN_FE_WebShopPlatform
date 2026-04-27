@@ -16,6 +16,8 @@ const PaymentInstructions = () => {
     const [copiedAccount, setCopiedAccount] = useState(false);
     const [paymentConfirmed, setPaymentConfirmed] = useState(false);
     const pollingInterval = useRef(null);
+    const [dynamicQrUrl, setDynamicQrUrl] = useState(null);
+    const [qrLoading, setQrLoading] = useState(true);
 
     const shopId = location.state?.shopId;
 
@@ -26,6 +28,24 @@ const PaymentInstructions = () => {
             if (pollingInterval.current) clearInterval(pollingInterval.current);
         };
     }, [orderId]);
+
+    useEffect(() => {
+        if (order && order.payment_method === 'bank_transfer' && order.payment_status !== 'paid') {
+            fetchDynamicQr();
+        }
+    }, [order]);
+
+    const fetchDynamicQr = async () => {
+        setQrLoading(true);
+        try {
+            const res = await api.get(`/api/v1/payments/generate-qr/${orderId}`);
+            setDynamicQrUrl(res.data.qr_code_url);
+        } catch (err) {
+            console.error("Failed to get dynamic QR", err);
+        } finally {
+            setQrLoading(false);
+        }
+    };
 
     const startPolling = () => {
         if (pollingInterval.current) clearInterval(pollingInterval.current);
@@ -50,7 +70,6 @@ const PaymentInstructions = () => {
         try {
             setLoading(true);
             setError(null);
-            
             const orderResponse = await api.get(`/api/v1/orders/${orderId}`);
             const orderData = orderResponse.data;
             setOrder(orderData);
@@ -141,7 +160,6 @@ const PaymentInstructions = () => {
 
     const orderCode = order?.id?.slice(-8).toUpperCase();
     const bankAccounts = shopPaymentInfo?.payment?.bank_accounts || [];
-    const qrCodeUrl = bankAccounts[0]?.qr_code_url;
 
     return (
         <ShopDetailLayout>
@@ -195,18 +213,20 @@ const PaymentInstructions = () => {
                         </p>
                     </div>
 
-                    {/* QR Code nếu có */}
-                    {qrCodeUrl && (
+                    {/* Mã QR động cho đơn hàng */}
+                    {dynamicQrUrl ? (
                         <div style={{ textAlign: "center", marginBottom: "24px" }}>
-                            <h3>📱 Quét mã QR để thanh toán nhanh</h3>
-                            <img 
-                                src={qrCodeUrl} 
-                                alt="QR Code thanh toán" 
-                                style={{ width: 180, height: 180, marginTop: 12, border: "1px solid #ddd", borderRadius: 12 }}
-                            />
-                            <p style={{ fontSize: 13, color: "#666", marginTop: 8 }}>
-                                Mở ứng dụng ngân hàng, chọn quét mã QR và kiểm tra lại số tiền
-                            </p>
+                            <h3>📱 Mã QR thanh toán (cho đơn hàng #{orderCode})</h3>
+                            <img src={dynamicQrUrl} alt="QR Code" style={{ width: 200, height: 200, border: "1px solid #ddd", borderRadius: 12 }} />
+                            <p style={{ fontSize: 13, marginTop: 8 }}>Quét mã bằng app ngân hàng, nội dung đã được điền sẵn mã đơn hàng.</p>
+                        </div>
+                    ) : qrLoading ? (
+                        <div style={{ textAlign: "center", marginBottom: "24px" }}>
+                            <FaSpinner className="spinning" /> Đang tạo mã QR...
+                        </div>
+                    ) : (
+                        <div style={{ background: "#fff3e0", padding: 12, borderRadius: 8, marginBottom: "24px" }}>
+                            ⚠️ Không thể tạo mã QR, vui lòng chuyển khoản thủ công theo nội dung bên dưới.
                         </div>
                     )}
 
@@ -222,91 +242,35 @@ const PaymentInstructions = () => {
                                     padding: "20px",
                                     marginBottom: idx < bankAccounts.length - 1 ? "16px" : 0
                                 }}>
-                                    <p style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
-                                        <FaBuilding color="#2e7d32" />
-                                        <strong>Ngân hàng:</strong> 
-                                        <span>{account.bank_name}</span>
-                                    </p>
-                                    <p style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px", flexWrap: "wrap" }}>
-                                        <FaUser color="#2e7d32" />
-                                        <strong>Số tài khoản:</strong> 
-                                        <code style={{
-                                            background: "#e9ecef",
-                                            padding: "6px 12px",
-                                            borderRadius: "6px",
-                                            fontSize: "16px",
-                                            fontWeight: "bold"
-                                        }}>
+                                    <p><FaBuilding color="#2e7d32" /> <strong>Ngân hàng:</strong> {account.bank_name}</p>
+                                    <p>
+                                        <FaUser color="#2e7d32" /> <strong>Số tài khoản:</strong> 
+                                        <code style={{ background: "#e9ecef", padding: "6px 12px", borderRadius: "6px", marginLeft: "8px" }}>
                                             {account.account_number}
                                         </code>
-                                        <button
-                                            onClick={() => copyToClipboard(account.account_number, 'account')}
-                                            style={{
-                                                background: "#e8f5e9",
-                                                border: "none",
-                                                borderRadius: "6px",
-                                                padding: "6px 12px",
-                                                cursor: "pointer",
-                                                color: "#2e7d32"
-                                            }}
-                                        >
+                                        <button onClick={() => copyToClipboard(account.account_number, 'account')}
+                                            style={{ marginLeft: "8px", background: "#e8f5e9", border: "none", borderRadius: "6px", padding: "4px 8px", cursor: "pointer" }}>
                                             {copiedAccount ? <FaCheck /> : <FaCopy />} Sao chép
                                         </button>
                                     </p>
-                                    <p style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
-                                        <strong>Chủ tài khoản:</strong> 
-                                        <span>{account.account_name}</span>
-                                    </p>
-                                    {account.branch && (
-                                        <p style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
-                                            <strong>Chi nhánh:</strong> 
-                                            <span>{account.branch}</span>
-                                        </p>
-                                    )}
+                                    <p><strong>Chủ tài khoản:</strong> {account.account_name}</p>
+                                    {account.branch && <p><strong>Chi nhánh:</strong> {account.branch}</p>}
                                 </div>
                             ))
                         ) : (
-                            <div style={{
-                                background: "#fff3e0",
-                                borderRadius: "12px",
-                                padding: "16px",
-                                textAlign: "center",
-                                color: "#e65100"
-                            }}>
+                            <div style={{ background: "#fff3e0", borderRadius: "12px", padding: "16px", textAlign: "center", color: "#e65100" }}>
                                 <FaExclamationTriangle size={24} />
-                                <p>Shop chưa cập nhật thông tin tài khoản ngân hàng. Vui lòng liên hệ shop để được hỗ trợ.</p>
+                                <p>Shop chưa cập nhật thông tin tài khoản ngân hàng.</p>
                             </div>
                         )}
-                        
-                        {/* Nội dung chuyển khoản */}
-                        <div style={{
-                            background: "#fff8e1",
-                            borderRadius: "8px",
-                            padding: "12px",
-                            marginTop: "16px"
-                        }}>
+
+                        {/* Nội dung chuyển khoản - fallback */}
+                        <div style={{ background: "#fff8e1", borderRadius: "8px", padding: "12px", marginTop: "16px" }}>
                             <p><strong>📝 Nội dung chuyển khoản BẮT BUỘC:</strong></p>
-                            <code style={{
-                                background: "#e9ecef",
-                                padding: "8px 12px",
-                                borderRadius: "6px",
-                                display: "inline-block",
-                                fontSize: "14px",
-                                fontWeight: "bold",
-                                marginTop: "8px"
-                            }}>
+                            <code style={{ background: "#e9ecef", padding: "8px 12px", borderRadius: "6px", display: "inline-block" }}>
                                 {orderCode}
                             </code>
-                            <button
-                                onClick={() => copyToClipboard(orderCode, 'order')}
-                                style={{
-                                    marginLeft: "8px",
-                                    background: "none",
-                                    border: "none",
-                                    cursor: "pointer",
-                                    color: "#2e7d32"
-                                }}
-                            >
+                            <button onClick={() => copyToClipboard(orderCode, 'order')} style={{ marginLeft: "8px" }}>
                                 {copied ? <FaCheck /> : <FaCopy />}
                             </button>
                             <p style={{ fontSize: "12px", color: "#d32f2f", marginTop: "8px" }}>
@@ -327,12 +291,7 @@ const PaymentInstructions = () => {
                     )}
 
                     {/* Lưu ý */}
-                    <div style={{
-                        background: "#fff3e0",
-                        borderRadius: "12px",
-                        padding: "16px",
-                        marginBottom: "24px"
-                    }}>
+                    <div style={{ background: "#fff3e0", borderRadius: "12px", padding: "16px", marginBottom: "24px" }}>
                         <h4 style={{ color: "#ed6c02", marginBottom: "12px" }}>⚠️ Lưu ý:</h4>
                         <ul style={{ margin: 0, paddingLeft: "20px", color: "#666" }}>
                             <li>Sau khi chuyển khoản, hệ thống sẽ tự động cập nhật trong vòng 30 giây</li>
@@ -343,58 +302,21 @@ const PaymentInstructions = () => {
                     </div>
 
                     <div style={{ display: "flex", gap: "12px" }}>
-                        <button
-                            onClick={() => navigate(`/orders/${orderId}`)}
-                            style={{
-                                flex: 1,
-                                padding: "14px",
-                                background: "#2e7d32",
-                                color: "white",
-                                border: "none",
-                                borderRadius: "40px",
-                                cursor: "pointer",
-                                fontWeight: "600"
-                            }}
-                        >
+                        <button onClick={() => navigate(`/orders/${orderId}`)}
+                            style={{ flex: 1, padding: "14px", background: "#2e7d32", color: "white", border: "none", borderRadius: "40px", cursor: "pointer", fontWeight: "600" }}>
                             Xem đơn hàng của tôi
                         </button>
-                        <button
-                            onClick={() => navigate('/')}
-                            style={{
-                                flex: 1,
-                                padding: "14px",
-                                background: "white",
-                                color: "#2e7d32",
-                                border: "2px solid #2e7d32",
-                                borderRadius: "40px",
-                                cursor: "pointer",
-                                fontWeight: "600"
-                            }}
-                        >
+                        <button onClick={() => navigate('/')}
+                            style={{ flex: 1, padding: "14px", background: "white", color: "#2e7d32", border: "2px solid #2e7d32", borderRadius: "40px", cursor: "pointer", fontWeight: "600" }}>
                             Tiếp tục mua sắm
                         </button>
                     </div>
                 </div>
             </div>
-
             <style>{`
-                @keyframes spin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
-                }
-                .spinner {
-                    width: 40px;
-                    height: 40px;
-                    border: 4px solid #f3f3f3;
-                    border-top: 4px solid #2e7d32;
-                    border-radius: 50%;
-                    animation: spin 1s linear infinite;
-                    margin: 0 auto 20px;
-                }
-                .spinning {
-                    animation: spin 1s linear infinite;
-                    display: inline-block;
-                }
+                @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                .spinner { width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #2e7d32; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px; }
+                .spinning { animation: spin 1s linear infinite; display: inline-block; }
             `}</style>
         </ShopDetailLayout>
     );
