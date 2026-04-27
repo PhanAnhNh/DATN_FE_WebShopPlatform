@@ -30,7 +30,7 @@ const PaymentInstructions = () => {
     }, [orderId]);
 
     useEffect(() => {
-        if (order && order.payment_method === 'bank_transfer' && order.payment_status !== 'paid') {
+        if (order && (order.payment_method === 'bank' || order.payment_method === 'bank_transfer') && order.payment_status !== 'paid') {
             fetchDynamicQr();
         }
     }, [order]);
