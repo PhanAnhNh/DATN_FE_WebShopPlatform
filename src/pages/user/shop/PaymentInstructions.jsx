@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { FaCopy, FaCheck, FaBuilding, FaUser, FaExclamationTriangle, FaSpinner } from 'react-icons/fa';
+import { FaCopy, FaCheck, FaBuilding, FaUser, FaExclamationTriangle, FaSpinner, FaSyncAlt } from 'react-icons/fa';
 import api from '../../../api/api';
 import ShopDetailLayout from '../../../components/layout/ShopDetailLayout';
 
@@ -17,7 +17,10 @@ const PaymentInstructions = () => {
     const [paymentConfirmed, setPaymentConfirmed] = useState(false);
     const pollingInterval = useRef(null);
     const [dynamicQrUrl, setDynamicQrUrl] = useState(null);
-    const [qrLoading, setQrLoading] = useState(true);
+    const [qrLoading, setQrLoading] = useState(false);
+    const [qrError, setQrError] = useState(false);
+    const retryCount = useRef(0);
+    const maxRetries = 3;
 
     const shopId = location.state?.shopId;
 
@@ -35,13 +38,26 @@ const PaymentInstructions = () => {
         }
     }, [order]);
 
-    const fetchDynamicQr = async () => {
+    const fetchDynamicQr = async (isRetry = false) => {
+        if (qrLoading) return;
         setQrLoading(true);
+        setQrError(false);
         try {
             const res = await api.get(`/api/v1/payments/generate-qr/${orderId}`);
-            setDynamicQrUrl(res.data.qr_code_url);
+            if (res.data && res.data.qr_code_url) {
+                setDynamicQrUrl(res.data.qr_code_url);
+                retryCount.current = 0;
+            } else {
+                throw new Error('Không nhận được URL QR');
+            }
         } catch (err) {
             console.error("Failed to get dynamic QR", err);
+            if (!isRetry && retryCount.current < maxRetries) {
+                retryCount.current++;
+                setTimeout(() => fetchDynamicQr(true), 2000);
+            } else {
+                setQrError(true);
+            }
         } finally {
             setQrLoading(false);
         }
@@ -217,12 +233,39 @@ const PaymentInstructions = () => {
                     {dynamicQrUrl ? (
                         <div style={{ textAlign: "center", marginBottom: "24px" }}>
                             <h3>📱 Mã QR thanh toán (cho đơn hàng #{orderCode})</h3>
-                            <img src={dynamicQrUrl} alt="QR Code" style={{ width: 200, height: 200, border: "1px solid #ddd", borderRadius: 12 }} />
+                            <img 
+                                src={dynamicQrUrl} 
+                                alt="QR Code thanh toán" 
+                                style={{ width: 200, height: 200, border: "1px solid #ddd", borderRadius: 12 }}
+                                onError={() => setQrError(true)}
+                            />
                             <p style={{ fontSize: 13, marginTop: 8 }}>Quét mã bằng app ngân hàng, nội dung đã được điền sẵn mã đơn hàng.</p>
                         </div>
                     ) : qrLoading ? (
                         <div style={{ textAlign: "center", marginBottom: "24px" }}>
                             <FaSpinner className="spinning" /> Đang tạo mã QR...
+                        </div>
+                    ) : qrError ? (
+                        <div style={{ background: "#fff3e0", padding: 12, borderRadius: 8, marginBottom: "24px", textAlign: "center" }}>
+                            <FaExclamationTriangle color="#ed6c02" size={24} />
+                            <p style={{ margin: "8px 0" }}>⚠️ Không thể tạo mã QR tự động do lỗi hệ thống.</p>
+                            <button 
+                                onClick={() => fetchDynamicQr()}
+                                style={{
+                                    background: "#2e7d32",
+                                    color: "white",
+                                    border: "none",
+                                    padding: "8px 16px",
+                                    borderRadius: "30px",
+                                    cursor: "pointer",
+                                    marginTop: "8px"
+                                }}
+                            >
+                                <FaSyncAlt style={{ marginRight: "6px" }} /> Thử lại
+                            </button>
+                            <p style={{ fontSize: "12px", color: "#666", marginTop: "12px" }}>
+                                Vui lòng sử dụng phương thức chuyển khoản thủ công bên dưới.
+                            </p>
                         </div>
                     ) : (
                         <div style={{ background: "#fff3e0", padding: 12, borderRadius: 8, marginBottom: "24px" }}>
