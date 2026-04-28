@@ -257,17 +257,19 @@ const PaymentInstructions = () => {
               </div>
             )}
 
-            {/* Mandatory Transfer Content */}
-            <div className="transfer-content-box">
-              <p><strong>📝 Nội dung chuyển khoản BẮT BUỘC:</strong></p>
-              <div className="transfer-code">
-                <code>{orderCode}</code>
-                <button onClick={() => copyToClipboard(orderCode, 'order')} className="copy-btn">
-                  {copiedOrderCode ? <FaCheck /> : <FaCopy />} Sao chép
+            
+            <div style={{ background: "#fff8e1", borderRadius: "8px", padding: "12px", marginTop: "16px" }}>
+                <p><strong>📝 Nội dung chuyển khoản BẮT BUỘC:</strong></p>
+                <code style={{ background: "#e9ecef", padding: "8px 12px", borderRadius: "6px", display: "inline-block" }}>
+                    SEVQR {orderCode}
+                </code>
+                <button onClick={() => copyToClipboard(`SEVQR ${orderCode}`, 'order')} style={{ marginLeft: "8px" }}>
+                    {copiedOrderCode ? <FaCheck /> : <FaCopy />}
                 </button>
-              </div>
-              <p className="warning-text">* Sao chép nội dung trên và dán vào ô "Nội dung chuyển khoản" khi thanh toán. <br/>
-              <strong>Nếu sai nội dung, hệ thống sẽ không tự động xác nhận thanh toán.</strong></p>
+                <p style={{ fontSize: "12px", color: "#d32f2f", marginTop: "12px" }}>
+                    ⚠️ <strong>BẮT BUỘC:</strong> Nội dung phải bắt đầu bằng <strong>SEVQR</strong> (viết hoa)
+                    <br />Ví dụ: <code>SEVQR {orderCode}</code>
+                </p>
             </div>
           </div>
 
