@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { FaCopy, FaCheck, FaBuilding, FaCheckCircle, FaUser, FaExclamationTriangle, FaSpinner, FaSyncAlt, FaQrcode, FaClock } from 'react-icons/fa';
+import { FaCopy, FaCheck, FaBuilding, FaCheckCircle, FaUser, FaExclamationTriangle, FaSpinner, FaSyncAlt, FaQrcode, FaClock, FaBan, FaTrash } from 'react-icons/fa';
 import api from '../../../api/api';
 import ShopDetailLayout from '../../../components/layout/ShopDetailLayout';
 
@@ -16,6 +16,8 @@ const PaymentInstructions = () => {
   const [copiedAccount, setCopiedAccount] = useState(null);
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const [cancelling, setCancelling] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const pollingInterval = useRef(null);
   const countdownInterval = useRef(null);
   const [dynamicQrUrl, setDynamicQrUrl] = useState(null);
@@ -50,11 +52,53 @@ const PaymentInstructions = () => {
       setCountdown(prev => {
         if (prev <= 1) {
           clearInterval(countdownInterval.current);
+          handleAutoCancelOrder();
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
+  };
+
+  const handleAutoCancelOrder = async () => {
+    try {
+      // Lưu lại items trước khi hủy
+      const itemsToRestore = order?.items?.map(item => ({
+        product_id: item.product_id,
+        variant_id: item.variant_id || null,
+        quantity: item.quantity,
+        price: item.price,
+        product_name: item.product_name,
+        variant_name: item.variant_name,
+        shop_id: item.shop_id,
+        image_url: item.image_url || null
+      })) || [];
+      
+      // Lưu vào localStorage để restore sau khi hủy
+      if (itemsToRestore.length > 0) {
+        // Lấy cart hiện tại
+        const existingCart = JSON.parse(localStorage.getItem('selectedCartItems') || '[]');
+        // Merge với items cần restore
+        const mergedCart = [...existingCart];
+        for (const item of itemsToRestore) {
+          const existingIndex = mergedCart.findIndex(
+            i => i.product_id === item.product_id && i.variant_id === item.variant_id
+          );
+          if (existingIndex >= 0) {
+            mergedCart[existingIndex].quantity += item.quantity;
+          } else {
+            mergedCart.push(item);
+          }
+        }
+        localStorage.setItem('selectedCartItems', JSON.stringify(mergedCart));
+      }
+      
+      await api.post(`/api/v1/orders/${orderId}/cancel`);
+      setError("Đơn hàng đã hết thời gian thanh toán và bị hủy");
+      setTimeout(() => navigate('/checkout'), 2000);
+    } catch (err) {
+      console.error("Auto cancel error:", err);
+    }
   };
 
   const formatCountdown = (seconds) => {
@@ -97,7 +141,14 @@ const PaymentInstructions = () => {
         if (response.data.payment_status === 'paid') {
           setPaymentConfirmed(true);
           clearInterval(pollingInterval.current);
+          if (countdownInterval.current) clearInterval(countdownInterval.current);
           setTimeout(() => navigate(`/orders/${orderId}`), 2000);
+        }
+        if (response.data.status === 'cancelled') {
+          clearInterval(pollingInterval.current);
+          if (countdownInterval.current) clearInterval(countdownInterval.current);
+          setError("Đơn hàng đã bị hủy");
+          setTimeout(() => navigate('/checkout'), 2000);
         }
       } catch (err) {
         console.error("Polling error", err);
@@ -110,6 +161,17 @@ const PaymentInstructions = () => {
       setLoading(true);
       const orderResponse = await api.get(`/api/v1/orders/${orderId}`);
       const orderData = orderResponse.data;
+      
+      if (orderData.payment_status === 'paid') {
+        navigate(`/orders/${orderId}`);
+        return;
+      }
+      if (orderData.status === 'cancelled') {
+        setError("Đơn hàng đã bị hủy");
+        setTimeout(() => navigate('/checkout'), 2000);
+        return;
+      }
+      
       setOrder(orderData);
       
       let targetShopId = shopId;
@@ -135,6 +197,66 @@ const PaymentInstructions = () => {
       setError(error.response?.data?.detail || "Có lỗi xảy ra khi tải thông tin");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCancelOrder = async () => {
+    setCancelling(true);
+    try {
+      // Lưu lại thông tin items của đơn hàng để restore vào checkout
+      const itemsToRestore = order?.items?.map(item => ({
+        product_id: item.product_id,
+        variant_id: item.variant_id || null,
+        quantity: item.quantity,
+        price: item.price,
+        product_name: item.product_name,
+        variant_name: item.variant_name,
+        shop_id: item.shop_id,
+        image_url: item.image_url || null,
+        subtotal: item.price * item.quantity
+      })) || [];
+      
+      // Lưu vào localStorage để checkout page có thể đọc được
+      if (itemsToRestore.length > 0) {
+        // Lấy giỏ hàng hiện tại (nếu có)
+        const existingCart = JSON.parse(localStorage.getItem('selectedCartItems') || '[]');
+        
+        // Merge với items cần restore (cộng dồn số lượng nếu trùng)
+        const mergedCart = [...existingCart];
+        for (const item of itemsToRestore) {
+          const existingIndex = mergedCart.findIndex(
+            i => i.product_id === item.product_id && i.variant_id === item.variant_id
+          );
+          if (existingIndex >= 0) {
+            mergedCart[existingIndex].quantity += item.quantity;
+            mergedCart[existingIndex].subtotal = mergedCart[existingIndex].price * mergedCart[existingIndex].quantity;
+          } else {
+            mergedCart.push(item);
+          }
+        }
+        localStorage.setItem('selectedCartItems', JSON.stringify(mergedCart));
+        
+        // Nếu có voucher đã áp dụng, lưu lại
+        if (order?.voucher) {
+          localStorage.setItem('selectedVoucher', JSON.stringify(order.voucher));
+        }
+      }
+      
+      // Gọi API hủy đơn hàng
+      await api.post(`/api/v1/orders/${orderId}/cancel`);
+      
+      clearInterval(pollingInterval.current);
+      clearInterval(countdownInterval.current);
+      
+      // Chuyển hướng về checkout thay vì orders
+      navigate('/checkout');
+      
+    } catch (err) {
+      console.error("Cancel error:", err);
+      setError(err.response?.data?.detail || "Không thể hủy đơn hàng");
+    } finally {
+      setCancelling(false);
+      setShowCancelConfirm(false);
     }
   };
 
@@ -172,7 +294,7 @@ const PaymentInstructions = () => {
             <FaExclamationTriangle size={48} color="#f44336" />
             <h2 style={{ color: "#d32f2f" }}>Có lỗi xảy ra</h2>
             <p>{error}</p>
-            <button onClick={() => navigate('/orders')} className="back-btn">Quay lại đơn hàng</button>
+            <button onClick={() => navigate('/checkout')} className="back-btn">Quay lại thanh toán</button>
           </div>
         </div>
       </ShopDetailLayout>
@@ -184,22 +306,26 @@ const PaymentInstructions = () => {
   return (
     <ShopDetailLayout>
       <div className="payment-instructions-container">
-        <button onClick={() => navigate('/orders')} className="back-button">
-          ← Quay lại danh sách đơn hàng
+        <button onClick={() => navigate('/checkout')} className="back-button">
+          ← Quay lại thanh toán
         </button>
 
         <div className="instructions-card">
           <h1>Hướng dẫn thanh toán</h1>
           <p className="subtitle">Vui lòng chuyển khoản theo thông tin bên dưới</p>
 
-          {/* Countdown Timer */}
           {!paymentConfirmed && countdown > 0 && (
             <div className="countdown-timer">
               <FaClock /> Thời gian còn lại để thanh toán: <strong>{formatCountdown(countdown)}</strong>
             </div>
           )}
 
-          {/* Order Info */}
+          {countdown === 0 && !paymentConfirmed && (
+            <div className="countdown-timer" style={{ background: "#ffebee", color: "#d32f2f" }}>
+              <FaExclamationTriangle /> Đơn hàng đã hết thời gian thanh toán
+            </div>
+          )}
+
           <div className="order-info-box">
             <h3>📋 Thông tin đơn hàng</h3>
             <div className="order-info-row"><strong>Mã đơn hàng:</strong> <span className="order-code-display">#{orderCode}</span></div>
@@ -209,7 +335,6 @@ const PaymentInstructions = () => {
             <div className="order-info-row amount"><strong>Số tiền cần thanh toán:</strong> <span className="amount-value">{formatCurrency(order?.total_amount)}</span></div>
           </div>
 
-          {/* QR Code Section */}
           <div className="qr-section">
             <h3><FaQrcode /> Quét mã QR để thanh toán</h3>
             
@@ -232,7 +357,6 @@ const PaymentInstructions = () => {
             )}
           </div>
 
-          {/* Bank Account Info */}
           <div className="bank-info-section">
             <h3>🏦 Thông tin tài khoản thụ hưởng</h3>
             
@@ -257,23 +381,21 @@ const PaymentInstructions = () => {
               </div>
             )}
 
-            
             <div style={{ background: "#fff8e1", borderRadius: "8px", padding: "12px", marginTop: "16px" }}>
-                <p><strong>📝 Nội dung chuyển khoản BẮT BUỘC:</strong></p>
-                <code style={{ background: "#e9ecef", padding: "8px 12px", borderRadius: "6px", display: "inline-block" }}>
-                    SEVQR {orderCode}
-                </code>
-                <button onClick={() => copyToClipboard(`SEVQR ${orderCode}`, 'order')} style={{ marginLeft: "8px" }}>
-                    {copiedOrderCode ? <FaCheck /> : <FaCopy />}
-                </button>
-                <p style={{ fontSize: "12px", color: "#d32f2f", marginTop: "12px" }}>
-                    ⚠️ <strong>BẮT BUỘC:</strong> Nội dung phải bắt đầu bằng <strong>SEVQR</strong> (viết hoa)
-                    <br />Ví dụ: <code>SEVQR {orderCode}</code>
-                </p>
+              <p><strong>📝 Nội dung chuyển khoản BẮT BUỘC:</strong></p>
+              <code style={{ background: "#e9ecef", padding: "8px 12px", borderRadius: "6px", display: "inline-block" }}>
+                SEVQR {orderCode}
+              </code>
+              <button onClick={() => copyToClipboard(`SEVQR ${orderCode}`, 'order')} style={{ marginLeft: "8px" }}>
+                {copiedOrderCode ? <FaCheck /> : <FaCopy />}
+              </button>
+              <p style={{ fontSize: "12px", color: "#d32f2f", marginTop: "12px" }}>
+                ⚠️ <strong>BẮT BUỘC:</strong> Nội dung phải bắt đầu bằng <strong>SEVQR</strong> (viết hoa)
+                <br />Ví dụ: <code>SEVQR {orderCode}</code>
+              </p>
             </div>
           </div>
 
-          {/* Payment Status */}
           <div className={`payment-status ${paymentConfirmed ? 'success' : 'pending'}`}>
             {paymentConfirmed ? (
               <>
@@ -286,7 +408,6 @@ const PaymentInstructions = () => {
             )}
           </div>
 
-          {/* Important Notes */}
           <div className="notes-box">
             <h4>⚠️ Lưu ý quan trọng:</h4>
             <ul>
@@ -295,19 +416,58 @@ const PaymentInstructions = () => {
               <li>Đơn hàng sẽ được xử lý ngay sau khi xác nhận thanh toán thành công</li>
               <li>Không đóng trình duyệt cho đến khi thấy thông báo thành công</li>
               <li>Nếu sau 5 phút chưa nhận được xác nhận, vui lòng liên hệ hotline hỗ trợ</li>
+              <li>Đơn hàng sẽ tự động hủy sau 15 phút nếu không thanh toán</li>
             </ul>
           </div>
 
           <div className="action-buttons">
-            <button onClick={() => navigate(`/orders/${orderId}`)} className="view-order-btn">
-              Xem đơn hàng của tôi
-            </button>
+            {!paymentConfirmed && countdown > 0 ? (
+              <button 
+                className="cancel-payment-btn"
+                onClick={() => setShowCancelConfirm(true)}
+                disabled={cancelling}
+              >
+                <FaBan /> Hủy thanh toán
+              </button>
+            ) : paymentConfirmed ? (
+              <button onClick={() => navigate(`/orders/${orderId}`)} className="view-order-btn">
+                <FaCheckCircle /> Xem đơn hàng
+              </button>
+            ) : null}
+            
             <button onClick={() => navigate('/')} className="continue-shopping-btn">
               Tiếp tục mua sắm
             </button>
           </div>
         </div>
       </div>
+
+      {showCancelConfirm && (
+        <div className="modal-overlay" onClick={() => setShowCancelConfirm(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2><FaExclamationTriangle color="#ed6c02" /> Xác nhận hủy thanh toán</h2>
+              <button className="modal-close" onClick={() => setShowCancelConfirm(false)}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <p>Bạn có chắc chắn muốn hủy thanh toán cho đơn hàng <strong>#{orderCode}</strong>?</p>
+              <p className="warning-text">⚠️ Hành động này sẽ hủy đơn hàng và quay lại trang thanh toán để bạn đặt lại.</p>
+            </div>
+            <div className="modal-footer">
+              <button className="modal-cancel-btn" onClick={() => setShowCancelConfirm(false)}>
+                Quay lại
+              </button>
+              <button 
+                className="modal-confirm-btn"
+                onClick={handleCancelOrder}
+                disabled={cancelling}
+              >
+                {cancelling ? <FaSpinner className="spinning" /> : <FaTrash />} Xác nhận hủy
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes spin { 100% { transform: rotate(360deg); } }
@@ -411,29 +571,6 @@ const PaymentInstructions = () => {
           color: #e65100;
         }
         
-        .transfer-content-box {
-          background: #e8f5e9;
-          border-radius: 16px;
-          padding: 20px;
-          margin-top: 16px;
-        }
-        .transfer-code {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          margin: 12px 0;
-        }
-        .transfer-code code {
-          background: #2e7d32;
-          color: white;
-          padding: 10px 16px;
-          border-radius: 8px;
-          font-family: monospace;
-          font-size: 16px;
-          font-weight: bold;
-        }
-        .warning-text { font-size: 12px; color: #d32f2f; margin-top: 8px; line-height: 1.5; }
-        
         .payment-status {
           padding: 14px;
           border-radius: 12px;
@@ -460,13 +597,17 @@ const PaymentInstructions = () => {
           display: flex;
           gap: 12px;
         }
-        .view-order-btn, .continue-shopping-btn {
+        .view-order-btn, .continue-shopping-btn, .cancel-payment-btn {
           flex: 1;
           padding: 14px;
           border-radius: 40px;
           cursor: pointer;
           font-weight: 600;
           text-align: center;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
         }
         .view-order-btn {
           background: #2e7d32;
@@ -478,6 +619,15 @@ const PaymentInstructions = () => {
           color: #2e7d32;
           border: 2px solid #2e7d32;
         }
+        .cancel-payment-btn {
+          background: #dc3545;
+          color: white;
+          border: none;
+        }
+        .cancel-payment-btn:disabled {
+          background: #ccc;
+          cursor: not-allowed;
+        }
         .back-btn {
           padding: 10px 24px;
           background: #2e7d32;
@@ -486,6 +636,85 @@ const PaymentInstructions = () => {
           border-radius: 30px;
           cursor: pointer;
           margin-top: 16px;
+        }
+        
+        .modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0,0,0,0.6);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 10001;
+        }
+        .modal-content {
+          background: white;
+          border-radius: 24px;
+          max-width: 450px;
+          width: 90%;
+          overflow: hidden;
+        }
+        .modal-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 20px 24px;
+          border-bottom: 1px solid #eee;
+        }
+        .modal-header h2 {
+          font-size: 20px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .modal-close {
+          background: none;
+          border: none;
+          font-size: 28px;
+          cursor: pointer;
+          color: #999;
+        }
+        .modal-body {
+          padding: 24px;
+        }
+        .modal-body .warning-text {
+          color: #dc3545;
+          font-size: 13px;
+          margin-top: 12px;
+        }
+        .modal-footer {
+          display: flex;
+          gap: 12px;
+          padding: 20px 24px;
+          border-top: 1px solid #eee;
+        }
+        .modal-cancel-btn {
+          flex: 1;
+          padding: 12px;
+          background: #f5f5f5;
+          border: none;
+          border-radius: 40px;
+          cursor: pointer;
+        }
+        .modal-confirm-btn {
+          flex: 1;
+          padding: 12px;
+          background: #dc3545;
+          color: white;
+          border: none;
+          border-radius: 40px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+        }
+        .modal-confirm-btn:disabled {
+          background: #ccc;
+          cursor: not-allowed;
         }
         
         @media (max-width: 600px) {

@@ -228,8 +228,13 @@ const OrderDetail = () => {
 
   const canCancel = () => {
     if (!order) return false;
+    // Nếu có yêu cầu hoàn trả đang xử lý thì không cho hủy
     if (returnInfo && ['pending', 'approved'].includes(returnInfo.status)) return false;
-    return order.status === 'pending' || order.status === 'paid';
+    
+    // ✅ Chỉ cho hủy khi:
+    // 1. Đơn hàng đang ở trạng thái 'pending' (chờ xử lý)
+    // 2. VÀ chưa thanh toán (payment_status !== 'paid')
+    return order.status === 'pending' && order.payment_status !== 'paid';
   };
 
   const canReorder = () => {

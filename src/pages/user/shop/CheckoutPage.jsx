@@ -245,6 +245,7 @@ const CheckoutPage = () => {
     showToast("Đã xóa mã giảm giá", "success");
   };
 
+  // Sửa hàm handleSubmitOrder
   const handleSubmitOrder = async () => {
     if (!shippingAddress?.street) return showToast("Vui lòng cập nhật địa chỉ nhận hàng", "error");
     if (selectedItems.length === 0) return showToast("Không có sản phẩm nào để đặt hàng", "error");
@@ -289,26 +290,6 @@ const CheckoutPage = () => {
       const order = response.data;
       const orderId = order.id || order._id;
       
-      // Tăng usage voucher
-      if (selectedVoucher?._id) {
-        try {
-          await api.post(`/api/v1/vouchers/${selectedVoucher._id}/use`);
-        } catch (error) {
-          console.error("Error using voucher:", error);
-        }
-      }
-      
-      // Xóa sản phẩm khỏi giỏ hàng
-      for (const item of selectedItems) {
-        try {
-          await api.delete('/api/v1/cart/remove', {
-            params: { product_id: item.product_id, variant_id: item.variant_id || null }
-          });
-        } catch (error) {
-          console.error("Error removing item from cart:", error);
-        }
-      }
-      
       // Xóa localStorage
       localStorage.removeItem('selectedCartItems');
       localStorage.removeItem('selectedVoucher');
@@ -317,8 +298,21 @@ const CheckoutPage = () => {
       
       // Xử lý theo phương thức thanh toán
       if (paymentMethod === 'cod') {
+        // COD: Hiển thị modal thành công ngay
         setShowSuccessModal(true);
+        
+        // Xóa sản phẩm khỏi giỏ hàng (background)
+        for (const item of selectedItems) {
+          try {
+            await api.delete('/api/v1/cart/remove', {
+              params: { product_id: item.product_id, variant_id: item.variant_id || null }
+            });
+          } catch (error) {
+            console.error("Error removing item from cart:", error);
+          }
+        }
       } else if (paymentMethod === 'bank') {
+        // Bank: Chuyển đến trang hướng dẫn thanh toán (đơn hàng đã được tạo với status = "pending_payment")
         navigate(`/payment/instructions/${orderId}`, {
           state: { shopId: selectedItems[0]?.shop_id, orderTotal: finalTotal }
         });
