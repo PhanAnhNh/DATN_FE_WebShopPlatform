@@ -48,7 +48,9 @@ const ShopDetailPage = () => {
     const [newChatMessage, setNewChatMessage] = useState(''); // THÊM STATE NÀY
     const messagesEndRef = useRef(null);
     const socketRef = useRef(null);
-    
+    const [editingMessage, setEditingMessage] = useState(null);
+    const [editContent, setEditContent] = useState('');
+    const [actionMenuMessageId, setActionMenuMessageId] = useState(null);
     const token = localStorage.getItem('user_token');
 
     // Lọc và sắp xếp sản phẩm
@@ -93,7 +95,16 @@ const ShopDetailPage = () => {
         setChatLoading(true);
         try {
             const response = await api.get(`/api/v1/chat/conversation/${shop_id}`);
-            setChatMessages(response.data);
+            // Sắp xếp tin nhắn theo thời gian tăng dần (cũ lên đầu, mới xuống cuối)
+            const sortedMessages = [...response.data].sort((a, b) => {
+                return new Date(a.created_at) - new Date(b.created_at);
+            });
+            setChatMessages(sortedMessages);
+            
+            // Scroll xuống cuối sau khi messages được set
+            setTimeout(() => {
+                messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+            }, 200);
         } catch (error) {
             console.error("Error fetching chat messages:", error);
         } finally {
@@ -102,53 +113,53 @@ const ShopDetailPage = () => {
     };
 
     const sendChatMessage = async () => {
-    if (!newChatMessage.trim()) return;
-    
-    const userToken = localStorage.getItem('user_token');
-    if (!userToken) {
-        alert("Vui lòng đăng nhập để nhắn tin");
-        navigate('/login');
-        return;
-    }
-    
-    const content = newChatMessage.trim();
-    const tempId = 'temp-' + Date.now();
-    const userData = JSON.parse(localStorage.getItem('user_data') || '{}');
-    const currentUserId = userData.id || userData._id;
-    
-    const tempMsg = {
-        id: tempId,
-        sender_id: currentUserId,
-        receiver_id: shop_id,
-        content: content,
-        created_at: new Date().toISOString(),
-        is_read: false,
-        sender_name: userData.full_name || userData.username || 'Bạn',
-        sender_avatar: userData.avatar_url
-    };
-    
-    // Thêm tin nhắn tạm thời vào UI ngay lập tức
-    setChatMessages(prev => [...prev, tempMsg]);
-    setNewChatMessage('');
-    
-    try {
-        // Gửi tin nhắn qua API - backend sẽ lưu vào database
-        await api.post('/api/v1/chat/send', null, {
-            params: {
-                receiver_id: shop_id,
-                content: content,
-                message_type: "text"
-            }
-        });
+        if (!newChatMessage.trim()) return;
         
-    } catch (err) {
-        // Nếu lỗi, xóa tin nhắn tạm
-        setChatMessages(prev => prev.filter(msg => msg.id !== tempId));
-        console.error("Error sending message:", err);
-        alert("Không thể gửi tin nhắn. Vui lòng thử lại.");
-    }
-};
+        const userToken = localStorage.getItem('user_token');
+        if (!userToken) {
+            alert("Vui lòng đăng nhập để nhắn tin");
+            navigate('/login');
+            return;
+        }
+        
+        const content = newChatMessage.trim();
+        const currentContent = content;
+        
+        // Xóa input ngay lập tức
+        setNewChatMessage('');
+        
+        try {
+            // Gửi tin nhắn qua API - backend sẽ lưu vào database và emit socket
+            await api.post('/api/v1/chat/send', null, {
+                params: {
+                    receiver_id: shop_id,
+                    content: currentContent,
+                    message_type: "text"
+                }
+            });
+            // KHÔNG thêm tin nhắn tạm ở đây - đợi socket trả về
+        } catch (err) {
+            console.error("Error sending message:", err);
+            alert("Không thể gửi tin nhắn. Vui lòng thử lại.");
+        }
+    }; 
 
+    const handleDeleteMessage = async (message) => {
+        if (!window.confirm('Bạn có chắc chắn muốn xóa tin nhắn này?')) return;
+        
+        try {
+            await api.delete(`/api/v1/chat/${message.id}`);
+            setChatMessages(prev => prev.filter(m => m.id !== message.id));
+        } catch (error) {
+            console.error("Error deleting message:", error);
+            alert("Không thể xóa tin nhắn");
+        }
+    };
+
+    const handleStartEdit = (message) => {
+        setEditingMessage(message);
+        setEditContent(message.content);
+    };
 
     // Fetch dữ liệu từ API
     useEffect(() => {
@@ -157,79 +168,100 @@ const ShopDetailPage = () => {
         checkFollowStatus();
     }, [shop_id]);
 
-    // Auto scroll messages
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [chatMessages]);
+        const handleClickOutside = (event) => {
+            // Kiểm tra nếu click không phải vào menu button hoặc menu content
+            const menuButton = document.querySelector('.message-menu-button');
+            const menuContent = document.querySelector('.message-menu-content');
+            
+            if (actionMenuMessageId && 
+                menuButton && !menuButton.contains(event.target) &&
+                menuContent && !menuContent.contains(event.target)) {
+                setActionMenuMessageId(null);
+            }
+        };
+        
+        if (actionMenuMessageId) {
+            // Dùng setTimeout để tránh click event ngay lập tức
+            setTimeout(() => {
+                document.addEventListener('click', handleClickOutside);
+            }, 0);
+            return () => document.removeEventListener('click', handleClickOutside);
+        }
+    }, [actionMenuMessageId]);
 
     // Trong ShopDetailPage.jsx, cập nhật useEffect cho socket
 
-useEffect(() => {
-    if (showChatModal && shop_id) {
-        fetchChatMessages();
-        
-        const userToken = localStorage.getItem('user_token');
-        if (userToken) {
-            if (!socket.connected) {
-                socket.connect();
-            }
+    useEffect(() => {
+        if (showChatModal && shop_id) {
+            fetchChatMessages();
             
-            const userData = JSON.parse(localStorage.getItem('user_data') || '{}');
-            const currentUserId = userData.id || userData._id;
-            
-            const handleConnect = () => {
-                console.log('Socket connected');
-                if (currentUserId) {
-                    // THAY ĐỔI: Join room với định dạng user_{userId}
-                    socket.emit('join', { user_id: currentUserId });
-                    console.log(`Joined room: user_${currentUserId}`);
+            const userToken = localStorage.getItem('user_token');
+            if (userToken) {
+                if (!socket.connected) {
+                    socket.connect();
                 }
-            };
-            
-            // Handler nhận tin nhắn mới
-            const handleNewMessage = (msg) => {
-                console.log('📨 Received new message:', msg);
                 
-                // Chỉ xử lý tin nhắn liên quan đến shop này
-                if (msg.sender_id === shop_id || msg.receiver_id === shop_id) {
-                    setChatMessages(prev => {
-                        // Kiểm tra trùng lặp
-                        const isDuplicate = prev.some(existingMsg => 
-                            existingMsg.id === msg.id || 
-                            (existingMsg.content === msg.content && 
-                             Math.abs(new Date(existingMsg.created_at) - new Date(msg.created_at)) < 2000)
-                        );
-                        
-                        if (isDuplicate) {
-                            console.log('Duplicate message ignored:', msg);
-                            return prev;
-                        }
-                        
-                        console.log('New message added to UI:', msg);
-                        return [...prev, msg];
-                    });
+                const userData = JSON.parse(localStorage.getItem('user_data') || '{}');
+                const currentUserId = userData.id || userData._id;
+                
+                const handleConnect = () => {
+                    console.log('Socket connected');
+                    if (currentUserId) {
+                        // THAY ĐỔI: Join room với định dạng user_{userId}
+                        socket.emit('join', { user_id: currentUserId });
+                        console.log(`Joined room: user_${currentUserId}`);
+                    }
+                };
+                
+                // Handler nhận tin nhắn mới
+                const handleNewMessage = (msg) => {
+                    console.log('📨 Received new message:', msg);
                     
-                    // Scroll xuống cuối
-                    setTimeout(() => {
-                        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-                    }, 100);
+                    // Chỉ xử lý tin nhắn liên quan đến shop này
+                    if (msg.sender_id === shop_id || msg.receiver_id === shop_id) {
+                        setChatMessages(prev => {
+                            // Kiểm tra trùng lặp
+                            const isDuplicate = prev.some(existingMsg => 
+                                existingMsg.id === msg.id || 
+                                (existingMsg.content === msg.content && 
+                                Math.abs(new Date(existingMsg.created_at) - new Date(msg.created_at)) < 2000)
+                            );
+                            
+                            if (isDuplicate) {
+                                console.log('Duplicate message ignored:', msg);
+                                return prev;
+                            }
+                            
+                            console.log('New message added to UI:', msg);
+                            return [...prev, msg];
+                        });
+                        
+                        // Scroll xuống cuối
+                        setTimeout(() => {
+                            messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+                        }, 100);
+                    }
+                };
+                
+                if (socket.connected) {
+                    handleConnect();
                 }
-            };
-            
-            if (socket.connected) {
-                handleConnect();
+                
+                socket.on('connect', handleConnect);
+                socket.on('new_message', handleNewMessage);
+                socket.on('message_edited', handleMessageEdited);
+                socket.on('message_deleted', handleMessageDeleted);
+                
+                return () => {
+                    socket.off('connect', handleConnect);
+                    socket.off('new_message', handleNewMessage);
+                    socket.off('message_edited', handleMessageEdited);
+                    socket.off('message_deleted', handleMessageDeleted);
+                };
             }
-            
-            socket.on('connect', handleConnect);
-            socket.on('new_message', handleNewMessage);
-            
-            return () => {
-                socket.off('connect', handleConnect);
-                socket.off('new_message', handleNewMessage);
-            };
         }
-    }
-}, [showChatModal, shop_id]);
+    }, [showChatModal, shop_id]);
 
     const fetchShopData = async () => {
         setLoading(true);
@@ -337,6 +369,40 @@ useEffect(() => {
 
     const handleProductClick = (productId) => navigate(`/product/${productId}`);
     
+    const handleSaveEdit = async () => {
+        if (!editContent.trim() || !editingMessage) return;
+        
+        try {
+            await api.put(`/api/v1/chat/${editingMessage.id}`, null, {
+                params: { content: editContent.trim() }
+            });
+            setChatMessages(prev => prev.map(m => 
+                m.id === editingMessage.id 
+                    ? { ...m, content: editContent.trim(), is_edited: true }
+                    : m
+            ));
+            setEditingMessage(null);
+            setEditContent('');
+        } catch (error) {
+            console.error("Error editing message:", error);
+            alert("Không thể sửa tin nhắn");
+        }
+    };
+
+    const handleMessageDeleted = (data) => {
+        setChatMessages(prev => prev.filter(m => m.id !== data.id));
+    };
+
+    const handleMessageEdited = (data) => {
+        setChatMessages(prev => prev.map(m => 
+            m.id === data.id 
+                ? { ...m, content: data.content, is_edited: true }
+                : m
+        ));
+    };
+
+
+
     const handleSubmitComment = async () => {
         if (!newComment.trim()) return;
         if (!token) {
@@ -1162,29 +1228,176 @@ useEffect(() => {
                                     const userData = JSON.parse(localStorage.getItem('user_data') || '{}');
                                     const currentUserId = userData.id || userData._id;
                                     const isMe = msg.sender_id === currentUserId;
+                                    const isEditing = editingMessage?.id === msg.id;
+                                    const showMenu = actionMenuMessageId === msg.id;
+                                    
                                     return (
                                         <div key={msg.id || index} style={{
                                             alignSelf: isMe ? 'flex-end' : 'flex-start',
-                                            maxWidth: '85%'
+                                            maxWidth: '85%',
+                                            position: 'relative'
                                         }}>
-                                            <div style={{
-                                                background: isMe ? '#2e7d32' : 'white',
-                                                color: isMe ? 'white' : '#333',
-                                                padding: '8px 12px',
-                                                borderRadius: '15px',
-                                                fontSize: '14px',
-                                                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                                                wordBreak: 'break-word'
-                                            }}>
-                                                {msg.content}
-                                            </div>
+                                            {isEditing ? (
+                                                // Chế độ sửa tin nhắn
+                                                <div style={{
+                                                    background: isMe ? '#2e7d32' : 'white',
+                                                    padding: '8px 12px',
+                                                    borderRadius: '15px',
+                                                    display: 'flex',
+                                                    gap: '8px',
+                                                    alignItems: 'center',
+                                                    flexWrap: 'wrap'
+                                                }}>
+                                                    <input
+                                                        type="text"
+                                                        value={editContent}
+                                                        onChange={(e) => setEditContent(e.target.value)}
+                                                        onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit()}
+                                                        style={{
+                                                            background: 'white',
+                                                            border: 'none',
+                                                            padding: '6px 12px',
+                                                            borderRadius: '20px',
+                                                            outline: 'none',
+                                                            fontSize: '14px',
+                                                            minWidth: '180px',
+                                                            color: '#333'
+                                                        }}
+                                                        autoFocus
+                                                    />
+                                                    <button 
+                                                        onClick={handleSaveEdit} 
+                                                        style={{ background: 'none', border: 'none', color: isMe ? 'white' : '#2e7d32', cursor: 'pointer', fontSize: '16px' }}
+                                                    >
+                                                        💾
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => {
+                                                            setEditingMessage(null);
+                                                            setEditContent('');
+                                                        }} 
+                                                        style={{ background: 'none', border: 'none', color: isMe ? 'white' : '#999', cursor: 'pointer', fontSize: '16px' }}
+                                                    >
+                                                        ✖
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <div style={{
+                                                        background: isMe ? '#2e7d32' : 'white',
+                                                        color: isMe ? 'white' : '#333',
+                                                        padding: '8px 12px',
+                                                        borderRadius: '15px',
+                                                        fontSize: '14px',
+                                                        boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                                                        wordBreak: 'break-word',
+                                                        position: 'relative'
+                                                    }}>
+                                                        {msg.content}
+                                                        {msg.is_edited && (
+                                                            <span style={{ fontSize: '10px', opacity: 0.7, marginLeft: '8px' }}>(đã sửa)</span>
+                                                        )}
+                                                    </div>
+                                                    
+                                                    {/* Nút 3 chấm - chỉ hiển thị cho tin nhắn của tôi */}
+                                                    {isMe && (
+                                                        <div style={{ position: 'relative', marginTop: '4px', textAlign: 'right' }}>
+                                                            <button
+                                                                onClick={() => setActionMenuMessageId(showMenu ? null : msg.id)}
+                                                                style={{
+                                                                    background: 'none',
+                                                                    border: 'none',
+                                                                    cursor: 'pointer',
+                                                                    color: '#999',
+                                                                    fontSize: '12px',
+                                                                    padding: '2px 6px',
+                                                                    borderRadius: '12px',
+                                                                    transition: 'background 0.2s'
+                                                                }}
+                                                                onMouseEnter={(e) => e.currentTarget.style.background = '#e0e0e0'}
+                                                                onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                                                            >
+                                                                ⋯
+                                                            </button>
+                                                            
+                                                            {/* Menu dropdown */}
+                                                            {showMenu && (
+                                                                <div style={{
+                                                                    position: 'absolute',
+                                                                    bottom: '100%',
+                                                                    right: 0,
+                                                                    marginBottom: '4px',
+                                                                    background: 'white',
+                                                                    borderRadius: '12px',
+                                                                    boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+                                                                    overflow: 'hidden',
+                                                                    zIndex: 100,
+                                                                    minWidth: '120px'
+                                                                }}>
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            handleStartEdit(msg);
+                                                                            setActionMenuMessageId(null);
+                                                                        }}
+                                                                        style={{
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            gap: '8px',
+                                                                            width: '100%',
+                                                                            padding: '10px 16px',
+                                                                            border: 'none',
+                                                                            background: 'white',
+                                                                            cursor: 'pointer',
+                                                                            fontSize: '14px',
+                                                                            color: '#333',
+                                                                            transition: 'background 0.2s'
+                                                                        }}
+                                                                        onMouseEnter={(e) => e.currentTarget.style.background = '#f5f5f5'}
+                                                                        onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                                                                    >
+                                                                        ✏️ Sửa
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            handleDeleteMessage(msg);
+                                                                            setActionMenuMessageId(null);
+                                                                        }}
+                                                                        style={{
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            gap: '8px',
+                                                                            width: '100%',
+                                                                            padding: '10px 16px',
+                                                                            border: 'none',
+                                                                            background: 'white',
+                                                                            cursor: 'pointer',
+                                                                            fontSize: '14px',
+                                                                            color: '#e41e3f',
+                                                                            transition: 'background 0.2s'
+                                                                        }}
+                                                                        onMouseEnter={(e) => e.currentTarget.style.background = '#f5f5f5'}
+                                                                        onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                                                                    >
+                                                                        🗑️ Xóa
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )}
+                                            
                                             <div style={{
                                                 fontSize: '10px',
                                                 color: '#999',
                                                 marginTop: '4px',
                                                 textAlign: isMe ? 'right' : 'left'
                                             }}>
-                                                {new Date(msg.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                                                {(() => {
+                                                    const date = new Date(msg.created_at);
+                                                    date.setHours(date.getHours() + 7);
+                                                    return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+                                                })()}
                                             </div>
                                         </div>
                                     );
