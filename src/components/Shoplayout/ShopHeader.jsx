@@ -17,6 +17,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import '../../css/ShopHeader.css';
 import NotificationBell from '../../pages/user/NotificationBell';
 import { shopApi } from '../../api/api';
+import ShopInbox from './ShopInbox';
+import socket from '../../socket'; // THÊM DÒNG NÀY
 
 const ShopHeader = ({ toggleSidebar }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -29,55 +31,76 @@ const ShopHeader = ({ toggleSidebar }) => {
   
   const navigate = useNavigate();
   const location = useLocation();
+  const [showInbox, setShowInbox] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
-  // Hàm lấy thông tin shop từ API
-  // src/pages/shop/ShopHeader.jsx - Phần fetchShopInfo
-const fetchShopInfo = async () => {
-  try {
-    setRefreshing(true);
-    const response = await shopApi.get('/api/v1/shops/info');
-    
-    const newShopInfo = response.data;
-    setShopInfo(newShopInfo);
-    
-    // Cập nhật localStorage
-    localStorage.setItem('shop_info', JSON.stringify(newShopInfo));
-    
-    // Dispatch event để các component khác cập nhật
-    window.dispatchEvent(new CustomEvent('shopInfoUpdate', { detail: newShopInfo }));
-    
-    return newShopInfo;
-  } catch (error) {
-    console.error('Error fetching shop info:', error);
-    
-    // Nếu API lỗi 404, thử lấy từ localStorage
-    if (error.response?.status === 404) {
-      console.log('API /shop/info not found, using localStorage data');
-    }
-    
-    // Fallback sang localStorage nếu API lỗi
+  // Lấy shopId
+  const shopInfoStorage = JSON.parse(localStorage.getItem('shop_info') || '{}');
+  const shopDataStorage = JSON.parse(localStorage.getItem('shop_data') || '{}');
+  const shopId = shopInfoStorage._id || shopInfoStorage.id || shopDataStorage.shop_id || localStorage.getItem('shop_id');
+
+  const fetchShopInfo = async () => {
     try {
-      const cached = JSON.parse(localStorage.getItem('shop_info') || '{}');
-      if (cached.name) {
-        setShopInfo(cached);
-      } else {
-        // Tạo dữ liệu mặc định từ shop_data
-        const shopData = JSON.parse(localStorage.getItem('shop_data') || '{}');
-        const defaultInfo = {
-          name: shopData.shop_name || 'Cửa hàng của tôi',
-          email: shopData.email || '',
-          phone: shopData.phone || '',
-          address: ''
-        };
-        setShopInfo(defaultInfo);
+      setRefreshing(true);
+      const response = await shopApi.get('/api/v1/shops/info');
+      
+      const newShopInfo = response.data;
+      setShopInfo(newShopInfo);
+      
+      // Cập nhật localStorage
+      localStorage.setItem('shop_info', JSON.stringify(newShopInfo));
+      
+      // Dispatch event để các component khác cập nhật
+      window.dispatchEvent(new CustomEvent('shopInfoUpdate', { detail: newShopInfo }));
+      
+      return newShopInfo;
+    } catch (error) {
+      console.error('Error fetching shop info:', error);
+      
+      // Nếu API lỗi 404, thử lấy từ localStorage
+      if (error.response?.status === 404) {
+        console.log('API /shop/info not found, using localStorage data');
       }
-    } catch (e) {
-      console.error('Error parsing cached shop info:', e);
+      
+      // Fallback sang localStorage nếu API lỗi
+      try {
+        const cached = JSON.parse(localStorage.getItem('shop_info') || '{}');
+        if (cached.name) {
+          setShopInfo(cached);
+        } else {
+          // Tạo dữ liệu mặc định từ shop_data
+          const shopData = JSON.parse(localStorage.getItem('shop_data') || '{}');
+          const defaultInfo = {
+            name: shopData.shop_name || 'Cửa hàng của tôi',
+            email: shopData.email || '',
+            phone: shopData.phone || '',
+            address: ''
+          };
+          setShopInfo(defaultInfo);
+        }
+      } catch (e) {
+        console.error('Error parsing cached shop info:', e);
+      }
+    } finally {
+      setRefreshing(false);
     }
-  } finally {
-    setRefreshing(false);
-  }
-};
+  };
+
+  const fetchUnreadCount = async () => {
+      try {
+          const response = await shopApi.get('/api/v1/chat/shop/unread-count');
+          setUnreadCount(response.data.unread_count);
+      } catch (error) {
+          console.error("Error fetching unread count:", error);
+      }
+  };
+
+  useEffect(() => {
+      fetchUnreadCount();
+      // Refresh mỗi 30 giây
+      const interval = setInterval(fetchUnreadCount, 30000);
+      return () => clearInterval(interval);
+  }, []);
 
   const loadUserData = () => {
     try {
@@ -87,6 +110,30 @@ const fetchShopInfo = async () => {
       console.error('Error loading user data:', error);
     }
   };
+
+  // Socket listener cho realtime unread count
+  useEffect(() => {
+      if (!socket || !shopId) return;
+      
+      // Shop join vào room của chính mình
+      socket.emit('join', { shop_id: shopId });
+      
+      const handleNewMessage = (msg) => {
+          // Nếu tin nhắn gửi đến shop này và chưa đọc
+          if (msg.receiver_id === shopId && !msg.is_read) {
+              setUnreadCount(prev => prev + 1);
+          }
+      };
+      
+      socket.on('new_message', handleNewMessage);
+      
+      return () => {
+          socket.off('new_message', handleNewMessage);
+          if (socket.connected) {
+              socket.emit('leave', { shop_id: shopId });
+          }
+      };
+  }, [socket, shopId]);
 
   useEffect(() => {
     loadUserData();
@@ -233,11 +280,18 @@ const fetchShopInfo = async () => {
 
       <div className="shop-header__right">
         <div className="shop-header__actions">
-          <button className="shop-header__action-btn">
-            <FaEnvelope />
-            <span className="shop-header__badge">3</span>
+          <button 
+              className="shop-header__action-btn"
+              onClick={() => setShowInbox(true)}
+          >
+              <FaEnvelope />
+              {unreadCount > 0 && (
+                  <span className="shop-header__badge">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+              )}
           </button>
-          
+
           <div className="shop-header__notification-wrapper">
             <div className="shop-header__notification">
               <NotificationBell userType="shop" />
@@ -370,6 +424,7 @@ const fetchShopInfo = async () => {
           font-weight: 500;
         }
       `}</style>
+      {showInbox && <ShopInbox isOpen={showInbox} onClose={() => setShowInbox(false)} />}
     </header>
   );
 };

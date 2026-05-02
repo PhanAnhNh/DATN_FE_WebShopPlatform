@@ -1,15 +1,18 @@
 // pages/user/shop/ShopDetailPage.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import ShopDetailLayout from "../../../components/layout/ShopDetailLayout";
 import api from "../../../api/api";
+import io from "socket.io-client";
+import socket from "../../../socket"; 
 import { 
   FaStore, FaUsers, FaCommentDots, FaStar, FaStarHalfAlt,
   FaRegStar, FaMapMarkerAlt, FaPhone, FaEnvelope, FaCalendarAlt,
   FaHeart, FaRegHeart, FaSearch, FaBox, FaShoppingCart, FaEye,
   FaCheckCircle, FaShareAlt, FaFacebook, FaTwitter, FaInstagram,
   FaTruck, FaShieldAlt, FaClock, FaReply, FaThumbsUp, FaUserCircle, FaEdit,
-  FaFilter, FaSortAmountDown, FaSortAmountUp, FaSortAmountDownAlt
+  FaFilter, FaSortAmountDown, FaSortAmountUp, FaSortAmountDownAlt,
+  FaPaperPlane, FaTimes
 } from 'react-icons/fa';
 
 const ShopDetailPage = () => {
@@ -33,10 +36,18 @@ const ShopDetailPage = () => {
     const [likedReviews, setLikedReviews] = useState({});
     const [newRating, setNewRating] = useState(5);
     const [showRatingSelector, setShowRatingSelector] = useState(false);
-    const [sortOption, setSortOption] = useState("default"); // default, price_asc, price_desc, rating_desc, sold_desc
+    const [sortOption, setSortOption] = useState("default");
     const [showSortMenu, setShowSortMenu] = useState(false);
     const [productReviews, setProductReviews] = useState({});
     const [loadingReviews, setLoadingReviews] = useState(false);
+    
+    // Chat state
+    const [chatMessages, setChatMessages] = useState([]);
+    const [showChatModal, setShowChatModal] = useState(false);
+    const [chatLoading, setChatLoading] = useState(false);
+    const [newChatMessage, setNewChatMessage] = useState(''); // THÊM STATE NÀY
+    const messagesEndRef = useRef(null);
+    const socketRef = useRef(null);
     
     const token = localStorage.getItem('user_token');
 
@@ -44,7 +55,6 @@ const ShopDetailPage = () => {
     const getFilteredAndSortedProducts = () => {
         let filtered = [...products];
         
-        // Lọc theo tìm kiếm
         if (searchTerm.trim()) {
             const searchLower = searchTerm.toLowerCase().trim();
             filtered = filtered.filter(product => 
@@ -52,7 +62,6 @@ const ShopDetailPage = () => {
             );
         }
         
-        // Sắp xếp
         switch (sortOption) {
             case "price_asc":
                 filtered.sort((a, b) => (a.price || 0) - (b.price || 0));
@@ -67,7 +76,6 @@ const ShopDetailPage = () => {
                 filtered.sort((a, b) => (b.sold_count || b.sold_quantity || 0) - (a.sold_count || a.sold_quantity || 0));
                 break;
             default:
-                // Mặc định sắp xếp theo mới nhất
                 filtered.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
         }
         
@@ -76,6 +84,72 @@ const ShopDetailPage = () => {
     
     const filteredProducts = getFilteredAndSortedProducts();
 
+    const handleSendMessage = () => {
+        setShowChatModal(true);
+    };
+
+    const fetchChatMessages = async () => {
+        if (!shop_id) return;
+        setChatLoading(true);
+        try {
+            const response = await api.get(`/api/v1/chat/conversation/${shop_id}`);
+            setChatMessages(response.data);
+        } catch (error) {
+            console.error("Error fetching chat messages:", error);
+        } finally {
+            setChatLoading(false);
+        }
+    };
+
+    const sendChatMessage = async () => {
+    if (!newChatMessage.trim()) return;
+    
+    const userToken = localStorage.getItem('user_token');
+    if (!userToken) {
+        alert("Vui lòng đăng nhập để nhắn tin");
+        navigate('/login');
+        return;
+    }
+    
+    const content = newChatMessage.trim();
+    const tempId = 'temp-' + Date.now();
+    const userData = JSON.parse(localStorage.getItem('user_data') || '{}');
+    const currentUserId = userData.id || userData._id;
+    
+    const tempMsg = {
+        id: tempId,
+        sender_id: currentUserId,
+        receiver_id: shop_id,
+        content: content,
+        created_at: new Date().toISOString(),
+        is_read: false,
+        sender_name: userData.full_name || userData.username || 'Bạn',
+        sender_avatar: userData.avatar_url
+    };
+    
+    // Thêm tin nhắn tạm thời vào UI ngay lập tức
+    setChatMessages(prev => [...prev, tempMsg]);
+    setNewChatMessage('');
+    
+    try {
+        // Gửi tin nhắn qua API - backend sẽ lưu vào database
+        await api.post('/api/v1/chat/send', null, {
+            params: {
+                receiver_id: shop_id,
+                content: content,
+                message_type: "text"
+            }
+        });
+        
+    } catch (err) {
+        // Nếu lỗi, xóa tin nhắn tạm
+        setChatMessages(prev => prev.filter(msg => msg.id !== tempId));
+        console.error("Error sending message:", err);
+        alert("Không thể gửi tin nhắn. Vui lòng thử lại.");
+    }
+};
+
+
     // Fetch dữ liệu từ API
     useEffect(() => {
         if (!shop_id) return;
@@ -83,62 +157,131 @@ const ShopDetailPage = () => {
         checkFollowStatus();
     }, [shop_id]);
 
-    const fetchShopData = async () => {
-    setLoading(true);
-    try {
-        // Lấy thông tin shop
-        const shopRes = await api.get(`/api/v1/shops/${shop_id}`);
-        setShop(shopRes.data);
+    // Auto scroll messages
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [chatMessages]);
 
-        let normalizedProducts = []; // Khai báo ở đây
+    // Trong ShopDetailPage.jsx, cập nhật useEffect cho socket
+
+useEffect(() => {
+    if (showChatModal && shop_id) {
+        fetchChatMessages();
         
-        // Lấy sản phẩm của shop
-        try {
-            const productsRes = await api.get(`/api/v1/shops/${shop_id}/products`);
-            normalizedProducts = (productsRes.data || []).map(product => ({
-                ...product,
-                id: product.id || product._id,
-                rating: product.average_rating || product.rating || 0,
-                sold_count: product.sold_count || product.sold_quantity || 0
-            }));
-            setProducts(normalizedProducts);
-            
-            // Cập nhật số lượng sản phẩm
-            if (shopRes.data && normalizedProducts.length !== shopRes.data.products_count) {
-                setShop(prev => ({
-                    ...prev,
-                    products_count: normalizedProducts.length
-                }));
+        const userToken = localStorage.getItem('user_token');
+        if (userToken) {
+            if (!socket.connected) {
+                socket.connect();
             }
-        } catch (productsError) {
-            console.error("Error fetching products:", productsError);
-            setProducts([]);
+            
+            const userData = JSON.parse(localStorage.getItem('user_data') || '{}');
+            const currentUserId = userData.id || userData._id;
+            
+            const handleConnect = () => {
+                console.log('Socket connected');
+                if (currentUserId) {
+                    // THAY ĐỔI: Join room với định dạng user_{userId}
+                    socket.emit('join', { user_id: currentUserId });
+                    console.log(`Joined room: user_${currentUserId}`);
+                }
+            };
+            
+            // Handler nhận tin nhắn mới
+            const handleNewMessage = (msg) => {
+                console.log('📨 Received new message:', msg);
+                
+                // Chỉ xử lý tin nhắn liên quan đến shop này
+                if (msg.sender_id === shop_id || msg.receiver_id === shop_id) {
+                    setChatMessages(prev => {
+                        // Kiểm tra trùng lặp
+                        const isDuplicate = prev.some(existingMsg => 
+                            existingMsg.id === msg.id || 
+                            (existingMsg.content === msg.content && 
+                             Math.abs(new Date(existingMsg.created_at) - new Date(msg.created_at)) < 2000)
+                        );
+                        
+                        if (isDuplicate) {
+                            console.log('Duplicate message ignored:', msg);
+                            return prev;
+                        }
+                        
+                        console.log('New message added to UI:', msg);
+                        return [...prev, msg];
+                    });
+                    
+                    // Scroll xuống cuối
+                    setTimeout(() => {
+                        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+                    }, 100);
+                }
+            };
+            
+            if (socket.connected) {
+                handleConnect();
+            }
+            
+            socket.on('connect', handleConnect);
+            socket.on('new_message', handleNewMessage);
+            
+            return () => {
+                socket.off('connect', handleConnect);
+                socket.off('new_message', handleNewMessage);
+            };
         }
-
-        // Lấy đánh giá của shop
-        try {
-            const reviewsRes = await api.get(`/api/v1/shops/${shop_id}/reviews`);
-            const normalizedReviews = (reviewsRes.data || []).map(review => ({
-                ...review,
-                id: review.id || review._id,
-                date: review.created_at || review.date,
-                likes: review.helpful_count || review.likes || 0
-            }));
-            setReviews(normalizedReviews);
-        } catch (reviewsError) {
-            console.error("Error fetching reviews:", reviewsError);
-            setReviews([]);
-        }
-        
-        // Lấy đánh giá cho từng sản phẩm - SỬ DỤNG normalizedProducts đã được khai báo
-        await fetchProductsRatings(normalizedProducts);
-        
-    } catch (error) {
-        console.error("Error fetching shop data:", error);
-    } finally {
-        setLoading(false);
     }
-};
+}, [showChatModal, shop_id]);
+
+    const fetchShopData = async () => {
+        setLoading(true);
+        try {
+            const shopRes = await api.get(`/api/v1/shops/${shop_id}`);
+            setShop(shopRes.data);
+
+            let normalizedProducts = [];
+            
+            try {
+                const productsRes = await api.get(`/api/v1/shops/${shop_id}/products`);
+                normalizedProducts = (productsRes.data || []).map(product => ({
+                    ...product,
+                    id: product.id || product._id,
+                    rating: product.average_rating || product.rating || 0,
+                    sold_count: product.sold_count || product.sold_quantity || 0
+                }));
+                setProducts(normalizedProducts);
+                
+                if (shopRes.data && normalizedProducts.length !== shopRes.data.products_count) {
+                    setShop(prev => ({
+                        ...prev,
+                        products_count: normalizedProducts.length
+                    }));
+                }
+            } catch (productsError) {
+                console.error("Error fetching products:", productsError);
+                setProducts([]);
+            }
+
+            try {
+                const reviewsRes = await api.get(`/api/v1/shops/${shop_id}/reviews`);
+                const normalizedReviews = (reviewsRes.data || []).map(review => ({
+                    ...review,
+                    id: review.id || review._id,
+                    date: review.created_at || review.date,
+                    likes: review.helpful_count || review.likes || 0
+                }));
+                setReviews(normalizedReviews);
+            } catch (reviewsError) {
+                console.error("Error fetching reviews:", reviewsError);
+                setReviews([]);
+            }
+            
+            await fetchProductsRatings(normalizedProducts);
+            
+        } catch (error) {
+            console.error("Error fetching shop data:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
     
     const fetchProductsRatings = async (productsList) => {
         if (!productsList || productsList.length === 0) return;
@@ -192,7 +335,6 @@ const ShopDetailPage = () => {
         }
     };
 
-    const handleSendMessage = () => navigate(`/chat?shop=${shop_id}`);
     const handleProductClick = (productId) => navigate(`/product/${productId}`);
     
     const handleSubmitComment = async () => {
@@ -395,8 +537,8 @@ const ShopDetailPage = () => {
                                 borderRadius: "40px",
                                 fontWeight: "600",
                                 background: isFollowing ? "#fff" : "#2e7d32",
-                                color: isFollowing ? "#2e7d32" : "white",  // ← sửa lại color
-                                border: isFollowing ? "2px solid #2e7d32" : "none",  // ← chỉ 1 border
+                                color: isFollowing ? "#2e7d32" : "white",
+                                border: isFollowing ? "2px solid #2e7d32" : "none",
                                 cursor: followLoading ? "not-allowed" : "pointer",
                                 display: "flex",
                                 alignItems: "center",
@@ -476,7 +618,6 @@ const ShopDetailPage = () => {
                             )}
                         </div>
                         
-                        {/* Sort Button */}
                         <div style={{ position: "relative" }}>
                             <button 
                                 onClick={() => setShowSortMenu(!showSortMenu)}
@@ -950,6 +1091,150 @@ const ShopDetailPage = () => {
                 </div>
             </div>
 
+            {/* Chat Modal */}
+            {showChatModal && (
+                <div style={{
+                    position: 'fixed',
+                    right: '20px',
+                    bottom: '0',
+                    zIndex: 2000,
+                    display: 'flex',
+                    alignItems: 'flex-end'
+                }}>
+                    <div style={{
+                        width: '380px',
+                        height: '500px',
+                        background: 'white',
+                        borderRadius: '12px 12px 0 0',
+                        boxShadow: '0 -5px 25px rgba(0,0,0,0.15)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden',
+                        border: '1px solid #ddd'
+                    }}>
+                        {/* Chat Header */}
+                        <div style={{
+                            padding: '12px 16px',
+                            background: '#2e7d32',
+                            color: 'white',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            flexShrink: 0
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <img 
+                                    src={shop?.logo_url || "https://via.placeholder.com/40"} 
+                                    alt={shop?.name}
+                                    style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }}
+                                />
+                                <div>
+                                    <div style={{ fontWeight: 'bold', fontSize: '14px' }}>{shop?.name}</div>
+                                    <div style={{ fontSize: '11px', opacity: 0.8 }}>Đang hoạt động</div>
+                                </div>
+                            </div>
+                            <FaTimes 
+                                style={{ cursor: 'pointer' }} 
+                                onClick={() => setShowChatModal(false)}
+                            />
+                        </div>
+
+                        {/* Messages Area */}
+                        <div style={{
+                            flex: 1,
+                            padding: '12px',
+                            overflowY: 'auto',
+                            background: '#f0f2f5',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '8px'
+                        }}>
+                            {chatLoading ? (
+                                <div style={{ textAlign: 'center', padding: '20px' }}>
+                                    <div style={{ width: '30px', height: '30px', border: '2px solid #f3f3f3', borderTop: '2px solid #2e7d32', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto' }} />
+                                </div>
+                            ) : chatMessages.length === 0 ? (
+                                <div style={{ textAlign: 'center', color: '#65676b', fontSize: '13px', marginTop: '20px' }}>
+                                    Bắt đầu trò chuyện cùng shop
+                                </div>
+                            ) : (
+                                chatMessages.map((msg, index) => {
+                                    const userData = JSON.parse(localStorage.getItem('user_data') || '{}');
+                                    const currentUserId = userData.id || userData._id;
+                                    const isMe = msg.sender_id === currentUserId;
+                                    return (
+                                        <div key={msg.id || index} style={{
+                                            alignSelf: isMe ? 'flex-end' : 'flex-start',
+                                            maxWidth: '85%'
+                                        }}>
+                                            <div style={{
+                                                background: isMe ? '#2e7d32' : 'white',
+                                                color: isMe ? 'white' : '#333',
+                                                padding: '8px 12px',
+                                                borderRadius: '15px',
+                                                fontSize: '14px',
+                                                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                                                wordBreak: 'break-word'
+                                            }}>
+                                                {msg.content}
+                                            </div>
+                                            <div style={{
+                                                fontSize: '10px',
+                                                color: '#999',
+                                                marginTop: '4px',
+                                                textAlign: isMe ? 'right' : 'left'
+                                            }}>
+                                                {new Date(msg.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
+                            <div ref={messagesEndRef} />
+                        </div>
+
+                        {/* Input Area */}
+                        <div style={{
+                            padding: '10px',
+                            borderTop: '1px solid #ddd',
+                            background: 'white',
+                            flexShrink: 0
+                        }}>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <input
+                                    type="text"
+                                    value={newChatMessage}
+                                    onChange={(e) => setNewChatMessage(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && sendChatMessage()}
+                                    placeholder="Nhập tin nhắn..."
+                                    style={{
+                                        flex: 1,
+                                        padding: '8px 15px',
+                                        border: '1px solid #ddd',
+                                        borderRadius: '20px',
+                                        outline: 'none',
+                                        fontSize: '14px'
+                                    }}
+                                />
+                                <button
+                                    onClick={sendChatMessage}
+                                    disabled={!newChatMessage.trim()}
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        color: newChatMessage.trim() ? '#2e7d32' : '#ccc',
+                                        cursor: 'pointer',
+                                        display: 'flex'
+                                    }}
+                                >
+                                    <FaPaperPlane size={20} />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            
             <style>{`
                 @keyframes spin {
                     0% { transform: rotate(0deg); }

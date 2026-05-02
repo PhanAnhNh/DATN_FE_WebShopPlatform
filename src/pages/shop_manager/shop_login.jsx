@@ -62,7 +62,14 @@ function ShopLogin() {
     localStorage.setItem("shop_data", JSON.stringify(data.user));
     
     if (data.shop) {
-      localStorage.setItem("shop_info", JSON.stringify(data.shop));
+        localStorage.setItem('shop_info', JSON.stringify(data.shop));
+        // LƯU SHOP_ID RIÊNG
+        if (data.shop.id) {
+            localStorage.setItem('shop_id', data.shop.id);
+        }
+        if (data.shop._id) {
+            localStorage.setItem('shop_id', data.shop._id);
+        }
     }
 
     showToast("Đăng nhập thành công!", "success");
