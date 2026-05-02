@@ -12,7 +12,7 @@ const ShopPage = () => {
     const [priceRange, setPriceRange] = useState({ from: "", to: "" });
     const [featuredProducts, setFeaturedProducts] = useState([]);
     const [hotProducts, setHotProducts] = useState([]);
-    const [allShops, setAllShops] = useState([]); // 👈 ĐỔI TÊN từ featuredShops thành allShops
+    const [allShops, setAllShops] = useState([]);
     const [provinces, setProvinces] = useState([]);
     const [loading, setLoading] = useState(true);
     const [imageErrors, setImageErrors] = useState({});
@@ -112,7 +112,7 @@ const ShopPage = () => {
     const loadFullCache = () => {
         const cachedProducts = sessionStorage.getItem('shop_featuredProducts');
         const cachedHot = sessionStorage.getItem('shop_hotProducts');
-        const cachedShops = sessionStorage.getItem('shop_allShops'); // 👈 SỬA TÊN KEY
+        const cachedShops = sessionStorage.getItem('shop_allShops');
         const cacheTime = sessionStorage.getItem('shop_full_cache_timestamp');
         const cachedCategory = sessionStorage.getItem('shop_activeCategory');
         const cachedSubCategory = sessionStorage.getItem('shop_selectedSubCategory');
@@ -178,7 +178,7 @@ const ShopPage = () => {
         if (hotProducts.length > 0) {
             sessionStorage.setItem('shop_hotProducts', JSON.stringify(hotProducts));
         }
-        if (allShops.length > 0) { // 👈 SỬA
+        if (allShops.length > 0) {
             sessionStorage.setItem('shop_allShops', JSON.stringify(allShops));
         }
         sessionStorage.setItem('shop_activeCategory', activeCategory);
@@ -211,7 +211,7 @@ const ShopPage = () => {
     // Khi có location thay đổi
     useEffect(() => {
         if (location && isInitialLoad === false && allShops.length === 0) {
-            fetchAllShops(); // 👈 GỌI HÀM MỚI
+            fetchAllShops();
         }
     }, [location]);
 
@@ -244,7 +244,7 @@ const ShopPage = () => {
             
             // Fetch shops nếu có location
             if (location) {
-                await fetchAllShops(); // 👈 GỌI HÀM MỚI
+                await fetchAllShops();
             } else {
                 // Nếu chưa có location, vẫn fetch tất cả shop (không có distance)
                 await fetchAllShopsWithoutLocation();
@@ -298,7 +298,7 @@ const ShopPage = () => {
             const formatted = shops.map(shop => ({
                 id: shop._id || shop.id,
                 name: shop.name,
-                address: shop.address || shop.location?.address || "Đang cập nhật", // 👈 THÊM địa chỉ
+                address: shop.address || shop.location?.address || "Đang cập nhật",
                 rating: shop.rating || 4.5,
                 distance_km: shop.distance_km || null,
                 distance_text: shop.distance_km ? (
@@ -333,7 +333,7 @@ const ShopPage = () => {
         }
     };
 
-    // 👈 HÀM MỚI: Fetch tất cả shop khi chưa có location (không tính khoảng cách)
+    // Fetch tất cả shop khi chưa có location (không tính khoảng cách)
     const fetchAllShopsWithoutLocation = async () => {
         try {
             const res = await userApi.get("/api/v1/shops/", {
@@ -412,7 +412,7 @@ const ShopPage = () => {
                     alignItems: "center", 
                     justifyContent: "center",
                     width: "100%",
-                    height: "100px",
+                    height: "120px",
                     background: "#f0f0f0",
                     borderRadius: "8px"
                 }}>
@@ -427,7 +427,7 @@ const ShopPage = () => {
                 alt={product.name}
                 style={{ 
                     width: "100%", 
-                    height: "100px", 
+                    height: "120px", 
                     objectFit: "cover",
                     borderRadius: "8px"
                 }}
@@ -440,11 +440,23 @@ const ShopPage = () => {
 
     const displayProducts = hotProducts.length > 0 ? hotProducts : featuredProducts.slice(0, 3);
 
+    // Media query styles for responsive
+    const isMobile = () => window.innerWidth <= 768;
+    const [isMobileView, setIsMobileView] = useState(window.innerWidth <= 768);
+
+    useEffect(() => {
+        const handleResize = () => {
+            setIsMobileView(window.innerWidth <= 768);
+        };
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
     return (
         <Layout>
-            <div className="shop-page" style={{ maxWidth: "1200px", margin: "0 auto" }}>
+            <div className="shop-page" style={{ maxWidth: "1200px", margin: "0 auto", padding: isMobileView ? "10px" : "0" }}>
                 {/* Header tabs */}
-                <div style={{ display: "flex", gap: "10px", marginBottom: "20px", alignItems: "center" }}>
+                <div style={{ display: "flex", gap: "10px", marginBottom: "20px", alignItems: "center", flexWrap: "wrap" }}>
                     <div style={{ display: "flex", flex: 1, gap: "10px" }}>
                         <div 
                             onClick={goToForum}
@@ -492,7 +504,7 @@ const ShopPage = () => {
                     </div>
                 </div>
 
-                {/* Khu vực tỉnh thành */}
+                {/* Khu vực tỉnh thành - Grid 2 cột trên mobile */}
                 <div style={{
                     background: "white",
                     borderRadius: "16px",
@@ -500,7 +512,7 @@ const ShopPage = () => {
                     marginBottom: "20px",
                     boxShadow: "0 2px 8px rgba(0,0,0,0.05)"
                 }}>
-                    <h3 style={{ marginBottom: "15px" }}>Khám phá các tỉnh thành</h3>
+                    <h3 style={{ marginBottom: "15px", fontSize: isMobileView ? "16px" : "18px" }}>Khám phá các tỉnh thành</h3>
                     {provinces.length === 0 ? (
                         <div style={{ textAlign: "center", padding: "40px", color: "#999" }}>
                             Đang tải danh sách tỉnh thành...
@@ -508,15 +520,15 @@ const ShopPage = () => {
                     ) : (
                         <div style={{ 
                             display: "grid", 
-                            gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", 
-                            gap: "20px" 
+                            gridTemplateColumns: isMobileView ? "repeat(2, 1fr)" : "repeat(auto-fill, minmax(280px, 1fr))", 
+                            gap: isMobileView ? "12px" : "20px" 
                         }}>
-                            {provinces.map(province => (
+                            {provinces.slice(0, isMobileView ? 6 : provinces.length).map(province => (
                                 <div
                                     key={province.id}
                                     onClick={() => handleProvinceClick(province.id)}
                                     style={{
-                                        height: "160px",
+                                        height: isMobileView ? "140px" : "160px",
                                         borderRadius: "12px",
                                         backgroundImage: `url(${province.image_url || 'https://via.placeholder.com/400x200?text=No+Image'})`,
                                         backgroundSize: "cover",
@@ -547,11 +559,11 @@ const ShopPage = () => {
                                         left: 0,
                                         right: 0,
                                         background: "linear-gradient(transparent, rgba(0,0,0,0.8))",
-                                        padding: "15px",
+                                        padding: isMobileView ? "10px" : "15px",
                                         textAlign: "center"
                                     }}>
-                                        <div style={{ fontWeight: "bold", fontSize: "16px" }}>{province.name}</div>
-                                        {province.description && (
+                                        <div style={{ fontWeight: "bold", fontSize: isMobileView ? "14px" : "16px" }}>{province.name}</div>
+                                        {!isMobileView && province.description && (
                                             <div style={{ fontSize: "12px", marginTop: "5px", opacity: 0.9 }}>
                                                 {province.description.length > 50 ? province.description.substring(0, 50) + "..." : province.description}
                                             </div>
@@ -561,12 +573,32 @@ const ShopPage = () => {
                             ))}
                         </div>
                     )}
+                    {isMobileView && provinces.length > 6 && (
+                        <div style={{ textAlign: "center", marginTop: "12px" }}>
+                            <button style={{
+                                padding: "8px 16px",
+                                background: "#4CAF50",
+                                color: "white",
+                                border: "none",
+                                borderRadius: "20px",
+                                cursor: "pointer",
+                                fontSize: "12px"
+                            }} onClick={() => {
+                                // Handle show more provinces
+                                const moreProvinces = provinces.slice(6);
+                                // You can implement modal or expand logic here
+                                alert(`Còn ${moreProvinces.length} tỉnh thành nữa`);
+                            }}>
+                                Xem thêm {provinces.length - 6} tỉnh
+                            </button>
+                        </div>
+                    )}
                 </div>
 
-                <div style={{ display: "flex", gap: "20px" }}>
+                <div style={{ display: "flex", gap: "20px", flexDirection: isMobileView ? "column" : "row" }}>
                     {/* Nội dung chính bên phải */}
                     <div style={{ flex: 1 }}>
-                        {/* SẢN PHẨM HOT - BÁN CHẠY NHẤT */}
+                        {/* SẢN PHẨM HOT - BÁN CHẠY NHẤT - Horizontal scroll on mobile */}
                         <div style={{
                             background: "white",
                             borderRadius: "12px",
@@ -576,7 +608,7 @@ const ShopPage = () => {
                         }}>
                             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "15px" }}>
                                 <span style={{ fontSize: "24px" }}>🔥</span>
-                                <h3 style={{ margin: 0, fontSize: "18px", color: "#333" }}>Sản phẩm bán chạy nhất</h3>
+                                <h3 style={{ margin: 0, fontSize: isMobileView ? "16px" : "18px", color: "#333" }}>Sản phẩm bán chạy nhất</h3>
                                 <span style={{ 
                                     background: "#ff5722", 
                                     color: "white", 
@@ -589,93 +621,149 @@ const ShopPage = () => {
                                 </span>
                             </div>
                             
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "20px" }}>
-                                {loading && displayProducts.length === 0 ? (
-                                    <div style={{ textAlign: "center", width: "100%", padding: "40px" }}>Đang tải...</div>
-                                ) : displayProducts.length === 0 ? (
-                                    <div style={{ textAlign: "center", width: "100%", padding: "40px", color: "#999" }}>
-                                        Chưa có sản phẩm nào
-                                    </div>
-                                ) : (
-                                    displayProducts.map((product, idx) => (
-                                        <div
-                                            key={product.id}
-                                            onClick={() => handleProductClick(product.id)}
-                                            style={{
-                                                cursor: "pointer",
-                                                textAlign: "center",
-                                                padding: "15px",
-                                                borderRadius: "8px",
-                                                transition: "all 0.3s",
-                                                background: "#f9f9f9",
-                                                position: "relative"
-                                            }}
-                                            onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-4px)"}
-                                            onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}
-                                        >
-                                            <div style={{
-                                                position: "absolute",
-                                                top: "-10px",
-                                                left: "-10px",
-                                                width: "32px",
-                                                height: "32px",
-                                                background: idx === 0 ? "#FFD700" : idx === 1 ? "#C0C0C0" : "#CD7F32",
-                                                borderRadius: "50%",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                                fontWeight: "bold",
-                                                color: "#333",
-                                                boxShadow: "0 2px 5px rgba(0,0,0,0.2)",
-                                                zIndex: 1
-                                            }}>
-                                                {idx + 1}
+                            {isMobileView ? (
+                                // Horizontal scroll for mobile
+                                <div style={{
+                                    overflowX: "auto",
+                                    overflowY: "hidden",
+                                    whiteSpace: "nowrap",
+                                    WebkitOverflowScrolling: "touch",
+                                    scrollbarWidth: "thin",
+                                    paddingBottom: "10px"
+                                }}>
+                                    <div style={{ display: "inline-flex", gap: "15px" }}>
+                                        {loading && displayProducts.length === 0 ? (
+                                            <div style={{ textAlign: "center", width: "200px", padding: "40px" }}>Đang tải...</div>
+                                        ) : displayProducts.length === 0 ? (
+                                            <div style={{ textAlign: "center", width: "200px", padding: "40px", color: "#999" }}>
+                                                Chưa có sản phẩm nào
                                             </div>
-                                            
-                                            <ProductImage product={product} isHot={true} />
-                                            
-                                            <div style={{ 
-                                                fontWeight: "bold", 
-                                                marginTop: "10px", 
-                                                whiteSpace: "nowrap",
-                                                overflow: "hidden",
-                                                textOverflow: "ellipsis" 
-                                            }}>
-                                                {product.name}
-                                            </div>
-                                            
-                                            <div style={{ color: "#d32f2f", fontWeight: "bold", marginTop: "5px" }}>
-                                                {formatCurrency(product.price)}/{product.unit || "kg"}
-                                            </div>
-                                            
-                                            <div style={{ fontSize: "12px", color: "#666", marginTop: "5px" }}>
-                                                {product.shop_name}
-                                            </div>
-                                            
-                                            {product.sold_quantity !== undefined && (
-                                                <div style={{ 
-                                                    fontSize: "11px", 
-                                                    color: "#ff5722", 
-                                                    marginTop: "5px",
-                                                    fontWeight: "500"
-                                                }}>
-                                                    🛒 Đã bán: {product.sold_quantity.toLocaleString()}
+                                        ) : (
+                                            displayProducts.map((product) => (
+                                                <div
+                                                    key={product.id}
+                                                    onClick={() => handleProductClick(product.id)}
+                                                    style={{
+                                                        cursor: "pointer",
+                                                        textAlign: "center",
+                                                        padding: "15px",
+                                                        borderRadius: "8px",
+                                                        transition: "all 0.3s",
+                                                        background: "#f9f9f9",
+                                                        position: "relative",
+                                                        width: "180px",
+                                                        display: "inline-block",
+                                                        whiteSpace: "normal"
+                                                    }}
+                                                    onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-4px)"}
+                                                    onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}
+                                                >
+                                                    <ProductImage product={product} isHot={true} />
+                                                    
+                                                    <div style={{ 
+                                                        fontWeight: "bold", 
+                                                        marginTop: "10px", 
+                                                        whiteSpace: "normal",
+                                                        wordBreak: "break-word",
+                                                        fontSize: "14px"
+                                                    }}>
+                                                        {product.name}
+                                                    </div>
+                                                    
+                                                    <div style={{ color: "#d32f2f", fontWeight: "bold", marginTop: "5px", fontSize: "14px" }}>
+                                                        {formatCurrency(product.price)}/{product.unit || "kg"}
+                                                    </div>
+                                                    
+                                                    <div style={{ fontSize: "12px", color: "#666", marginTop: "5px", whiteSpace: "normal" }}>
+                                                        {product.shop_name}
+                                                    </div>
+                                                    
+                                                    {product.sold_quantity !== undefined && (
+                                                        <div style={{ 
+                                                            fontSize: "11px", 
+                                                            color: "#ff5722", 
+                                                            marginTop: "5px",
+                                                            fontWeight: "500"
+                                                        }}>
+                                                            🛒 Đã bán: {product.sold_quantity.toLocaleString()}
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            )}
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+                            ) : (
+                                // Grid for desktop
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "20px" }}>
+                                    {loading && displayProducts.length === 0 ? (
+                                        <div style={{ textAlign: "center", width: "100%", padding: "40px" }}>Đang tải...</div>
+                                    ) : displayProducts.length === 0 ? (
+                                        <div style={{ textAlign: "center", width: "100%", padding: "40px", color: "#999" }}>
+                                            Chưa có sản phẩm nào
                                         </div>
-                                    ))
-                                )}
-                            </div>
+                                    ) : (
+                                        displayProducts.map((product) => (
+                                            <div
+                                                key={product.id}
+                                                onClick={() => handleProductClick(product.id)}
+                                                style={{
+                                                    cursor: "pointer",
+                                                    textAlign: "center",
+                                                    padding: "15px",
+                                                    borderRadius: "8px",
+                                                    transition: "all 0.3s",
+                                                    background: "#f9f9f9",
+                                                    position: "relative"
+                                                }}
+                                                onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-4px)"}
+                                                onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}
+                                            >
+                                                <ProductImage product={product} isHot={true} />
+                                                
+                                                <div style={{ 
+                                                    fontWeight: "bold", 
+                                                    marginTop: "10px", 
+                                                    whiteSpace: "nowrap",
+                                                    overflow: "hidden",
+                                                    textOverflow: "ellipsis" 
+                                                }}>
+                                                    {product.name}
+                                                </div>
+                                                
+                                                <div style={{ color: "#d32f2f", fontWeight: "bold", marginTop: "5px" }}>
+                                                    {formatCurrency(product.price)}/{product.unit || "kg"}
+                                                </div>
+                                                
+                                                <div style={{ fontSize: "12px", color: "#666", marginTop: "5px" }}>
+                                                    {product.shop_name}
+                                                </div>
+                                                
+                                                {product.sold_quantity !== undefined && (
+                                                    <div style={{ 
+                                                        fontSize: "11px", 
+                                                        color: "#ff5722", 
+                                                        marginTop: "5px",
+                                                        fontWeight: "500"
+                                                    }}>
+                                                        🛒 Đã bán: {product.sold_quantity.toLocaleString()}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            )}
                         </div>
 
-                        {/* 👈 DANH SÁCH TẤT CẢ CỬA HÀNG (đã sửa theo yêu cầu) */}
+                        {/* DANH SÁCH TẤT CẢ CỬA HÀNG - Grid 2 cột trên mobile */}
                         <div style={{
                             background: "white",
                             borderRadius: "12px",
                             padding: "20px",
                             boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
                         }}>
-                            <h3 style={{ margin: "0 0 15px 0", fontSize: "18px", color: "#333" }}>
+                            <h3 style={{ margin: "0 0 15px 0", fontSize: isMobileView ? "16px" : "18px", color: "#333" }}>
                                 🏪 Danh sách cửa hàng
                             </h3>
                             
@@ -705,10 +793,10 @@ const ShopPage = () => {
                             ) : (
                                 <div style={{
                                     display: "grid",
-                                    gridTemplateColumns: "repeat(3, 1fr)",
-                                    gap: "20px"
+                                    gridTemplateColumns: isMobileView ? "repeat(2, 1fr)" : "repeat(3, 1fr)",
+                                    gap: isMobileView ? "12px" : "20px"
                                 }}>
-                                    {allShops.map(shop => {
+                                    {allShops.slice(0, isMobileView ? 6 : allShops.length).map(shop => {
                                         // Kiểm tra xem có hiển thị khoảng cách không (chỉ hiển thị nếu distance_km <= 10)
                                         const showDistance = shop.distance_km !== null && shop.distance_km <= 10;
                                         
@@ -727,17 +815,17 @@ const ShopPage = () => {
                                                 onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}
                                             >
                                                 <div style={{
-                                                    height: "160px",
+                                                    height: isMobileView ? "120px" : "160px",
                                                     backgroundImage: `url(${shop.banner_url || shop.cover_image || "https://via.placeholder.com/300x160?text=Shop"})`,
                                                     backgroundSize: "cover",
                                                     backgroundPosition: "center",
                                                     backgroundColor: "#f5f5f5"
                                                 }} />
 
-                                                <div style={{ padding: "15px" }}>
+                                                <div style={{ padding: isMobileView ? "12px" : "15px" }}>
                                                     <div style={{ 
                                                         fontWeight: "bold", 
-                                                        fontSize: "16px", 
+                                                        fontSize: isMobileView ? "13px" : "16px", 
                                                         whiteSpace: "nowrap",
                                                         overflow: "hidden",
                                                         textOverflow: "ellipsis",
@@ -746,22 +834,21 @@ const ShopPage = () => {
                                                         {shop.name}
                                                     </div>
 
-                                                    {/* 👈 HIỂN THỊ ĐỊA CHỈ */}
                                                     <div style={{ 
-                                                        marginTop: "8px", 
+                                                        marginTop: "6px", 
                                                         color: "#666", 
-                                                        fontSize: "13px",
+                                                        fontSize: isMobileView ? "11px" : "13px",
                                                         display: "flex",
-                                                        alignItems: "flex-start", // Đổi từ center thành flex-start
+                                                        alignItems: "flex-start",
                                                         gap: "4px"
                                                     }}>
                                                         <span>📍</span>
                                                         <span style={{ 
                                                             wordBreak: "break-word", 
                                                             whiteSpace: "normal",
-                                                            lineHeight: "1.4",
+                                                            lineHeight: "1.3",
                                                             display: "-webkit-box",
-                                                            WebkitLineClamp: 1, // Giới hạn 1 dòng
+                                                            WebkitLineClamp: 1,
                                                             WebkitBoxOrient: "vertical",
                                                             overflow: "hidden",
                                                             textOverflow: "ellipsis"
@@ -770,35 +857,34 @@ const ShopPage = () => {
                                                         </span>
                                                     </div>
 
-                                                    <div style={{ marginTop: "5px", color: "#f5b042" }}>
+                                                    <div style={{ marginTop: "4px", color: "#f5b042", fontSize: isMobileView ? "12px" : "14px" }}>
                                                         ⭐ {shop.rating}
                                                     </div>
 
-                                                    {/* 👈 CHỈ HIỂN THỊ KHOẢNG CÁCH NẾU <= 10KM */}
                                                     {showDistance && (
-                                                        <div style={{ color: "#4CAF50", fontSize: "14px", marginTop: "5px", fontWeight: "500" }}>
+                                                        <div style={{ color: "#4CAF50", fontSize: isMobileView ? "11px" : "14px", marginTop: "4px", fontWeight: "500" }}>
                                                             🚗 Cách bạn: <strong>{shop.distance_text}</strong>
                                                         </div>
                                                     )}
                                                     
-                                                    {/* 👈 NẾU CÓ KHOẢNG CÁCH NHƯNG > 10KM, KHÔNG HIỂN THỊ GÌ THÊM */}
                                                     {shop.distance_km !== null && shop.distance_km > 10 && (
-                                                        <div style={{ color: "#999", fontSize: "12px", marginTop: "5px", fontStyle: "italic" }}>
+                                                        <div style={{ color: "#999", fontSize: isMobileView ? "10px" : "12px", marginTop: "4px", fontStyle: "italic" }}>
                                                             (Xa hơn 10km)
                                                         </div>
                                                     )}
 
                                                     <button
                                                         style={{
-                                                            marginTop: "12px",
+                                                            marginTop: "10px",
                                                             width: "100%",
-                                                            padding: "10px",
+                                                            padding: isMobileView ? "8px" : "10px",
                                                             borderRadius: "20px",
                                                             background: "#4CAF50",
                                                             color: "white",
                                                             border: "none",
                                                             fontWeight: "bold",
-                                                            cursor: "pointer"
+                                                            cursor: "pointer",
+                                                            fontSize: isMobileView ? "12px" : "14px"
                                                         }}
                                                         onClick={() => handleShopClick(shop.id)}
                                                     >
@@ -808,6 +894,25 @@ const ShopPage = () => {
                                             </div>
                                         );
                                     })}
+                                </div>
+                            )}
+                            {isMobileView && allShops.length > 6 && (
+                                <div style={{ textAlign: "center", marginTop: "16px" }}>
+                                    <button style={{
+                                        padding: "10px 20px",
+                                        background: "#4CAF50",
+                                        color: "white",
+                                        border: "none",
+                                        borderRadius: "25px",
+                                        cursor: "pointer",
+                                        fontSize: "14px",
+                                        fontWeight: "bold"
+                                    }} onClick={() => {
+                                        // Handle show more shops
+                                        alert(`Xem thêm cửa hàng`);
+                                    }}>
+                                        Xem thêm cửa hàng
+                                    </button>
                                 </div>
                             )}
                         </div>

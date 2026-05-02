@@ -1,18 +1,17 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { FaTimes } from 'react-icons/fa';
 import api from "../../api/api";
-import Toast from "../../components/common/Toast"; // Import Toast component
+import Toast from "../../components/common/Toast";
 
-function SidebarLeft({ userProfile = null }) {
+function SidebarLeft({ userProfile = null, onClose = null }) {
     const [user, setUser] = useState(() => {
-        // Lấy từ cache nếu có
         const cachedUser = sessionStorage.getItem("sidebar_user");
         if (cachedUser) {
             try {
                 const parsed = JSON.parse(cachedUser);
                 const cacheTime = sessionStorage.getItem("sidebar_user_cache_time");
                 if (cacheTime && (Date.now() - parseInt(cacheTime) < 300000)) {
-                    console.log("Using cached sidebar user data");
                     return parsed;
                 }
             } catch (e) {
@@ -31,24 +30,19 @@ function SidebarLeft({ userProfile = null }) {
         };
     });
 
-    // Trạng thái phục vụ chỉnh sửa
     const [isEditing, setIsEditing] = useState(false);
     const [editData, setEditData] = useState({});
     const [loading, setLoading] = useState(false);
-    
-    // Thêm state cho toast
     const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
     const location = useLocation();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
 
-    // Xác định logic trang
     const isProfilePage = location.pathname === "/profile"; 
     const isUserProfilePage = location.pathname.startsWith("/profile/");
     const currentCategory = searchParams.get("category") || "general";
 
-    // Helper function để hiển thị toast
     const showToast = (message, type = 'success') => {
         setToast({ show: true, message, type });
     };
@@ -57,7 +51,6 @@ function SidebarLeft({ userProfile = null }) {
         setToast({ show: false, message: '', type: 'success' });
     };
 
-    // Lưu cache khi user thay đổi
     useEffect(() => {
         if (user && (user.full_name || user.username)) {
             sessionStorage.setItem("sidebar_user", JSON.stringify(user));
@@ -73,7 +66,6 @@ function SidebarLeft({ userProfile = null }) {
         }
 
         const fetchMyProfile = async () => {
-            // Kiểm tra cache trước khi fetch
             const cachedUser = sessionStorage.getItem("sidebar_user");
             const cacheTime = sessionStorage.getItem("sidebar_user_cache_time");
             const isCacheValid = cachedUser && cacheTime && (Date.now() - parseInt(cacheTime) < 300000);
@@ -111,8 +103,8 @@ function SidebarLeft({ userProfile = null }) {
     };
 
     const handleProfileClick = () => {
+        if (onClose) onClose();
         if (user && (user.id || user._id)) {
-            const userId = user.id || user._id;
             navigate(`/profile`);
         } else {
             navigate("/profile");
@@ -135,19 +127,20 @@ function SidebarLeft({ userProfile = null }) {
         }
     };
 
-    // Clear cache function
-    const clearUserCache = () => {
-        sessionStorage.removeItem("sidebar_user");
-        sessionStorage.removeItem("sidebar_user_cache_time");
-    };
-
     const firstLetter = user.full_name 
         ? user.full_name.charAt(0).toUpperCase() 
         : (user.username ? user.username.charAt(0).toUpperCase() : "U");
 
     const handleCategoryClick = (categoryType) => {
-        // Clear cache trước khi chuyển category
-        clearCategoryCache();
+        if (onClose) onClose();
+        
+        // Clear cache
+        const categories = ["general", "agriculture", "seafood", "specialty"];
+        categories.forEach(cat => {
+            sessionStorage.removeItem(`home_posts_${cat}`);
+            sessionStorage.removeItem(`home_cache_time_${cat}`);
+            sessionStorage.removeItem(`home_liked_${cat}`);
+        });
         
         if (categoryType === "general") {
             navigate("/");
@@ -156,17 +149,6 @@ function SidebarLeft({ userProfile = null }) {
         }
     };
 
-    const clearCategoryCache = () => {
-        // Xóa cache của tất cả categories
-        const categories = ["general", "agriculture", "seafood", "specialty"];
-        categories.forEach(cat => {
-            sessionStorage.removeItem(`home_posts_${cat}`);
-            sessionStorage.removeItem(`home_cache_time_${cat}`);
-            sessionStorage.removeItem(`home_liked_${cat}`);
-        });
-    };
-
-    // Styles nội bộ
     const cardStyle = {
         background: "white",
         borderRadius: "12px",
@@ -204,12 +186,9 @@ function SidebarLeft({ userProfile = null }) {
     const getMenuItemStyle = (categoryType) => {
         let isActive = false;
 
-        // Trang saved
         if (categoryType === "saved") {
             isActive = location.pathname === "/user/saved-posts";
-        } 
-        // Trang home + category
-        else {
+        } else {
             const isHome = location.pathname === "/";
             isActive = isHome && currentCategory === categoryType;
         }
@@ -230,9 +209,33 @@ function SidebarLeft({ userProfile = null }) {
 
     const shouldShowProfileInfo = isProfilePage || (isUserProfilePage && userProfile);
 
-    return (
-        <div style={{ width: "280px", flexShrink: 0, fontFamily: "Segoe UI, Tahoma, Geneva, Verdana, sans-serif" }}>
-            {/* Toast Notification */}
+    const sidebarContent = (
+        <div style={{ padding: "16px" }}>
+            {/* Close button for mobile */}
+            {onClose && (
+                <button 
+                    onClick={onClose}
+                    style={{
+                        position: "absolute",
+                        top: "10px",
+                        right: "10px",
+                        width: "32px",
+                        height: "32px",
+                        borderRadius: "50%",
+                        background: "#f0f2f5",
+                        border: "none",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: "pointer",
+                        transition: "all 0.3s",
+                        zIndex: 10
+                    }}
+                >
+                    <FaTimes size={16} />
+                </button>
+            )}
+
             {toast.show && (
                 <Toast 
                     message={toast.message} 
@@ -259,7 +262,7 @@ function SidebarLeft({ userProfile = null }) {
                         <>
                             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "15px" }}>
                                 {user.avatar_url ? (
-                                     <img 
+                                    <img 
                                         src={user.avatar_url} 
                                         alt="avatar" 
                                         style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover", cursor: "pointer" }}
@@ -270,7 +273,7 @@ function SidebarLeft({ userProfile = null }) {
                                         {firstLetter}
                                     </div>
                                 )}
-                                <div >
+                                <div>
                                     <h4 onClick={handleProfileClick} style={{ margin: 0, fontSize: "16px", cursor: "pointer", color: "#2e7d32" }}>{user.full_name || user.username}</h4>
                                     <span style={{ fontSize: "12px", color: "#65676b" }}>@{user.username}</span>
                                 </div>
@@ -334,7 +337,6 @@ function SidebarLeft({ userProfile = null }) {
                     )}
                 </div>
             ) : (
-            /* Menu Trang Chủ */
                 <div style={cardStyle}>
                     <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "15px" }}>
                         {user.avatar_url ? (
@@ -379,14 +381,16 @@ function SidebarLeft({ userProfile = null }) {
                         <li style={getMenuItemStyle("specialty")} onClick={() => handleCategoryClick("specialty")}>
                             <span style={{ fontSize: "20px" }}>📦</span> <span>Đặc sản</span>
                         </li>
-                        <li style={getMenuItemStyle("saved")} onClick={() => navigate("/user/saved-posts")}>
+                        <li style={getMenuItemStyle("saved")} onClick={() => {
+                            if (onClose) onClose();
+                            navigate("/user/saved-posts");
+                        }}>
                             <span style={{ fontSize: "20px" }}>📌</span> <span>Đã lưu</span>
                         </li>
                     </ul>
                 </div>
             )}
                
-            {/* Khối Được quan tâm */}
             <h4 style={{ fontSize: "16px", margin: "15px 0 10px 5px", color: "#65676b", fontWeight: "600" }}>Được quan tâm</h4>
             <div style={cardStyle}>
                 <h4 style={{ margin: "0 0 10px 0", fontSize: "15px", color: "#333" }}>Đặc sản</h4>
@@ -405,6 +409,8 @@ function SidebarLeft({ userProfile = null }) {
             </div>
         </div>
     );
+
+    return sidebarContent;
 }
 
 export default SidebarLeft;

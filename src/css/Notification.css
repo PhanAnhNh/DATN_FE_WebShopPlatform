@@ -12,11 +12,46 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 8px;
+  padding: 6px;
   border-radius: 50%;
   transition: all 0.3s;
+  color: #2e7d32;
+  width: 35px;
+  height: 35px;
+}
+
+.notification-bell-btn svg {
+  width: 18px;
+  height: 18px;
   font-size: 18px;
-  color: #ffb300;
+}
+
+/* Responsive - giữ kích thước ổn định */
+@media (max-width: 768px) {
+  .notification-bell-btn {
+    width: 32px;
+    height: 32px;
+    padding: 6px;
+  }
+  
+  .notification-bell-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+/* Khi zoom nhỏ (dưới 400px) - giảm nhẹ */
+@media (max-width: 480px) {
+  .notification-bell-btn {
+    width: 28px;
+    height: 28px;
+    padding: 4px;
+  }
+  
+  .notification-bell-btn svg {
+    width: 14px;
+    height: 14px;
+  }
 }
 
 .notification-bell-btn:hover {
@@ -25,25 +60,28 @@
 
 .notification-badge {
   position: absolute;
-  top: -7px;
-  right: 0;
+  top: -4px;
+  right: -4px;
   background: #ff4444;
   color: white;
   border-radius: 50%;
-  width: 18px;
-  height: 18px;
-  font-size: 10px;
+  min-width: 16px;
+  height: 16px;
+  font-size: 9px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: bold;
+  padding: 0 3px;
 }
 
+/* Phần còn lại giữ nguyên */
 .notification-dropdown {
   position: absolute;
-  top: 45px;
+  top: 40px;
   right: 0;
   width: 380px;
+  max-width: calc(100vw - 20px);
   max-height: 500px;
   background: white;
   border-radius: 12px;
@@ -53,6 +91,17 @@
   display: flex;
   flex-direction: column;
   animation: slideDown 0.2s ease;
+}
+
+/* Responsive cho dropdown trên mobile */
+@media (max-width: 480px) {
+  .notification-dropdown {
+    position: fixed;
+    top: 50px;
+    right: 10px;
+    left: 10px;
+    width: auto;
+  }
 }
 
 .notification-dropdown-header {
@@ -73,7 +122,7 @@
 .mark-all-btn {
   background: none;
   border: none;
-  color: #eeff00;
+  color: #2e7d32;
   cursor: pointer;
   font-size: 12px;
   display: flex;
@@ -124,12 +173,12 @@
   top: 0;
   bottom: 0;
   width: 3px;
-  background: #eeff00;
+  background: #2e7d32;
 }
 
 .notification-item-icon {
-  font-size: 24px;
-  min-width: 40px;
+  font-size: 20px;
+  min-width: 36px;
   text-align: center;
 }
 
@@ -164,8 +213,8 @@
   padding: 4px;
   border-radius: 4px;
   transition: all 0.2s;
-  height: 24px;
-  width: 24px;
+  height: 28px;
+  width: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -189,7 +238,7 @@
   background: none;
   border: none;
   cursor: pointer;
-  color: #eeff00;
+  color: #2e7d32;
   padding: 4px 8px;
   border-radius: 4px;
   transition: all 0.2s;

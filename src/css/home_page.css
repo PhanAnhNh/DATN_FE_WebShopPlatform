@@ -1,0 +1,127 @@
+/* components/layout/layout.css - Thêm vào file CSS của bạn */
+
+/* Reset và base styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* Responsive container */
+.container {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 16px;
+}
+
+/* Mobile menu button styles */
+.menu-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.menu-btn:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* Sidebar mobile styles */
+@media (max-width: 768px) {
+    .sidebar-mobile-open {
+        left: 0 !important;
+    }
+    
+    .sidebar-mobile-closed {
+        left: -280px !important;
+    }
+}
+
+/* Overlay animation */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.mobile-overlay.active {
+    animation: fadeIn 0.3s ease;
+}
+
+/* Tablet styles */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .container {
+        padding: 0 20px;
+    }
+    
+    .sidebar-left-component {
+        width: 240px !important;
+    }
+}
+
+/* Desktop styles */
+@media (min-width: 1025px) {
+    .container {
+        padding: 0 24px;
+    }
+}
+
+/* Search bar responsive */
+@media (max-width: 768px) {
+    .search-bar input {
+        font-size: 13px;
+    }
+    
+    .header-icon > div,
+    .header-icon > span {
+        transform: scale(0.9);
+    }
+}
+
+/* Hide scrollbar but keep functionality */
+.sidebar-left-component::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar-left-component::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+.sidebar-left-component::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 10px;
+}
+
+.sidebar-left-component::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* Touch-friendly button sizes for mobile */
+@media (max-width: 768px) {
+    button, 
+    [role="button"],
+    .clickable {
+        min-height: 44px;
+        min-width: 44px;
+    }
+}
+
+/* Improve tap highlighting on mobile */
+@media (max-width: 768px) {
+    .clickable,
+    button,
+    a {
+        -webkit-tap-highlight-color: transparent;
+    }
+}
