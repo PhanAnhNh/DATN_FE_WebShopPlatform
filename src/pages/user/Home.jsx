@@ -52,6 +52,10 @@ function Home() {
     const [confirmMessage, setConfirmMessage] = useState("");
     const [showShareModal, setShowShareModal] = useState(false);
     
+    // State cho Lightbox xem ảnh
+    const [lightboxImages, setLightboxImages] = useState([]);
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);
+    const [isLightboxOpen, setIsLightboxOpen] = useState(false);
     
     const clearCache = () => {
         sessionStorage.removeItem(`home_posts_${category}`);
@@ -82,6 +86,51 @@ function Home() {
         setToastConfig({ show: true, message, type });
         setTimeout(() => setToastConfig({ show: false, message: '', type: 'success' }), 3000);
     };
+
+    // Hàm mở lightbox xem ảnh
+    const openLightbox = (images, startIndex) => {
+        setLightboxImages(images);
+        setCurrentImageIndex(startIndex);
+        setIsLightboxOpen(true);
+        // Ngăn scroll body khi mở lightbox
+        document.body.style.overflow = 'hidden';
+    };
+
+    // Hàm đóng lightbox
+    const closeLightbox = () => {
+        setIsLightboxOpen(false);
+        setLightboxImages([]);
+        setCurrentImageIndex(0);
+        document.body.style.overflow = 'unset';
+    };
+
+    // Hàm xem ảnh tiếp theo
+    const nextImage = (e) => {
+        e.stopPropagation();
+        setCurrentImageIndex((prev) => (prev + 1) % lightboxImages.length);
+    };
+
+    // Hàm xem ảnh trước
+    const prevImage = (e) => {
+        e.stopPropagation();
+        setCurrentImageIndex((prev) => (prev - 1 + lightboxImages.length) % lightboxImages.length);
+    };
+
+    // Xử lý phím mũi tên
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (!isLightboxOpen) return;
+            if (e.key === 'ArrowLeft') {
+                setCurrentImageIndex((prev) => (prev - 1 + lightboxImages.length) % lightboxImages.length);
+            } else if (e.key === 'ArrowRight') {
+                setCurrentImageIndex((prev) => (prev + 1) % lightboxImages.length);
+            } else if (e.key === 'Escape') {
+                closeLightbox();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isLightboxOpen, lightboxImages.length]);
 
     // Lưu cache khi posts thay đổi
     useEffect(() => {
@@ -845,6 +894,7 @@ function Home() {
                         )}
                     </div>
 
+                    {/* Phần hiển thị ảnh - ĐÃ THÊM onclick để xem ảnh */}
                     {post.images && post.images.length > 0 && (
                         <div style={{ 
                             display: "grid", 
@@ -861,8 +911,16 @@ function Home() {
                                         width: "100%", 
                                         borderRadius: "8px", 
                                         objectFit: "cover", 
-                                        maxHeight: "400px"
-                                    }} 
+                                        maxHeight: "400px",
+                                        cursor: "pointer",
+                                        transition: "transform 0.2s"
+                                    }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        openLightbox(post.images, index);
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.02)"}
+                                    onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
                                 />
                             ))}
                         </div>
@@ -1012,7 +1070,12 @@ function Home() {
                                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px", marginBottom: "10px" }}>
                                     {imageUrls.map((url, idx) => (
                                         <div key={idx} style={{ position: "relative" }}>
-                                            <img src={url} alt={`preview_${idx}`} style={{ width: "100%", aspectRatio: "1/1", objectFit: "cover", borderRadius: "8px" }} />
+                                            <img 
+                                                src={url} 
+                                                alt={`preview_${idx}`} 
+                                                style={{ width: "100%", aspectRatio: "1/1", objectFit: "cover", borderRadius: "8px", cursor: "pointer" }} 
+                                                onClick={() => openLightbox(imageUrls, idx)}
+                                            />
                                             <button 
                                                 onClick={() => removeImage(idx)}
                                                 style={{ position: "absolute", top: "4px", right: "4px", background: "rgba(0,0,0,0.5)", color: "white", border: "none", borderRadius: "50%", width: "24px", height: "24px", cursor: "pointer" }}
@@ -1049,7 +1112,7 @@ function Home() {
                 </div>
             )}
             
-            {/* Modal xem chi tiết bài viết */}
+            {/* Modal xem chi tiết bài viết - ĐÃ THÊM xem ảnh */}
             {isPostModalOpen && selectedPost && (
                 <div style={{
                     position: "fixed",
@@ -1141,6 +1204,7 @@ function Home() {
                                 )}
                             </div>
 
+                            {/* Phần hiển thị ảnh trong modal chi tiết - ĐÃ THÊM onClick */}
                             {selectedPost.images && selectedPost.images.length > 0 && (
                                 <div style={{
                                     display: "grid",
@@ -1149,7 +1213,21 @@ function Home() {
                                     marginBottom: "15px"
                                 }}>
                                     {selectedPost.images.map((img, idx) => (
-                                        <img key={idx} src={img} alt="post" style={{ width: "100%", borderRadius: "8px", objectFit: "cover" }} />
+                                        <img 
+                                            key={idx} 
+                                            src={img} 
+                                            alt="post" 
+                                            style={{ 
+                                                width: "100%", 
+                                                borderRadius: "8px", 
+                                                objectFit: "cover",
+                                                cursor: "pointer",
+                                                transition: "transform 0.2s"
+                                            }}
+                                            onClick={() => openLightbox(selectedPost.images, idx)}
+                                            onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.02)"}
+                                            onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
+                                        />
                                     ))}
                                 </div>
                             )}
@@ -1184,7 +1262,7 @@ function Home() {
                                 </div>
                                 <div style={{ flex: 1, textAlign: "center", color: "#555", fontWeight: "500", padding: "6px 0" }}>💬 Bình luận</div>
                                 <div style={{ flex: 1, textAlign: "center", cursor: "pointer", color: "#555", fontWeight: "500", padding: "6px 0", borderRadius: "6px" }}
-                                    onClick={() => handleOpenShare(post)}
+                                    onClick={() => handleOpenShare(selectedPost)}
                                     
                                 >↗️ Chia sẻ</div>
                             </div>
@@ -1780,6 +1858,142 @@ function Home() {
                                 Xóa ngay
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ==================== LIGHTBOX XEM ẢNH ==================== */}
+            {isLightboxOpen && lightboxImages.length > 0 && (
+                <div
+                    style={{
+                        position: "fixed",
+                        top: 0,
+                        left: 0,
+                        width: "100vw",
+                        height: "100vh",
+                        backgroundColor: "rgba(0, 0, 0, 0.95)",
+                        zIndex: 10000,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: "pointer"
+                    }}
+                    onClick={closeLightbox}
+                >
+                    {/* Nút đóng */}
+                    <button
+                        onClick={closeLightbox}
+                        style={{
+                            position: "absolute",
+                            top: "20px",
+                            right: "30px",
+                            background: "rgba(0,0,0,0.5)",
+                            border: "none",
+                            color: "white",
+                            fontSize: "30px",
+                            cursor: "pointer",
+                            width: "50px",
+                            height: "50px",
+                            borderRadius: "50%",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            zIndex: 10001,
+                            transition: "all 0.2s"
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.2)"}
+                        onMouseLeave={(e) => e.currentTarget.style.background = "rgba(0,0,0,0.5)"}
+                    >
+                        ✕
+                    </button>
+
+                    {/* Nút prev */}
+                    {lightboxImages.length > 1 && (
+                        <button
+                            onClick={prevImage}
+                            style={{
+                                position: "absolute",
+                                left: "30px",
+                                background: "rgba(0,0,0,0.5)",
+                                border: "none",
+                                color: "white",
+                                fontSize: "40px",
+                                cursor: "pointer",
+                                width: "60px",
+                                height: "60px",
+                                borderRadius: "50%",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                zIndex: 10001,
+                                transition: "all 0.2s"
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.2)"}
+                            onMouseLeave={(e) => e.currentTarget.style.background = "rgba(0,0,0,0.5)"}
+                        >
+                            ◀
+                        </button>
+                    )}
+
+                    {/* Ảnh hiện tại */}
+                    <img
+                        src={lightboxImages[currentImageIndex]}
+                        alt={`Lightbox ${currentImageIndex + 1}`}
+                        style={{
+                            maxWidth: "90vw",
+                            maxHeight: "90vh",
+                            objectFit: "contain",
+                            cursor: "default",
+                            borderRadius: "8px"
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    />
+
+                    {/* Nút next */}
+                    {lightboxImages.length > 1 && (
+                        <button
+                            onClick={nextImage}
+                            style={{
+                                position: "absolute",
+                                right: "30px",
+                                background: "rgba(0,0,0,0.5)",
+                                border: "none",
+                                color: "white",
+                                fontSize: "40px",
+                                cursor: "pointer",
+                                width: "60px",
+                                height: "60px",
+                                borderRadius: "50%",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                zIndex: 10001,
+                                transition: "all 0.2s"
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.2)"}
+                            onMouseLeave={(e) => e.currentTarget.style.background = "rgba(0,0,0,0.5)"}
+                        >
+                            ▶
+                        </button>
+                    )}
+
+                    {/* Số thứ tự ảnh */}
+                    <div
+                        style={{
+                            position: "absolute",
+                            bottom: "20px",
+                            left: "50%",
+                            transform: "translateX(-50%)",
+                            background: "rgba(0,0,0,0.6)",
+                            color: "white",
+                            padding: "6px 16px",
+                            borderRadius: "20px",
+                            fontSize: "14px",
+                            fontWeight: "500",
+                            pointerEvents: "none"
+                        }}
+                    >
+                        {currentImageIndex + 1} / {lightboxImages.length}
                     </div>
                 </div>
             )}

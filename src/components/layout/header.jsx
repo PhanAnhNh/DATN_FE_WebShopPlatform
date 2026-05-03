@@ -316,7 +316,7 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
                         />
 
                         {showSearchResults && (
-                            <div style={{
+                            <div className="result-page" style={{
                                 position: "absolute",
                                 top: "100%",
                                 left: 0,
@@ -327,7 +327,7 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
                                 boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
                                 maxHeight: "400px",
                                 overflowY: "auto",
-                                zIndex: 1001
+                                zIndex: 1001,
                             }}>
                                 {isSearching ? (
                                     <div style={{ padding: "20px", textAlign: "center", color: "#666" }}>
