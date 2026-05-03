@@ -6,6 +6,7 @@ import ShareModal from "./ShareModal";
 import SharedPostCard from "./SharedPostCard";
 import ReportModal from "../admin/reportModal";
 import Toast from "../../components/common/Toast";
+import NavigationTabs from "../../components/Shoplayout/NavigationTabs";
 
 function Home() {
     const navigate = useNavigate();
@@ -713,52 +714,7 @@ function Home() {
     return (
         <Layout>
             <div style={{ display: "flex", gap: "10px", marginBottom: "20px", alignItems: "center" }}>
-                <div style={{ display: "flex", flex: 1, gap: "10px" }}>
-                    <div 
-                        onClick={goToForum}
-                        style={{ 
-                            flex: 1, 
-                            background: location.pathname === "/" ? "white" : "#f0f2f5", 
-                            padding: "12px", 
-                            textAlign: "center", 
-                            borderRadius: "10px", 
-                            fontWeight: "bold", 
-                            color: location.pathname === "/" ? "#2e7d32" : "#666", 
-                            borderBottom: location.pathname === "/" ? "3px solid #2e7d32" : "none",
-                            boxShadow: location.pathname === "/" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
-                            cursor: "pointer",
-                            transition: "all 0.2s"
-                        }}
-                    >
-                        Diễn Đàn
-                    </div>
-                    
-                    <div 
-                        onClick={goToShop}
-                        style={{ 
-                            flex: 1, 
-                            background: location.pathname === "/user/shop" ? "white" : "#f0f2f5", 
-                            padding: "12px", 
-                            textAlign: "center", 
-                            borderRadius: "10px", 
-                            fontWeight: "bold", 
-                            color: location.pathname === "/user/shop" ? "#2e7d32" : "#666", 
-                            borderBottom: location.pathname === "/user/shop" ? "3px solid #2e7d32" : "none",
-                            boxShadow: location.pathname === "/user/shop" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
-                            cursor: "pointer",
-                            transition: "all 0.2s"
-                        }}
-                    >
-                        Cửa Hàng
-                    </div>
-                </div>
-
-                <div style={{ background: "white", padding: "10px 15px", borderRadius: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)", display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", border: "1px solid #eee" }}>
-                    <span style={{ fontWeight: "bold", fontSize: "12px", color: "#333" }}>Chế độ tối</span>
-                    <div style={{ width: "38px", height: "24px", background: "#333", borderRadius: "15px", position: "relative" }}>
-                        <div style={{ width: "18px", height: "18px", background: "white", borderRadius: "50%", position: "absolute", top: "3px", right: "3px" }}></div>
-                    </div>
-                </div>
+                <NavigationTabs />
             </div>
 
             {posts.map((post) => (

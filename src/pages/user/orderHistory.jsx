@@ -1,5 +1,5 @@
 // src/pages/Orders.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   FaSearch, 
@@ -25,7 +25,8 @@ import {
   FaStar,
   FaRegStar,
   FaUndo,
-  FaExclamationTriangle
+  FaExclamationTriangle,
+  FaImage
 } from 'react-icons/fa';
 import api from '../../api/api';
 import '../../css/Orders.css';
@@ -89,10 +90,12 @@ const Orders = () => {
   const [bankInfo, setBankInfo] = useState({ name: '', account: '', holder: '' });
   const [hasReturnRequest, setHasReturnRequest] = useState({}); 
   const [cancelling, setCancelling] = useState(false);
+  const [imageErrors, setImageErrors] = useState({});
 
   // Helper function to show toast
   const showToast = (message, type = 'success') => {
     setToast({ show: true, message, type });
+    setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
   };
 
   // Helper function to show confirm dialog
@@ -190,6 +193,7 @@ const Orders = () => {
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchTerm);
+      setPagination(prev => ({ ...prev, page: 1 })); // Reset page when search changes
     }, 500);
     return () => clearTimeout(timer);
   }, [searchTerm]);
@@ -207,51 +211,95 @@ const Orders = () => {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/api/v1/orders/my', {
-        params: {
-          page: pagination.page,
-          limit: pagination.limit,
-          search: debouncedSearch || undefined,
-          status: selectedStatus || undefined,
-          from_date: fromDate || undefined,
-          to_date: toDate || undefined
-        }
-      });
       
-      let ordersData = [];
-      let paginationData = pagination;
+      // Build params - chỉ gửi search nếu có giá trị
+      const params = {
+        page: pagination.page,
+        limit: pagination.limit
+      };
       
-      if (response.data.data) {
-        ordersData = response.data.data;
-        paginationData = response.data.pagination;
-      } else if (Array.isArray(response.data)) {
-        ordersData = response.data;
-        paginationData = {
-          page: 1,
-          limit: 10,
-          total: response.data.length,
-          total_pages: Math.ceil(response.data.length / 10)
-        };
-      } else {
-        ordersData = [];
+      if (debouncedSearch && debouncedSearch.trim()) {
+        params.search = debouncedSearch.trim();
+      }
+      if (selectedStatus) {
+        params.status = selectedStatus;
+      }
+      if (fromDate) {
+        params.from_date = fromDate;
+      }
+      if (toDate) {
+        params.to_date = toDate;
       }
       
-      const processedOrders = ordersData.map(order => ({
+      console.log('Fetching orders with params:', params);
+      
+      const response = await api.get('/api/v1/orders/my', { params });
+      
+      console.log('Orders response:', response.data);
+      
+      let ordersData = [];
+      let paginationData = {
+        page: pagination.page,
+        limit: 10,
+        total: 0,
+        total_pages: 1
+      };
+      
+      if (response.data) {
+        // Trường hợp 1: { data: [...], pagination: {...} }
+        if (response.data.data && Array.isArray(response.data.data)) {
+          ordersData = response.data.data;
+          paginationData = response.data.pagination || paginationData;
+        } 
+        // Trường hợp 2: Trả về trực tiếp mảng
+        else if (Array.isArray(response.data)) {
+          ordersData = response.data;
+          paginationData = {
+            page: 1,
+            limit: 10,
+            total: response.data.length,
+            total_pages: Math.ceil(response.data.length / 10)
+          };
+        }
+        // Trường hợp 3: { orders: [...], ... }
+        else if (response.data.orders && Array.isArray(response.data.orders)) {
+          ordersData = response.data.orders;
+          paginationData = response.data.pagination || {
+            page: 1,
+            limit: 10,
+            total: ordersData.length,
+            total_pages: Math.ceil(ordersData.length / 10)
+          };
+        }
+        else {
+          console.warn('Unexpected response structure:', response.data);
+          ordersData = [];
+        }
+      }
+      
+      // Xử lý ordersData
+      const processedOrders = (ordersData || []).map(order => ({
         ...order,
         total_price: order.total_amount || order.total_price || 0,
-        items: order.items.map(item => ({
+        items: (order.items || []).map((item, index) => ({
           ...item,
-          _id: item._id || `item_${Math.random()}`,
+          _id: item._id || item.id || `item_${index}`,
           product_id: item.product_id,
-          product_name: item.product_name,
-          price: item.price,
-          quantity: item.quantity
+          product_name: item.product_name || item.name || 'Sản phẩm',
+          price: item.price || 0,
+          quantity: item.quantity || 1,
+          image_url: item.image_url || item.product_image || item.image || null
         }))
       }));
       
       setOrders(processedOrders);
-      setPagination(paginationData);
+      setPagination(prev => ({
+        ...prev,
+        total: paginationData.total || 0,
+        total_pages: paginationData.total_pages || 1
+      }));
       
+      // Kiểm tra trạng thái return request cho các order đã hoàn thành
       processedOrders.forEach(order => {
         if (order.status === 'completed') {
           checkReturnRequest(order._id);
@@ -265,6 +313,13 @@ const Orders = () => {
         navigate('/login');
         return;
       }
+      
+      setOrders([]);
+      setPagination(prev => ({
+        ...prev,
+        total: 0,
+        total_pages: 1
+      }));
     } finally {
       setLoading(false);
     }
@@ -363,7 +418,6 @@ const Orders = () => {
     }
   };
 
-  // SỬA: Hàm xử lý hủy đơn - không dùng window.confirm nữa
   const handleCancelOrder = async (orderId) => {
     try {
       setCancelling(true);
@@ -380,7 +434,6 @@ const Orders = () => {
     }
   };
 
-  // Hàm mở confirm dialog trước khi hủy
   const openCancelConfirm = (orderId, orderCode) => {
     showConfirm(
       'Xác nhận hủy đơn hàng',
@@ -402,6 +455,7 @@ const Orders = () => {
         variant_name: item.variant_name || null,
         quantity: Number(item.quantity),
         price: Number(item.price),
+        image_url: item.image_url,
         selected: false
       };
     });
@@ -473,8 +527,9 @@ const Orders = () => {
 
   const handleReorder = (order) => {
     const itemsToReorder = order.items.map(item => ({
-      ...item,
-      quantity: item.quantity
+      product_id: item.product_id,
+      quantity: item.quantity,
+      variant_id: item.variant_id
     }));
     localStorage.setItem('selectedCartItems', JSON.stringify(itemsToReorder));
     navigate('/checkout');
@@ -505,6 +560,33 @@ const Orders = () => {
     } finally {
       setSubmittingReview(false);
     }
+  };
+
+  const handleImageError = (itemId) => {
+    setImageErrors(prev => ({ ...prev, [itemId]: true }));
+  };
+
+  // Component hiển thị ảnh sản phẩm
+  const ProductImage = ({ item, orderId }) => {
+    const imageKey = `${orderId}_${item._id}`;
+    const hasError = imageErrors[imageKey];
+    
+    if (hasError || !item.image_url) {
+      return (
+        <div className="product-image-placeholder">
+          <FaImage size={24} />
+        </div>
+      );
+    }
+    
+    return (
+      <img 
+        src={item.image_url} 
+        alt={item.product_name}
+        className="product-image"
+        onError={() => handleImageError(imageKey)}
+      />
+    );
   };
 
   return (
@@ -566,7 +648,7 @@ const Orders = () => {
 
           {/* Stats Cards */}
           <div className="orders-stats">
-            <div className="stat-card total" onClick={() => setSelectedStatus('')}>
+            <div className="stat-card total" onClick={() => { setSelectedStatus(''); clearFilters(); }}>
               <div className="stat-icon">
                 <FaShoppingBag />
               </div>
@@ -575,7 +657,7 @@ const Orders = () => {
                 <span className="stat-value">{stats.total}</span>
               </div>
             </div>
-            <div className="stat-card pending" onClick={() => setSelectedStatus('pending')}>
+            <div className="stat-card pending" onClick={() => { setSelectedStatus('pending'); setPagination(prev => ({ ...prev, page: 1 })); }}>
               <div className="stat-icon">
                 <FaClock />
               </div>
@@ -584,7 +666,7 @@ const Orders = () => {
                 <span className="stat-value">{stats.pending}</span>
               </div>
             </div>
-            <div className="stat-card paid" onClick={() => setSelectedStatus('paid')}>
+            <div className="stat-card paid" onClick={() => { setSelectedStatus('paid'); setPagination(prev => ({ ...prev, page: 1 })); }}>
               <div className="stat-icon">
                 <FaCheckCircle />
               </div>
@@ -593,7 +675,7 @@ const Orders = () => {
                 <span className="stat-value">{stats.paid}</span>
               </div>
             </div>
-            <div className="stat-card shipped" onClick={() => setSelectedStatus('shipped')}>
+            <div className="stat-card shipped" onClick={() => { setSelectedStatus('shipped'); setPagination(prev => ({ ...prev, page: 1 })); }}>
               <div className="stat-icon">
                 <FaTruck />
               </div>
@@ -602,7 +684,7 @@ const Orders = () => {
                 <span className="stat-value">{stats.shipped}</span>
               </div>
             </div>
-            <div className="stat-card completed" onClick={() => setSelectedStatus('completed')}>
+            <div className="stat-card completed" onClick={() => { setSelectedStatus('completed'); setPagination(prev => ({ ...prev, page: 1 })); }}>
               <div className="stat-icon">
                 <FaCheckCircle />
               </div>
@@ -619,10 +701,15 @@ const Orders = () => {
               <FaSearch className="search-icon" />
               <input
                 type="text"
-                placeholder="Tìm kiếm theo mã đơn hàng..."
+                placeholder="Tìm kiếm theo mã đơn hàng hoặc tên sản phẩm..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
+              {searchTerm && (
+                <button className="clear-search" onClick={() => setSearchTerm('')}>
+                  <FaTimes />
+                </button>
+              )}
             </div>
 
             <button 
@@ -646,7 +733,10 @@ const Orders = () => {
                 <label>Trạng thái đơn hàng</label>
                 <select 
                   value={selectedStatus} 
-                  onChange={(e) => setSelectedStatus(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedStatus(e.target.value);
+                    setPagination(prev => ({ ...prev, page: 1 }));
+                  }}
                 >
                   <option value="">Tất cả</option>
                   {Object.entries(statusConfig).map(([key, config]) => (
@@ -660,7 +750,10 @@ const Orders = () => {
                 <input
                   type="date"
                   value={fromDate}
-                  onChange={(e) => setFromDate(e.target.value)}
+                  onChange={(e) => {
+                    setFromDate(e.target.value);
+                    setPagination(prev => ({ ...prev, page: 1 }));
+                  }}
                 />
               </div>
 
@@ -669,7 +762,10 @@ const Orders = () => {
                 <input
                   type="date"
                   value={toDate}
-                  onChange={(e) => setToDate(e.target.value)}
+                  onChange={(e) => {
+                    setToDate(e.target.value);
+                    setPagination(prev => ({ ...prev, page: 1 }));
+                  }}
                 />
               </div>
             </div>
@@ -684,16 +780,30 @@ const Orders = () => {
           ) : orders.length === 0 ? (
             <div className="empty-state">
               <FaShoppingBag className="empty-icon" />
-              <h3>Chưa có đơn hàng nào</h3>
-              <p>Bạn chưa có đơn hàng nào. Hãy mua sắm ngay!</p>
-              <Link to="/" className="shop-now-btn">
-                Mua sắm ngay
-              </Link>
+              <h3>
+                {searchTerm ? 'Không tìm thấy đơn hàng' : 'Chưa có đơn hàng nào'}
+              </h3>
+              <p>
+                {searchTerm 
+                  ? `Không tìm thấy đơn hàng nào phù hợp với "${searchTerm}"`
+                  : 'Bạn chưa có đơn hàng nào. Hãy mua sắm ngay!'
+                }
+              </p>
+              {searchTerm ? (
+                <button className="shop-now-btn" onClick={clearFilters}>
+                  Xóa tìm kiếm
+                </button>
+              ) : (
+                <Link to="/" className="shop-now-btn">
+                  Mua sắm ngay
+                </Link>
+              )}
             </div>
           ) : (
             <div className="orders-list">
               {orders.map((order) => {
                 const orderCode = order._id.slice(-8).toUpperCase();
+                const firstItem = order.items?.[0];
                 
                 return (
                   <div key={order._id} className="order-card">
@@ -713,13 +823,16 @@ const Orders = () => {
                       </div>
                     </div>
 
+                    {/* Hiển thị sản phẩm với ảnh */}
                     <div className="order-items">
-                      {order.items && order.items.slice(0, 2).map((item, idx) => (
+                      {order.items && order.items.slice(0, 3).map((item, idx) => (
                         <div key={idx} className="order-item">
-                          <FaBox className="item-icon" />
+                          <div className="item-image-wrapper">
+                            <ProductImage item={item} orderId={order._id} />
+                          </div>
                           <div className="item-details">
                             <div className="item-name">{item.product_name}</div>
-                            {item.variant_name && (
+                            {item.product_name && (
                               <div className="item-variant">Đơn vị: {item.variant_name}</div>
                             )}
                             <div className="item-meta">
@@ -729,9 +842,9 @@ const Orders = () => {
                           </div>
                         </div>
                       ))}
-                      {order.items && order.items.length > 2 && (
+                      {order.items && order.items.length > 3 && (
                         <div className="more-items">
-                          và {order.items.length - 2} sản phẩm khác
+                          và {order.items.length - 3} sản phẩm khác
                         </div>
                       )}
                     </div>
@@ -755,7 +868,7 @@ const Orders = () => {
                           </button>
                         )}
                         
-                        {order.status !== 'cancelled' && (
+                        {order.status !== 'cancelled' && order.status !== 'completed' && (
                           <button 
                             className="action-btn reorder"
                             onClick={() => handleReorder(order)}
@@ -764,7 +877,6 @@ const Orders = () => {
                           </button>
                         )}
                         
-                        {/* SỬA: Dùng confirm dialog thay vì window.confirm */}
                         {(order.status === 'pending' || order.status === 'paid') && (
                           <button 
                             className="action-btn cancel"
@@ -798,7 +910,7 @@ const Orders = () => {
           )}
 
           {/* Pagination */}
-          {pagination.total_pages > 1 && !loading && (
+          {pagination.total_pages > 1 && !loading && orders.length > 0 && (
             <div className="pagination">
               <div className="pagination-info">
                 Hiển thị {(pagination.page - 1) * pagination.limit + 1} -{' '}
@@ -926,7 +1038,6 @@ const Orders = () => {
               </button>
             </div>
             <div className="modal-body">
-              {/* Modal body content - giữ nguyên */}
               <div className="return-items-selection">
                 <h4>Chọn sản phẩm muốn trả</h4>
                 {selectedOrderForReturn.items.map((item, idx) => (
@@ -948,6 +1059,7 @@ const Orders = () => {
                             variant_name: item.variant_name,
                             quantity: item.quantity,
                             price: item.price,
+                            image_url: item.image_url,
                             selected: e.target.checked
                           });
                         }
@@ -1143,6 +1255,102 @@ const Orders = () => {
         .confirm-modal .cancel-btn:hover {
           background: #5a6268;
           transform: translateY(-1px);
+        }
+        
+        .search-box {
+          position: relative;
+          flex: 1;
+        }
+        
+        .clear-search {
+          position: absolute;
+          right: 10px;
+          top: 50%;
+          transform: translateY(-50%);
+          background: none;
+          border: none;
+          color: #999;
+          cursor: pointer;
+          padding: 4px;
+        }
+        
+        .clear-search:hover {
+          color: #333;
+        }
+        
+        .item-image-wrapper {
+          width: 60px;
+          height: 60px;
+          flex-shrink: 0;
+          border-radius: 8px;
+          overflow: hidden;
+          background: #f5f5f5;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        
+        .product-image {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+        
+        .product-image-placeholder {
+          width: 100%;
+          height: 100%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #999;
+          background: #f0f0f0;
+        }
+        
+        .order-item {
+          display: flex;
+          gap: 12px;
+          padding: 10px 0;
+          border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .order-item:last-child {
+          border-bottom: none;
+        }
+        
+        .item-details {
+          flex: 1;
+        }
+        
+        .item-name {
+          font-weight: 500;
+          color: #333;
+          margin-bottom: 4px;
+        }
+        
+        .item-variant {
+          font-size: 12px;
+          color: #666;
+          margin-bottom: 4px;
+        }
+        
+        .item-meta {
+          display: flex;
+          gap: 16px;
+          font-size: 13px;
+          color: #888;
+        }
+        
+        .order-items {
+          padding: 0 16px;
+        }
+        
+        .more-items {
+          padding: 8px 0;
+          text-align: center;
+          font-size: 13px;
+          color: #888;
+          border-top: 1px solid #f0f0f0;
+          margin-top: 8px;
         }
       `}</style>
     </ShopDetailLayout>

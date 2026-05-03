@@ -4,6 +4,7 @@ import Layout from "../../../components/layout/Layout";
 import {userApi} from "../../../api/api";
 import locationApi from "../../../api/locationApi";
 import { useUserLocation } from "../../../components/Hooks/useUserLocation";
+import NavigationTabs from "../../../components/Shoplayout/NavigationTabs";
 
 const ShopPage = () => {
     const navigate = useNavigate();
@@ -456,53 +457,7 @@ const ShopPage = () => {
         <Layout>
             <div className="shop-page" style={{ maxWidth: "1200px", margin: "0 auto", padding: isMobileView ? "10px" : "0" }}>
                 {/* Header tabs */}
-                <div style={{ display: "flex", gap: "10px", marginBottom: "20px", alignItems: "center", flexWrap: "wrap" }}>
-                    <div style={{ display: "flex", flex: 1, gap: "10px" }}>
-                        <div 
-                            onClick={goToForum}
-                            style={{ 
-                                flex: 1, 
-                                background: "#f0f2f5", 
-                                padding: "12px", 
-                                textAlign: "center", 
-                                borderRadius: "10px", 
-                                fontWeight: "bold", 
-                                color: "#666", 
-                                boxShadow: "0 1px 3px rgba(0,0,0,0.1)", 
-                                cursor: "pointer",
-                                transition: "all 0.2s"
-                            }}
-                        >
-                            Diễn Đàn
-                        </div>
-                        
-                        <div 
-                            onClick={goToShop}
-                            style={{ 
-                                flex: 1, 
-                                background: "white", 
-                                padding: "12px", 
-                                textAlign: "center", 
-                                borderRadius: "10px", 
-                                fontWeight: "bold", 
-                                color: "#2e7d32", 
-                                borderBottom: "3px solid #2e7d32",
-                                boxShadow: "0 1px 3px rgba(0,0,0,0.1)", 
-                                cursor: "pointer",
-                                transition: "all 0.2s"
-                            }}
-                        >
-                            Cửa Hàng
-                        </div>
-                    </div>
-
-                    <div style={{ background: "white", padding: "10px 15px", borderRadius: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.1)", display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", border: "1px solid #eee" }}>
-                        <span style={{ fontWeight: "bold", fontSize: "12px", color: "#333" }}>Chế độ tối</span>
-                        <div style={{ width: "38px", height: "24px", background: "#333", borderRadius: "15px", position: "relative" }}>
-                            <div style={{ width: "18px", height: "18px", background: "white", borderRadius: "50%", position: "absolute", top: "3px", right: "3px" }}></div>
-                        </div>
-                    </div>
-                </div>
+                <NavigationTabs />
 
                 {/* Khu vực tỉnh thành - Grid 2 cột trên mobile */}
                 <div style={{
