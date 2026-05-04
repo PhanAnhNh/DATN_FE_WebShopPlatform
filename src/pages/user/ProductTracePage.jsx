@@ -9,6 +9,7 @@ import {
 } from 'react-icons/fa';
 import { QRCodeCanvas } from 'qrcode.react';
 import ShopDetailLayout from '../../components/layout/ShopDetailLayout';
+import '../../css/ProductTracePage.css';
 
 const ProductTracePage = () => {
   const { product_id } = useParams();

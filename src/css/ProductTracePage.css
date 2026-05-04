@@ -1,0 +1,739 @@
+/* ProductTracePage.css - Responsive cho mọi thiết bị */
+
+/* Reset & Base */
+.product-trace-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background: #f5f5f5;
+}
+
+/* ==================== HEADER ==================== */
+.trace-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: white;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: #f5f5f5;
+  border: none;
+  border-radius: 30px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  transition: all 0.3s;
+  white-space: nowrap;
+}
+
+.back-btn:active {
+  background: #e0e0e0;
+  transform: scale(0.96);
+}
+
+.trace-header h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ==================== PRODUCT INFO CARD ==================== */
+/* Mặc định trên mobile: hiển thị DỌC (ảnh trên, text dưới) */
+.product-info-card {
+  background: white;
+  margin: 12px;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  display: flex;
+  flex-direction: column;
+}
+
+.product-info-card img {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.product-info {
+  flex: 1;
+}
+
+.product-info h2 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #222;
+}
+
+.product-description {
+  color: #666;
+  font-size: 14px;
+  line-height: 1.5;
+  margin-bottom: 12px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.product-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.meta-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: #f0f0f0;
+  border-radius: 20px;
+  font-size: 12px;
+  color: #666;
+}
+
+.meta-tag.certification {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+/* ==================== STAGES OVERVIEW ==================== */
+.stages-overview {
+  padding: 0 12px;
+  margin-bottom: 24px;
+}
+
+.stages-overview h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 12px;
+  padding-left: 4px;
+}
+
+.stages-grid {
+  display: flex;
+  overflow-x: auto;
+  gap: 12px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 8px;
+}
+
+.stages-grid::-webkit-scrollbar {
+  height: 3px;
+}
+
+.stages-grid::-webkit-scrollbar-track {
+  background: #f0f0f0;
+  border-radius: 10px;
+}
+
+.stages-grid::-webkit-scrollbar-thumb {
+  background: #ccc;
+  border-radius: 10px;
+}
+
+.stage-card {
+  flex: 0 0 auto;
+  width: 140px;
+  padding: 12px;
+  background: white;
+  border-radius: 12px;
+  border-top: 3px solid;
+  cursor: pointer;
+  transition: all 0.3s;
+  scroll-snap-align: start;
+}
+
+.stage-card:active {
+  transform: scale(0.98);
+}
+
+.stage-card.active {
+  background: #f8f9fa;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.stage-icon {
+  font-size: 28px;
+  margin-bottom: 8px;
+}
+
+.stage-info h4 {
+  margin: 0 0 4px 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.event-count {
+  font-size: 11px;
+  color: #999;
+}
+
+/* ==================== TIMELINE ==================== */
+.trace-timeline {
+  padding: 0 12px;
+  margin-bottom: 24px;
+}
+
+.trace-timeline h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 16px;
+  padding-left: 4px;
+}
+
+.timeline {
+  position: relative;
+  padding-left: 24px;
+}
+
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 12px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(to bottom, #4caf50, #2196f3, #ff9800, #9c27b0);
+}
+
+.timeline-item {
+  position: relative;
+  margin-bottom: 24px;
+}
+
+.timeline-marker {
+  position: absolute;
+  left: -24px;
+  top: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  z-index: 1;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.timeline-marker svg {
+  font-size: 14px;
+}
+
+.timeline-content {
+  background: white;
+  border-radius: 12px;
+  padding: 14px;
+  margin-left: 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+.event-stage-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  color: white;
+  font-size: 10px;
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+
+.timeline-content h4 {
+  margin: 0 0 8px 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+}
+
+.event-description {
+  color: #666;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+
+.event-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid #f0f0f0;
+  font-size: 11px;
+  color: #999;
+}
+
+.event-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.event-images {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.event-images img {
+  width: 70px;
+  height: 70px;
+  object-fit: cover;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.event-images img:active {
+  transform: scale(0.95);
+}
+
+/* ==================== QR CODE SECTION ==================== */
+.qr-code-section {
+  text-align: center;
+  padding: 24px 16px;
+  background: white;
+  margin: 12px;
+  border-radius: 16px;
+}
+
+.qr-code-section h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: #333;
+}
+
+.qr-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.qr-container canvas {
+  width: 120px;
+  height: 120px;
+  margin-bottom: 12px;
+}
+
+.qr-container p {
+  font-size: 12px;
+  color: #999;
+}
+
+/* ==================== NO TRACEABILITY ==================== */
+.no-traceability {
+  text-align: center;
+  padding: 48px 24px;
+  background: white;
+  margin: 12px;
+  border-radius: 16px;
+}
+
+.no-trace-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+}
+
+.no-traceability h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #333;
+}
+
+.no-traceability p {
+  font-size: 14px;
+  color: #666;
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+.basic-info {
+  text-align: left;
+  margin-top: 24px;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 12px;
+}
+
+.basic-info h4 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: #333;
+}
+
+.basic-info p {
+  font-size: 13px;
+  margin: 6px 0;
+  color: #555;
+}
+
+/* ==================== LOADING & ERROR ==================== */
+.trace-loading, .trace-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+  font-size: 48px;
+  color: #4caf50;
+  margin-bottom: 20px;
+}
+
+.trace-error h2 {
+  font-size: 20px;
+  color: #333;
+  margin-bottom: 20px;
+}
+
+.trace-error button {
+  padding: 10px 24px;
+  background: #2e7d32;
+  color: white;
+  border: none;
+  border-radius: 30px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ==================== TABLET (768px - 1023px) ==================== */
+@media (min-width: 768px) {
+  .trace-header {
+    padding: 20px 24px;
+  }
+  
+  .trace-header h1 {
+    font-size: 24px;
+  }
+  
+  .back-btn {
+    padding: 10px 20px;
+    font-size: 15px;
+  }
+
+  /* Trên tablet: chuyển sang hiển thị NGANG (ảnh trái, text phải) */
+  .product-info-card {
+    flex-direction: row;
+    gap: 24px;
+    padding: 24px;
+    margin: 16px;
+  }
+
+  .product-info-card img {
+    width: 200px;
+    height: 200px;
+    margin-bottom: 0;
+    flex-shrink: 0;
+  }
+
+  .product-info h2 {
+    font-size: 22px;
+  }
+  
+  .product-description {
+    font-size: 14px;
+    -webkit-line-clamp: unset;
+  }
+  
+  .stages-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 16px;
+    overflow-x: visible;
+  }
+  
+  .stage-card {
+    width: auto;
+  }
+  
+  .timeline {
+    padding-left: 35px;
+  }
+  
+  .timeline::before {
+    left: 20px;
+  }
+  
+  .timeline-marker {
+    left: -35px;
+    width: 32px;
+    height: 32px;
+  }
+  
+  .timeline-marker svg {
+    font-size: 16px;
+  }
+  
+  .timeline-content {
+    padding: 20px;
+    margin-left: 20px;
+  }
+  
+  .event-meta {
+    flex-direction: row;
+    gap: 16px;
+  }
+  
+  .event-images img {
+    width: 80px;
+    height: 80px;
+  }
+  
+  .no-traceability {
+    padding: 60px 40px;
+    margin: 16px;
+  }
+  
+  .basic-info {
+    max-width: 400px;
+    margin: 24px auto 0;
+  }
+}
+
+/* ==================== DESKTOP (1024px trở lên) ==================== */
+@media (min-width: 1024px) {
+  .product-trace-page {
+    padding: 24px;
+  }
+  
+  .trace-header {
+    padding: 0 0 24px 0;
+    background: transparent;
+    position: static;
+    box-shadow: none;
+  }
+  
+  .back-btn:hover {
+    background: #e0e0e0;
+    transform: translateY(-1px);
+  }
+
+  .product-info-card {
+    padding: 32px;
+  }
+  
+  .product-info-card img {
+    width: 240px;
+    height: 240px;
+  }
+  
+  .stages-overview h3,
+  .trace-timeline h3 {
+    font-size: 20px;
+  }
+  
+  .stage-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  }
+  
+  .timeline-content {
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  
+  .timeline-content:hover {
+    transform: translateX(4px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  }
+  
+  .event-images img:hover {
+    transform: scale(1.05);
+  }
+  
+  .qr-code-section {
+    padding: 32px;
+  }
+}
+
+/* ==================== SMALL MOBILE (dưới 375px) ==================== */
+@media (max-width: 374px) {
+  .trace-header {
+    gap: 10px;
+    padding: 12px;
+  }
+  
+  .back-btn {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+  
+  .trace-header h1 {
+    font-size: 16px;
+  }
+  
+  .product-info-card {
+    padding: 12px;
+    margin: 8px;
+  }
+  
+  .product-info-card img {
+    height: 160px;
+  }
+  
+  .product-info h2 {
+    font-size: 16px;
+  }
+  
+  .product-description {
+    font-size: 12px;
+  }
+  
+  .stage-card {
+    width: 120px;
+    padding: 10px;
+  }
+  
+  .stage-icon svg {
+    font-size: 20px;
+  }
+  
+  .stage-info h4 {
+    font-size: 12px;
+  }
+  
+  .timeline-content {
+    padding: 12px;
+  }
+  
+  .timeline-content h4 {
+    font-size: 14px;
+  }
+  
+  .event-description {
+    font-size: 12px;
+  }
+  
+  .event-images img {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .no-traceability {
+    padding: 32px 16px;
+  }
+  
+  .no-trace-icon {
+    font-size: 48px;
+  }
+  
+  .no-traceability h3 {
+    font-size: 16px;
+  }
+}
+
+/* ==================== LANDSCAPE MODE (xoay ngang) ==================== */
+@media (max-width: 768px) and (orientation: landscape) {
+  .trace-header {
+    position: static;
+  }
+  
+  /* Khi xoay ngang trên mobile, chuyển sang ngang */
+  .product-info-card {
+    flex-direction: row;
+    gap: 16px;
+  }
+  
+  .product-info-card img {
+    width: 150px;
+    height: 150px;
+    margin-bottom: 0;
+  }
+  
+  .stages-grid {
+    gap: 10px;
+  }
+  
+  .stage-card {
+    width: 130px;
+  }
+  
+  .timeline {
+    padding-left: 30px;
+  }
+}
+
+/* ==================== ANIMATIONS & UTILITIES ==================== */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.timeline-item {
+  animation: fadeInUp 0.4s ease forwards;
+  animation-delay: calc(var(--index, 0) * 0.05s);
+  opacity: 0;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Touch optimization */
+@media (max-width: 768px) {
+  button, 
+  .stage-card,
+  .back-btn {
+    cursor: default;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  button:active,
+  .stage-card:active,
+  .back-btn:active {
+    opacity: 0.7;
+  }
+}
+
+/* Prevent zoom on input focus (iOS) */
+@media (max-width: 768px) {
+  input, 
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
