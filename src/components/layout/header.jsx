@@ -1,4 +1,4 @@
-// components/layout/header.jsx - Phần Icons
+// components/layout/header.jsx
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { FaShoppingCart, FaBell, FaUser, FaBook, FaSignOutAlt, FaComment, FaSearch, FaBars } from 'react-icons/fa';
@@ -19,11 +19,53 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
     const [showSearchResults, setShowSearchResults] = useState(false);
     const [isSearching, setIsSearching] = useState(false);
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+    const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem("user_token")); // Thêm state này
     
     const menuRef = useRef(null);
     const searchRef = useRef(null);
     const navigate = useNavigate();
     const location = useLocation();
+
+    // Theo dõi trạng thái đăng nhập
+    useEffect(() => {
+        const checkLoginStatus = () => {
+            const token = localStorage.getItem("user_token");
+            setIsLoggedIn(!!token);
+            
+            if (!token) {
+                // Reset các state khi logout
+                setCartCount(0);
+                setFavoriteCount(0);
+                setIsMenuOpen(false);
+            }
+        };
+        
+        // Check initial status
+        checkLoginStatus();
+        
+        // Lắng nghe sự kiện storage (khi logout ở tab khác)
+        const handleStorageChange = (e) => {
+            if (e.key === 'user_token') {
+                checkLoginStatus();
+                window.location.reload(); // Hoặc dùng navigate
+            }
+        };
+        
+        window.addEventListener('storage', handleStorageChange);
+        
+        // Custom event cho logout
+        const handleLogoutEvent = () => {
+            checkLoginStatus();
+            navigate("/login");
+        };
+        
+        window.addEventListener('userLoggedOut', handleLogoutEvent);
+        
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+            window.removeEventListener('userLoggedOut', handleLogoutEvent);
+        };
+    }, [navigate]);
 
     // Theo dõi kích thước màn hình
     useEffect(() => {
@@ -34,15 +76,15 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Fetch cart count
+    // Fetch cart count - chỉ khi đã đăng nhập
     const fetchCartCount = async () => {
+        const token = localStorage.getItem("user_token");
+        if (!token) {
+            setCartCount(0);
+            return;
+        }
+        
         try {
-            const token = localStorage.getItem("user_token");
-            if (!token) {
-                setCartCount(0);
-                return;
-            }
-            
             const response = await api.get('/api/v1/cart/count');
             setCartCount(response.data.count);
         } catch (error) {
@@ -51,15 +93,15 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
         }
     };
 
-    // Fetch favorite count
+    // Fetch favorite count - chỉ khi đã đăng nhập
     const fetchFavoriteCount = async () => {
+        const token = localStorage.getItem("user_token");
+        if (!token) {
+            setFavoriteCount(0);
+            return;
+        }
+        
         try {
-            const token = localStorage.getItem("user_token");
-            if (!token) {
-                setFavoriteCount(0);
-                return;
-            }
-            
             const response = await api.get('/api/v1/favorites/my-favorites?limit=1');
             setFavoriteCount(response.data.total || 0);
         } catch (error) {
@@ -120,27 +162,29 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // Initial fetch and intervals
+    // Initial fetch and intervals - chỉ khi đã đăng nhập
     useEffect(() => {
-        fetchCartCount();
-        fetchFavoriteCount();
-        
-        const interval = setInterval(() => {
+        if (isLoggedIn) {
             fetchCartCount();
             fetchFavoriteCount();
-        }, 30000);
-        
-        return () => clearInterval(interval);
-    }, []);
+            
+            const interval = setInterval(() => {
+                fetchCartCount();
+                fetchFavoriteCount();
+            }, 30000);
+            
+            return () => clearInterval(interval);
+        }
+    }, [isLoggedIn]);
 
     // Listen for custom events
     useEffect(() => {
         const handleCartUpdate = () => {
-            fetchCartCount(); 
+            if (isLoggedIn) fetchCartCount(); 
         };
         
         const handleFavoriteUpdate = () => {
-            fetchFavoriteCount();
+            if (isLoggedIn) fetchFavoriteCount();
         };
         
         window.addEventListener('cartUpdated', handleCartUpdate);
@@ -150,7 +194,7 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
             window.removeEventListener('cartUpdated', handleCartUpdate);
             window.removeEventListener('favoriteUpdated', handleFavoriteUpdate);
         };
-    }, []);
+    }, [isLoggedIn]);
 
     const handleAvatarClick = () => {
         const token = localStorage.getItem("user_token");
@@ -163,12 +207,25 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
     };
 
     const handleLogout = () => {
+        // Clear localStorage
         localStorage.removeItem("user_token");
         localStorage.removeItem("user");
+        localStorage.removeItem("user_data");
+        
+        // Reset all states
         setIsMenuOpen(false);
         setCartCount(0);
         setFavoriteCount(0);
+        setIsLoggedIn(false);
+        
+        // Dispatch custom event để thông báo logout
+        window.dispatchEvent(new CustomEvent('userLoggedOut'));
+        
+        // Navigate to home page
         navigate("/");
+        
+        // Force reload để reset toàn bộ app (optional)
+        // window.location.href = "/";
     };
 
     const handleCartClick = () => {
@@ -217,7 +274,6 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
             borderBottom: "1px solid #ddd",
             width: "100%",
             boxSizing: "border-box",
-            // SỬA: từ sticky thành fixed
             position: "fixed",
             top: 0,
             left: 0,
@@ -262,234 +318,242 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
                     </div>
                 </div>
 
-                {/* Search Bar - Responsive */}
-                <div style={{ 
-                    flex: 1, 
-                    display: "flex", 
-                    justifyContent: "center", 
-                    position: "relative",
-                    paddingLeft: isMobile ? "0" : "20px",
-                    marginRight: isMobile ? "8px" : "0"
-                }} ref={searchRef}>
-                    <div className="search-bar" style={{ 
-                        position: "relative", 
-                        width: isMobile ? "100%" : "400px",
-                        maxWidth: isMobile ? "100%" : "400px"
-                    }}>
-                        <input
-                            placeholder={isMobile ? "Tìm kiếm..." : "Tìm kiếm bài viết, sản phẩm..."}
-                            value={searchKeyword}
-                            onChange={(e) => setSearchKeyword(e.target.value)}
-                            style={{
-                                width: "100%",
-                                padding: isMobile ? "8px 36px 8px 12px" : "10px 40px 10px 16px",
-                                borderRadius: "20px",
-                                border: "1px solid #ddd",
-                                backgroundColor: "#f0f2f5",
-                                outline: "none",
-                                transition: "all 0.3s",
-                                fontSize: isMobile ? "13px" : "14px"
-                            }}
-                            onFocus={(e) => {
-                                e.target.style.borderColor = "#2e7d32";
-                                e.target.style.backgroundColor = "white";
-                                if (searchKeyword && searchResults.length > 0) {
-                                    setShowSearchResults(true);
-                                }
-                            }}
-                            onBlur={(e) => {
-                                e.target.style.borderColor = "#ddd";
-                                e.target.style.backgroundColor = "#f0f2f5";
-                            }}
-                        />
-                        <FaSearch 
-                            style={{
-                                position: "absolute",
-                                right: "12px",
-                                top: "50%",
-                                transform: "translateY(-50%)",
-                                color: "#999",
-                                cursor: "pointer",
-                                fontSize: isMobile ? "14px" : "16px"
-                            }}
-                            onClick={() => handleSearch(searchKeyword)}
-                        />
+                {/* Search Bar - Responsive - Chỉ hiển thị khi đã đăng nhập */}
+                {isLoggedIn && (
+                    <div style={{ 
+                        flex: 1, 
+                        display: "flex", 
+                        justifyContent: "center", 
+                        position: "relative",
+                        paddingLeft: isMobile ? "0" : "20px",
+                        marginRight: isMobile ? "8px" : "0"
+                    }} ref={searchRef}>
+                        <div className="search-bar" style={{ 
+                            position: "relative", 
+                            width: isMobile ? "100%" : "400px",
+                            maxWidth: isMobile ? "100%" : "400px"
+                        }}>
+                            <input
+                                placeholder={isMobile ? "Tìm kiếm..." : "Tìm kiếm bài viết, sản phẩm..."}
+                                value={searchKeyword}
+                                onChange={(e) => setSearchKeyword(e.target.value)}
+                                style={{
+                                    width: "100%",
+                                    padding: isMobile ? "8px 36px 8px 12px" : "10px 40px 10px 16px",
+                                    borderRadius: "20px",
+                                    border: "1px solid #ddd",
+                                    backgroundColor: "#f0f2f5",
+                                    outline: "none",
+                                    transition: "all 0.3s",
+                                    fontSize: isMobile ? "13px" : "14px"
+                                }}
+                                onFocus={(e) => {
+                                    e.target.style.borderColor = "#2e7d32";
+                                    e.target.style.backgroundColor = "white";
+                                    if (searchKeyword && searchResults.length > 0) {
+                                        setShowSearchResults(true);
+                                    }
+                                }}
+                                onBlur={(e) => {
+                                    e.target.style.borderColor = "#ddd";
+                                    e.target.style.backgroundColor = "#f0f2f5";
+                                }}
+                            />
+                            <FaSearch 
+                                style={{
+                                    position: "absolute",
+                                    right: "12px",
+                                    top: "50%",
+                                    transform: "translateY(-50%)",
+                                    color: "#999",
+                                    cursor: "pointer",
+                                    fontSize: isMobile ? "14px" : "16px"
+                                }}
+                                onClick={() => handleSearch(searchKeyword)}
+                            />
 
-                        {showSearchResults && (
-                            <div className="result-page" style={{
-                                position: "absolute",
-                                top: "100%",
-                                left: 0,
-                                right: 0,
-                                marginTop: "8px",
-                                backgroundColor: "white",
-                                borderRadius: "12px",
-                                boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
-                                maxHeight: "400px",
-                                overflowY: "auto",
-                                zIndex: 1001,
-                            }}>
-                                {isSearching ? (
-                                    <div style={{ padding: "20px", textAlign: "center", color: "#666" }}>
-                                        Đang tìm kiếm...
-                                    </div>
-                                ) : searchResults.length === 0 ? (
-                                    <div style={{ padding: "20px", textAlign: "center", color: "#666" }}>
-                                        Không tìm thấy kết quả nào
-                                    </div>
-                                ) : (
-                                    <>
-                                        <div style={{ 
-                                            padding: "10px 15px", 
-                                            borderBottom: "1px solid #eee",
-                                            fontSize: "12px",
-                                            color: "#666",
-                                            fontWeight: "bold"
-                                        }}>
-                                            Tìm thấy {searchResults.length} kết quả cho "{searchKeyword}"
+                            {showSearchResults && (
+                                <div className="result-page" style={{
+                                    position: "absolute",
+                                    top: "100%",
+                                    left: 0,
+                                    right: 0,
+                                    marginTop: "8px",
+                                    backgroundColor: "white",
+                                    borderRadius: "12px",
+                                    boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+                                    maxHeight: "400px",
+                                    overflowY: "auto",
+                                    zIndex: 1001,
+                                }}>
+                                    {isSearching ? (
+                                        <div style={{ padding: "20px", textAlign: "center", color: "#666" }}>
+                                            Đang tìm kiếm...
                                         </div>
-                                        {searchResults.map((post) => (
-                                            <div
-                                                key={post._id}
-                                                onClick={() => handleResultClick(post)}
-                                                style={{
-                                                    padding: "12px 15px",
-                                                    borderBottom: "1px solid #f0f0f0",
-                                                    cursor: "pointer",
-                                                    transition: "background-color 0.2s"
-                                                }}
-                                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f5f5f5"}
-                                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "white"}
-                                            >
-                                                <div style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
-                                                    <div style={{ 
-                                                        width: "40px", 
-                                                        height: "40px", 
-                                                        background: "#e4e6eb", 
-                                                        borderRadius: "50%", 
-                                                        display: "flex", 
-                                                        alignItems: "center", 
-                                                        justifyContent: "center",
-                                                        flexShrink: 0
-                                                    }}>
-                                                        {post.author_avatar ? (
-                                                            <img src={post.author_avatar} alt="avatar" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }}/>
-                                                        ) : (
-                                                            <span>👤</span>
-                                                        )}
-                                                    </div>
-                                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                                        <div style={{ fontWeight: "bold", fontSize: "14px", color: "#333", marginBottom: "4px" }}>
-                                                            {post.author_name}
-                                                        </div>
+                                    ) : searchResults.length === 0 ? (
+                                        <div style={{ padding: "20px", textAlign: "center", color: "#666" }}>
+                                            Không tìm thấy kết quả nào
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div style={{ 
+                                                padding: "10px 15px", 
+                                                borderBottom: "1px solid #eee",
+                                                fontSize: "12px",
+                                                color: "#666",
+                                                fontWeight: "bold"
+                                            }}>
+                                                Tìm thấy {searchResults.length} kết quả cho "{searchKeyword}"
+                                            </div>
+                                            {searchResults.map((post) => (
+                                                <div
+                                                    key={post._id}
+                                                    onClick={() => handleResultClick(post)}
+                                                    style={{
+                                                        padding: "12px 15px",
+                                                        borderBottom: "1px solid #f0f0f0",
+                                                        cursor: "pointer",
+                                                        transition: "background-color 0.2s"
+                                                    }}
+                                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f5f5f5"}
+                                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "white"}
+                                                >
+                                                    <div style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
                                                         <div style={{ 
-                                                            fontSize: "13px", 
-                                                            color: "#666",
-                                                            overflow: "hidden",
-                                                            textOverflow: "ellipsis",
-                                                            whiteSpace: "nowrap"
+                                                            width: "40px", 
+                                                            height: "40px", 
+                                                            background: "#e4e6eb", 
+                                                            borderRadius: "50%", 
+                                                            display: "flex", 
+                                                            alignItems: "center", 
+                                                            justifyContent: "center",
+                                                            flexShrink: 0
                                                         }}>
-                                                            {post.content || "Không có nội dung"}
+                                                            {post.author_avatar ? (
+                                                                <img src={post.author_avatar} alt="avatar" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }}/>
+                                                            ) : (
+                                                                <span>👤</span>
+                                                            )}
                                                         </div>
-                                                        <div style={{ 
-                                                            fontSize: "11px", 
-                                                            color: "#999",
-                                                            marginTop: "4px"
-                                                        }}>
-                                                            {new Date(post.created_at).toLocaleDateString()} • {post.stats?.like_count || 0} thích
+                                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                                            <div style={{ fontWeight: "bold", fontSize: "14px", color: "#333", marginBottom: "4px" }}>
+                                                                {post.author_name}
+                                                            </div>
+                                                            <div style={{ 
+                                                                fontSize: "13px", 
+                                                                color: "#666",
+                                                                overflow: "hidden",
+                                                                textOverflow: "ellipsis",
+                                                                whiteSpace: "nowrap"
+                                                            }}>
+                                                                {post.content || "Không có nội dung"}
+                                                            </div>
+                                                            <div style={{ 
+                                                                fontSize: "11px", 
+                                                                color: "#999",
+                                                                marginTop: "4px"
+                                                            }}>
+                                                                {new Date(post.created_at).toLocaleDateString()} • {post.stats?.like_count || 0} thích
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        ))}
-                                    </>
-                                )}
-                            </div>
-                        )}
+                                            ))}
+                                        </>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
+                )}
 
                 {/* Icons - HIỂN THỊ ĐẦY ĐỦ CÁC ICON */}
                 <div style={{ display: "flex", gap: isMobile ? "8px" : "12px", alignItems: "center", flexShrink: 0 }}>
-                    {/* Chat Icon */}
-                    <div 
-                        style={{ position: "relative", cursor: "pointer" }}
-                        onClick={() => setIsChatOpen(!isChatOpen)}
-                    >
-                        <span style={{
-                            display: "flex",
-                            border: "1px solid #ddd",
-                            padding: "8px",
-                            borderRadius: "50%",
-                            backgroundColor: "#f0f2f5",
-                            transition: "all 0.3s"
-                        }}>
-                            <FaComment size={18} color="#2e7d32" />
-                        </span>
-                        
-                        {unreadCount > 0 && (
+                    {/* Chat Icon - Chỉ hiển thị khi đã đăng nhập */}
+                    {isLoggedIn && (
+                        <div 
+                            style={{ position: "relative", cursor: "pointer" }}
+                            onClick={() => setIsChatOpen(!isChatOpen)}
+                        >
                             <span style={{
-                                position: "absolute", top: "-5px", right: "-5px",
-                                background: "#ff4444", color: "white",
-                                borderRadius: "50%", width: "16px", height: "16px",
-                                fontSize: "9px", display: "flex",
-                                alignItems: "center", justifyContent: "center"
+                                display: "flex",
+                                border: "1px solid #ddd",
+                                padding: "8px",
+                                borderRadius: "50%",
+                                backgroundColor: "#f0f2f5",
+                                transition: "all 0.3s"
                             }}>
-                                {unreadCount > 99 ? "99+" : unreadCount}
+                                <FaComment size={18} color="#2e7d32" />
                             </span>
-                        )}
-                    </div>
+                            
+                            {unreadCount > 0 && (
+                                <span style={{
+                                    position: "absolute", top: "-5px", right: "-5px",
+                                    background: "#ff4444", color: "white",
+                                    borderRadius: "50%", width: "16px", height: "16px",
+                                    fontSize: "9px", display: "flex",
+                                    alignItems: "center", justifyContent: "center"
+                                }}>
+                                    {unreadCount > 99 ? "99+" : unreadCount}
+                                </span>
+                            )}
+                        </div>
+                    )}
                     
-                    {/* Cart Icon */}
-                    <div style={{ position: "relative", cursor: "pointer" }} onClick={handleCartClick}>
-                        <span style={{ 
+                    {/* Cart Icon - Chỉ hiển thị khi đã đăng nhập */}
+                    {isLoggedIn && (
+                        <div style={{ position: "relative", cursor: "pointer" }} onClick={handleCartClick}>
+                            <span style={{ 
+                                display: "flex", 
+                                border: "1px solid #ddd", 
+                                padding: "8px", 
+                                borderRadius: "50%", 
+                                backgroundColor: "#f0f2f5",
+                                transition: "all 0.3s"
+                            }}>
+                                <FaShoppingCart size={18} color="#2e7d32" />
+                            </span>
+                            {cartCount > 0 && (
+                                <span style={{
+                                    position: "absolute",
+                                    top: "-5px",
+                                    right: "-5px",
+                                    background: "#ff4444",
+                                    color: "white",
+                                    borderRadius: "50%",
+                                    width: "18px",
+                                    height: "18px",
+                                    fontSize: "10px",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontWeight: "bold"
+                                }}>
+                                    {cartCount > 99 ? "99+" : cartCount}
+                                </span>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Notification Icon - Chỉ hiển thị khi đã đăng nhập */}
+                    {isLoggedIn && (
+                        <div style={{ 
+                            cursor: "pointer", 
                             display: "flex", 
                             border: "1px solid #ddd", 
-                            padding: "8px", 
                             borderRadius: "50%", 
                             backgroundColor: "#f0f2f5",
-                            transition: "all 0.3s"
+                            transition: "all 0.3s",
+                            width: "35px",
+                            height: "35px",
+                            alignItems: "center",
+                            justifyContent: "center"
                         }}>
-                            <FaShoppingCart size={18} color="#2e7d32" />
-                        </span>
-                        {cartCount > 0 && (
-                            <span style={{
-                                position: "absolute",
-                                top: "-5px",
-                                right: "-5px",
-                                background: "#ff4444",
-                                color: "white",
-                                borderRadius: "50%",
-                                width: "18px",
-                                height: "18px",
-                                fontSize: "10px",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                fontWeight: "bold"
-                            }}>
-                                {cartCount > 99 ? "99+" : cartCount}
-                            </span>
-                        )}
-                    </div>
-
-                    {/* Notification Icon */}
-                    <div style={{ 
-                        cursor: "pointer", 
-                        display: "flex", 
-                        border: "1px solid #ddd", 
-                        borderRadius: "50%", 
-                        backgroundColor: "#f0f2f5",
-                        transition: "all 0.3s",
-                        width: "35px",
-                        height: "35px",
-                        alignItems: "center",
-                        justifyContent: "center"
-                    }}>
-                        <div className="notification-wrapper">
-                            <NotificationBell userType="user" />
+                            <div className="notification-wrapper">
+                                <NotificationBell userType="user" />
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     {/* Avatar and Dropdown Menu */}
                     <div style={{ position: "relative" }} ref={menuRef}>
@@ -508,8 +572,8 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
                             <FaUser size={18} color="#2e7d32" />
                         </span>
 
-                        {/* Menu Dropdown */}
-                        {isMenuOpen && (
+                        {/* Menu Dropdown - Chỉ hiển thị khi đã đăng nhập */}
+                        {isLoggedIn && isMenuOpen && (
                             <div style={{
                                 position: "absolute",
                                 top: "45px",
