@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import '../../css/local_map.css'; 
 
 // ==================== CUSTOM PHOTO MARKER (giống hệt cột "Hình ảnh" trong Admin) ====================
 const createPhotoMarker = (location) => {
@@ -84,67 +85,71 @@ const LocationMap = ({ locations, center, onMarkerClick, selectedLocation }) => 
   };
 
   return (
-    <MapContainer
-      key={mapKey}
-      center={mapCenter}
-      zoom={13}
-      style={mapContainerStyle}
-      zoomControl={true}
-    >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
-
-      {locations && locations.map((location) => (
-        <Marker
-          key={location.id || location._id}
-          position={[location.lat, location.lng]}
-          icon={createPhotoMarker(location)}
-          eventHandlers={{
-            click: () => handleMarkerClick(location),
-          }}
+    <div className="location-map-container">
+      <div className="map-wrapper">
+        <MapContainer
+          key={mapKey}
+          center={mapCenter}
+          zoom={13}
+          style={mapContainerStyle}
+          zoomControl={true}
         >
-          {selectedLocation?.id === location.id && (
-            <Popup>
-              <div style={{ minWidth: '200px' }}>
-                <h4 style={{ margin: '0 0 8px 0', color: '#2e7d32' }}>
-                  {location.name}
-                </h4>
-                <p style={{ margin: '4px 0', fontSize: '12px', color: '#666' }}>
-                  📍 {location.address}
-                </p>
-                {location.phone && (
-                  <p style={{ margin: '4px 0', fontSize: '12px' }}>
-                    📞 {location.phone}
-                  </p>
-                )}
-                {location.rating > 0 && (
-                  <p style={{ margin: '4px 0', fontSize: '12px', color: '#f5b042' }}>
-                    ⭐ {location.rating} ({location.total_reviews || 0} đánh giá)
-                  </p>
-                )}
-                <button
-                  onClick={() => window.open(`/location/${location.id || location._id}`, '_blank')}
-                  style={{
-                    marginTop: '8px',
-                    padding: '4px 12px',
-                    background: '#4CAF50',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '12px'
-                  }}
-                >
-                  Xem chi tiết
-                </button>
-              </div>
-            </Popup>
-          )}
-        </Marker>
-      ))}
-    </MapContainer>
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+
+          {locations && locations.map((location) => (
+            <Marker
+              key={location.id || location._id}
+              position={[location.lat, location.lng]}
+              icon={createPhotoMarker(location)}
+              eventHandlers={{
+                click: () => handleMarkerClick(location),
+              }}
+            >
+              {selectedLocation?.id === location.id && (
+                <Popup>
+                  <div style={{ minWidth: '200px' }}>
+                    <h4 style={{ margin: '0 0 8px 0', color: '#2e7d32' }}>
+                      {location.name}
+                    </h4>
+                    <p style={{ margin: '4px 0', fontSize: '12px', color: '#666' }}>
+                      📍 {location.address}
+                    </p>
+                    {location.phone && (
+                      <p style={{ margin: '4px 0', fontSize: '12px' }}>
+                        📞 {location.phone}
+                      </p>
+                    )}
+                    {location.rating > 0 && (
+                      <p style={{ margin: '4px 0', fontSize: '12px', color: '#f5b042' }}>
+                        ⭐ {location.rating} ({location.total_reviews || 0} đánh giá)
+                      </p>
+                    )}
+                    <button
+                      onClick={() => window.open(`/location/${location.id || location._id}`, '_blank')}
+                      style={{
+                        marginTop: '8px',
+                        padding: '4px 12px',
+                        background: '#4CAF50',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '12px'
+                      }}
+                    >
+                      Xem chi tiết
+                    </button>
+                  </div>
+                </Popup>
+              )}
+            </Marker>
+          ))}
+        </MapContainer>
+      </div>
+    </div>
   );
 };
 

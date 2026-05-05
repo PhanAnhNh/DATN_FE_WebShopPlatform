@@ -5,7 +5,8 @@ import api from '../../api/api';
 import { 
   FaSeedling, FaIndustry, FaCogs, FaTruck, FaStore, FaCertificate,
   FaCalendarAlt, FaMapMarkerAlt, FaUser, FaImage, FaCheckCircle,
-  FaClock, FaSpinner, FaArrowLeft, FaShareAlt, FaDownload
+  FaClock, FaSpinner, FaArrowLeft, FaShareAlt, FaDownload,
+  FaChevronDown, FaChevronUp
 } from 'react-icons/fa';
 import { QRCodeCanvas } from 'qrcode.react';
 import ShopDetailLayout from '../../components/layout/ShopDetailLayout';
@@ -17,6 +18,10 @@ const ProductTracePage = () => {
   const [loading, setLoading] = useState(true);
   const [traceData, setTraceData] = useState(null);
   const [selectedStage, setSelectedStage] = useState(null);
+  
+  // State cho chức năng xem thêm/ẩn bớt
+  const [expandedProductDesc, setExpandedProductDesc] = useState(false);
+  const [expandedEvents, setExpandedEvents] = useState({});
 
   useEffect(() => {
     fetchTraceData();
@@ -32,6 +37,19 @@ const ProductTracePage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Toggle mô tả sản phẩm
+  const toggleProductDescription = () => {
+    setExpandedProductDesc(!expandedProductDesc);
+  };
+
+  // Toggle mô tả sự kiện
+  const toggleEventDescription = (eventIndex) => {
+    setExpandedEvents(prev => ({
+      ...prev,
+      [eventIndex]: !prev[eventIndex]
+    }));
   };
 
   const stageIcons = {
@@ -61,6 +79,11 @@ const ProductTracePage = () => {
     certification: 'Chứng nhận'
   };
 
+  // Hàm kiểm tra nội dung có dài không (ví dụ > 150 ký tự)
+  const isLongText = (text, limit = 150) => {
+    return text && text.length > limit;
+  };
+
   if (loading) {
     return (
       <ShopDetailLayout>
@@ -70,18 +93,7 @@ const ProductTracePage = () => {
         </div>
       </ShopDetailLayout>
     );
-  }
-
-  if (!traceData) {
-    return (
-      <ShopDetailLayout>
-        <div className="trace-error">
-          <h2>Không tìm thấy thông tin</h2>
-          <button onClick={() => navigate(-1)}>Quay lại</button>
-        </div>
-      </ShopDetailLayout>
-    );
-  }
+  }  
 
   const { product, stages, trace_events } = traceData;
   const hasTraceability = product.has_traceability && trace_events && trace_events.length > 0;
@@ -89,19 +101,45 @@ const ProductTracePage = () => {
   return (
     <ShopDetailLayout>
       <div className="product-trace-page">
-        <div className="trace-header">
-          <button className="back-btn" onClick={() => navigate(-1)}>
-            <FaArrowLeft /> Quay lại
-          </button>
-          <h1>Truy xuất nguồn gốc sản phẩm</h1>
+        <div className="trace-header">          
+          <h1> Nguồn gốc sản phẩm</h1>
         </div>
 
-        {/* Product Info */}
+        {/* Product Info with Expandable Description */}
         <div className="product-info-card">
           <img src={product.image_url || '/placeholder.png'} alt={product.name} />
           <div className="product-info">
             <h2>{product.name}</h2>
-            <p className="product-description">{product.description}</p>
+            
+            {/* Product Description với chức năng xem thêm/ẩn bớt */}
+            <div className="expandable-content">
+              {isLongText(product.description, 150) ? (
+                <>
+                  <div className={`product-description ${expandedProductDesc ? 'expanded' : 'collapsed'}`}>
+                    {product.description}
+                  </div>
+                  <button 
+                    className="expand-btn"
+                    onClick={toggleProductDescription}
+                  >
+                    {expandedProductDesc ? (
+                      <>
+                        <FaChevronUp size={12} /> Ẩn bớt
+                      </>
+                    ) : (
+                      <>
+                        <FaChevronDown size={12} /> Xem thêm
+                      </>
+                    )}
+                  </button>
+                </>
+              ) : (
+                <div className="product-description-full">
+                  {product.description}
+                </div>
+              )}
+            </div>
+
             <div className="product-meta">
               {product.origin && (
                 <span className="meta-tag">
@@ -157,7 +195,7 @@ const ProductTracePage = () => {
               </div>
             </div>
 
-            {/* Timeline */}
+            {/* Timeline with Expandable Event Descriptions */}
             <div className="trace-timeline">
               <h3>Lộ trình chi tiết</h3>
               <div className="timeline">
@@ -177,7 +215,36 @@ const ProductTracePage = () => {
                           {stageNames[stageKey]}
                         </div>
                         <h4>{event.title}</h4>
-                        <p className="event-description">{event.description}</p>
+                        
+                        {/* Event Description với chức năng xem thêm/ẩn bớt */}
+                        <div className="expandable-event">
+                          {isLongText(event.description, 100) ? (
+                            <>
+                              <div className={`event-description ${expandedEvents[index] ? 'expanded' : 'collapsed'}`}>
+                                {event.description}
+                              </div>
+                              <button 
+                                className="expand-event-btn"
+                                onClick={() => toggleEventDescription(index)}
+                              >
+                                {expandedEvents[index] ? (
+                                  <>
+                                    <FaChevronUp size={10} /> Thu gọn
+                                  </>
+                                ) : (
+                                  <>
+                                    <FaChevronDown size={10} /> Xem thêm
+                                  </>
+                                )}
+                              </button>
+                            </>
+                          ) : (
+                            <div className="event-description-full">
+                              {event.description}
+                            </div>
+                          )}
+                        </div>
+
                         <div className="event-meta">
                           {event.location && (
                             <span><FaMapMarkerAlt /> {event.location}</span>
@@ -286,7 +353,45 @@ const ProductTracePage = () => {
         .product-description {
           color: #666;
           line-height: 1.6;
+          margin-bottom: 8px;
+        }
+
+        .product-description.collapsed {
+          display: -webkit-box;
+          -webkit-line-clamp: 3;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .product-description.expanded {
+          display: block;
+        }
+
+        .product-description-full {
+          color: #666;
+          line-height: 1.6;
           margin-bottom: 16px;
+        }
+
+        .expand-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 6px 12px;
+          background: transparent;
+          border: none;
+          color: #2e7d32;
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s;
+          border-radius: 20px;
+          margin-bottom: 16px;
+        }
+
+        .expand-btn:hover {
+          background: #e8f5e9;
         }
 
         .product-meta {
@@ -431,7 +536,45 @@ const ProductTracePage = () => {
         .event-description {
           color: #666;
           line-height: 1.6;
+          margin-bottom: 8px;
+        }
+
+        .event-description.collapsed {
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .event-description.expanded {
+          display: block;
+        }
+
+        .event-description-full {
+          color: #666;
+          line-height: 1.6;
           margin-bottom: 16px;
+        }
+
+        .expand-event-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 4px 10px;
+          background: transparent;
+          border: none;
+          color: #2e7d32;
+          font-size: 12px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s;
+          border-radius: 20px;
+          margin-bottom: 16px;
+        }
+
+        .expand-event-btn:hover {
+          background: #e8f5e9;
         }
 
         .event-meta {

@@ -1,0 +1,798 @@
+/* LocationMap.css - Responsive cho mọi thiết bị */
+
+/* ==================== CONTAINER CHÍNH ==================== */
+.location-map-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 400px;
+  background: #f5f5f5;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Map container wrapper */
+.map-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 400px;
+  transition: all 0.3s ease;
+}
+
+/* Leaflet map custom styles */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  min-height: 400px;
+  background: #e8f0f8;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* ==================== CUSTOM MARKER STYLES ==================== */
+.custom-photo-marker {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.custom-photo-marker:hover {
+  transform: scale(1.1);
+  z-index: 1000 !important;
+}
+
+.custom-photo-marker > div {
+  transition: box-shadow 0.2s ease;
+}
+
+.custom-photo-marker:hover > div {
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Marker với ảnh */
+.custom-photo-marker .marker-image {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 4px solid #ffffff;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* Marker với emoji mặc định */
+.custom-photo-marker .marker-emoji {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 4px solid #ffffff;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.3);
+  background: linear-gradient(135deg, #4285f4, #34a853);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  color: white;
+}
+
+/* Marker cho category khác nhau */
+.custom-photo-marker[data-category="store"] .marker-emoji {
+  background: linear-gradient(135deg, #f093fb, #f5576c);
+}
+
+.custom-photo-marker[data-category="restaurant"] .marker-emoji {
+  background: linear-gradient(135deg, #fa709a, #fee140);
+}
+
+.custom-photo-marker[data-category="cafe"] .marker-emoji {
+  background: linear-gradient(135deg, #a8edea, #fed6e3);
+}
+
+/* Marker đang được chọn */
+.custom-photo-marker.selected {
+  transform: scale(1.15);
+  filter: drop-shadow(0 0 8px rgba(76, 175, 80, 0.6));
+  z-index: 1000 !important;
+}
+
+.custom-photo-marker.selected > div {
+  border: 4px solid #ffd700;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* ==================== POPUP STYLES ==================== */
+.leaflet-popup-content-wrapper {
+  border-radius: 16px;
+  padding: 0;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  background: white;
+  min-width: 240px;
+  max-width: 320px;
+}
+
+.leaflet-popup-content {
+  margin: 0;
+  padding: 16px;
+  min-width: 220px;
+  max-width: 300px;
+}
+
+.leaflet-popup-tip {
+  background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Popup header */
+.popup-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.popup-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #f5f5f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.popup-icon img {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.popup-title {
+  flex: 1;
+}
+
+.popup-title h4 {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #2e7d32;
+  line-height: 1.3;
+}
+
+.popup-category {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #f0f0f0;
+  border-radius: 12px;
+  font-size: 10px;
+  color: #666;
+}
+
+/* Popup content */
+.popup-address {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+  font-size: 12px;
+  color: #666;
+  line-height: 1.4;
+}
+
+.popup-address svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #ff5252;
+}
+
+.popup-phone {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  font-size: 12px;
+  color: #333;
+}
+
+.popup-phone svg {
+  flex-shrink: 0;
+  color: #34a853;
+}
+
+.popup-rating {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 6px 0;
+  border-top: 1px solid #f0f0f0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.popup-rating .stars {
+  display: flex;
+  gap: 2px;
+  color: #ffc107;
+  font-size: 14px;
+}
+
+.popup-rating .rating-value {
+  font-weight: 600;
+  color: #333;
+  font-size: 13px;
+}
+
+.popup-rating .review-count {
+  color: #999;
+  font-size: 11px;
+}
+
+/* Popup button */
+.popup-button {
+  width: 100%;
+  margin-top: 12px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #4CAF50, #45a049);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  text-align: center;
+  display: block;
+}
+
+.popup-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+.popup-button:active {
+  transform: translateY(0);
+}
+
+/* ==================== ZOOM CONTROL ==================== */
+.leaflet-control-zoom {
+  border: none !important;
+  border-radius: 12px !important;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.leaflet-control-zoom a {
+  width: 36px !important;
+  height: 36px !important;
+  line-height: 36px !important;
+  background: white !important;
+  color: #333 !important;
+  transition: all 0.2s ease;
+}
+
+.leaflet-control-zoom a:hover {
+  background: #f5f5f5 !important;
+  color: #2e7d32 !important;
+}
+
+.leaflet-control-zoom-in {
+  border-radius: 12px 12px 0 0 !important;
+}
+
+.leaflet-control-zoom-out {
+  border-radius: 0 0 12px 12px !important;
+}
+
+/* ==================== ATTRIBUTION CONTROL ==================== */
+.leaflet-control-attribution {
+  background: rgba(255, 255, 255, 0.9) !important;
+  font-size: 10px !important;
+  padding: 4px 8px !important;
+  border-radius: 8px !important;
+  bottom: 8px !important;
+  right: 8px !important;
+}
+
+.leaflet-control-attribution a {
+  color: #2e7d32 !important;
+}
+
+/* ==================== LOADING STATES ==================== */
+.map-loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1000;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 16px 24px;
+  border-radius: 48px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  font-size: 14px;
+  color: #333;
+}
+
+.map-loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #f0f0f0;
+  border-top-color: #4CAF50;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ==================== ERROR STATES ==================== */
+.map-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  background: white;
+  border-radius: 12px;
+  padding: 32px;
+  text-align: center;
+}
+
+.map-error-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.map-error h3 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  color: #333;
+}
+
+.map-error p {
+  margin: 0 0 20px 0;
+  font-size: 14px;
+  color: #666;
+}
+
+.map-error button {
+  padding: 10px 24px;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 30px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.map-error button:hover {
+  background: #45a049;
+  transform: translateY(-1px);
+}
+
+/* ==================== NO LOCATIONS STATE ==================== */
+.map-no-locations {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  background: #fafafa;
+  border-radius: 12px;
+  padding: 32px;
+  text-align: center;
+}
+
+.map-no-locations-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.map-no-locations h3 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  color: #666;
+}
+
+.map-no-locations p {
+  margin: 0;
+  font-size: 14px;
+  color: #999;
+}
+
+/* ==================== RESPONSIVE STYLES ==================== */
+
+/* Tablet (768px - 1023px) */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .location-map-container,
+  .map-wrapper,
+  .leaflet-container {
+    min-height: 500px;
+  }
+
+  .custom-photo-marker > div,
+  .custom-photo-marker .marker-image,
+  .custom-photo-marker .marker-emoji {
+    width: 48px;
+    height: 48px;
+  }
+
+  .custom-photo-marker {
+    margin-left: -24px;
+    margin-top: -24px;
+  }
+
+  .leaflet-popup-content {
+    min-width: 200px;
+    max-width: 280px;
+    padding: 14px;
+  }
+
+  .popup-title h4 {
+    font-size: 15px;
+  }
+
+  .leaflet-control-zoom a {
+    width: 32px !important;
+    height: 32px !important;
+    line-height: 32px !important;
+  }
+}
+
+/* Desktop (1024px trở lên) */
+@media (min-width: 1024px) {
+  .location-map-container,
+  .map-wrapper,
+  .leaflet-container {
+    min-height: 600px;
+  }
+
+  .custom-photo-marker > div,
+  .custom-photo-marker .marker-image,
+  .custom-photo-marker .marker-emoji {
+    width: 56px;
+    height: 56px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .custom-photo-marker:hover {
+    transform: scale(1.15);
+  }
+
+  .leaflet-popup-content {
+    min-width: 260px;
+    max-width: 340px;
+    padding: 18px;
+  }
+
+  .popup-title h4 {
+    font-size: 17px;
+  }
+
+  .popup-button:hover {
+    transform: translateY(-2px);
+  }
+
+  .leaflet-control-zoom a {
+    width: 40px !important;
+    height: 40px !important;
+    line-height: 40px !important;
+  }
+}
+
+/* Mobile nhỏ (dưới 480px) */
+@media (max-width: 479px) {
+  .location-map-container,
+  .map-wrapper,
+  .leaflet-container {
+    min-height: 300px;
+  }
+
+  .custom-photo-marker > div,
+  .custom-photo-marker .marker-image,
+  .custom-photo-marker .marker-emoji {
+    width: 40px;
+    height: 40px;
+    border-width: 3px;
+  }
+
+  .custom-photo-marker {
+    margin-left: -20px;
+    margin-top: -20px;
+  }
+
+  .custom-photo-marker .marker-emoji {
+    font-size: 20px;
+  }
+
+  .leaflet-popup-content {
+    min-width: 180px;
+    max-width: 240px;
+    padding: 12px;
+  }
+
+  .popup-header {
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .popup-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+  }
+
+  .popup-icon img {
+    width: 36px;
+    height: 36px;
+  }
+
+  .popup-title h4 {
+    font-size: 14px;
+  }
+
+  .popup-category {
+    font-size: 9px;
+  }
+
+  .popup-address,
+  .popup-phone {
+    font-size: 11px;
+    margin: 6px 0;
+  }
+
+  .popup-rating {
+    margin: 6px 0;
+    padding: 4px 0;
+  }
+
+  .popup-rating .stars {
+    font-size: 12px;
+  }
+
+  .popup-rating .rating-value {
+    font-size: 12px;
+  }
+
+  .popup-rating .review-count {
+    font-size: 10px;
+  }
+
+  .popup-button {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .leaflet-control-zoom a {
+    width: 28px !important;
+    height: 28px !important;
+    line-height: 28px !important;
+    font-size: 14px !important;
+  }
+
+  .leaflet-control-attribution {
+    font-size: 8px !important;
+    padding: 2px 4px !important;
+  }
+}
+
+/* Mobile trung bình (480px - 767px) */
+@media (min-width: 480px) and (max-width: 767px) {
+  .location-map-container,
+  .map-wrapper,
+  .leaflet-container {
+    min-height: 350px;
+  }
+
+  .custom-photo-marker > div,
+  .custom-photo-marker .marker-image,
+  .custom-photo-marker .marker-emoji {
+    width: 44px;
+    height: 44px;
+    border-width: 3px;
+  }
+
+  .custom-photo-marker {
+    margin-left: -22px;
+    margin-top: -22px;
+  }
+
+  .custom-photo-marker .marker-emoji {
+    font-size: 22px;
+  }
+
+  .leaflet-popup-content {
+    min-width: 200px;
+    max-width: 260px;
+    padding: 12px;
+  }
+
+  .popup-title h4 {
+    font-size: 15px;
+  }
+}
+
+/* Landscape mode (xoay ngang trên mobile) */
+@media (max-width: 768px) and (orientation: landscape) {
+  .location-map-container,
+  .map-wrapper,
+  .leaflet-container {
+    min-height: 280px;
+  }
+
+  .custom-photo-marker > div,
+  .custom-photo-marker .marker-image,
+  .custom-photo-marker .marker-emoji {
+    width: 38px;
+    height: 38px;
+    border-width: 2px;
+  }
+
+  .custom-photo-marker {
+    margin-left: -19px;
+    margin-top: -19px;
+  }
+
+  .custom-photo-marker .marker-emoji {
+    font-size: 18px;
+  }
+
+  .leaflet-popup-content {
+    max-height: 200px;
+    overflow-y: auto;
+  }
+}
+
+/* High DPI screens (Retina) */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .custom-photo-marker .marker-image,
+  .custom-photo-marker .marker-emoji {
+    border-width: 3px;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .location-map-container {
+    background: #1a1a1a;
+  }
+
+  .leaflet-container {
+    background: #2c2c2c;
+  }
+
+  .leaflet-popup-content-wrapper {
+    background: #2c2c2c;
+    color: #e0e0e0;
+  }
+
+  .leaflet-popup-tip {
+    background: #2c2c2c;
+  }
+
+  .popup-header {
+    border-bottom-color: #404040;
+  }
+
+  .popup-category {
+    background: #404040;
+    color: #ccc;
+  }
+
+  .popup-address,
+  .popup-phone {
+    color: #bbb;
+  }
+
+  .popup-rating {
+    border-top-color: #404040;
+    border-bottom-color: #404040;
+  }
+
+  .popup-rating .rating-value {
+    color: #e0e0e0;
+  }
+
+  .popup-button {
+    background: linear-gradient(135deg, #2e7d32, #1b5e20);
+  }
+
+  .leaflet-control-zoom a {
+    background: #2c2c2c !important;
+    color: #e0e0e0 !important;
+  }
+
+  .leaflet-control-zoom a:hover {
+    background: #404040 !important;
+  }
+
+  .leaflet-control-attribution {
+    background: rgba(0, 0, 0, 0.8) !important;
+    color: #ccc !important;
+  }
+
+  .leaflet-control-attribution a {
+    color: #4caf50 !important;
+  }
+}
+
+/* Print styles */
+@media print {
+  .location-map-container {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .leaflet-control-zoom,
+  .leaflet-control-attribution {
+    display: none !important;
+  }
+
+  .custom-photo-marker {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}
+
+/* Touch optimization */
+@media (hover: none) and (pointer: coarse) {
+  .custom-photo-marker {
+    cursor: default;
+  }
+
+  .custom-photo-marker:active {
+    transform: scale(1.05);
+  }
+
+  .popup-button {
+    cursor: default;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .popup-button:active {
+    transform: scale(0.98);
+  }
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .custom-photo-marker,
+  .popup-button,
+  .leaflet-control-zoom a {
+    transition: none;
+  }
+
+  .custom-photo-marker:hover {
+    transform: none;
+  }
+
+  .map-loading-spinner {
+    animation: none;
+  }
+}
+
+/* Focus styles for keyboard navigation */
+.leaflet-container:focus {
+  outline: 2px solid #4caf50;
+  outline-offset: 2px;
+}
+
+.custom-photo-marker:focus-visible {
+  outline: 2px solid #4caf50;
+  outline-offset: 2px;
+  border-radius: 50%;
+}

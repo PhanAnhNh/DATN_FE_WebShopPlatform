@@ -55,7 +55,6 @@
 }
 
 /* ==================== PRODUCT INFO CARD ==================== */
-/* Mặc định trên mobile: hiển thị DỌC (ảnh trên, text dưới) */
 .product-info-card {
   background: white;
   margin: 12px;
@@ -67,11 +66,13 @@
 }
 
 .product-info-card img {
-  width: 100%;
+  width: auto;
   height: 200px;
+  max-width: 100%;
   object-fit: cover;
   border-radius: 12px;
-  margin-bottom: 16px;
+  margin: 0 auto 16px auto;
+  display: block;
 }
 
 .product-info {
@@ -85,15 +86,59 @@
   color: #222;
 }
 
+/* Expandable Content Styles */
+.expandable-content {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
 .product-description {
   color: #666;
   font-size: 14px;
   line-height: 1.5;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
+  transition: all 0.3s ease;
+}
+
+.product-description.collapsed {
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.product-description.expanded {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+}
+
+.product-description-full {
+  color: #666;
+  font-size: 14px;
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+
+.expand-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: transparent;
+  border: none;
+  color: #2e7d32;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-radius: 20px;
+  margin-bottom: 8px;
+}
+
+.expand-btn:active {
+  transform: scale(0.96);
 }
 
 .product-meta {
@@ -270,11 +315,59 @@
   color: #333;
 }
 
+/* Expandable Event Styles */
+.expandable-event {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
 .event-description {
   color: #666;
   font-size: 13px;
   line-height: 1.5;
+  margin-bottom: 8px;
+  transition: all 0.3s ease;
+}
+
+.event-description.collapsed {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.event-description.expanded {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+}
+
+.event-description-full {
+  color: #666;
+  font-size: 13px;
+  line-height: 1.5;
   margin-bottom: 12px;
+}
+
+.expand-event-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: transparent;
+  border: none;
+  color: #2e7d32;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-radius: 20px;
+  margin-bottom: 8px;
+}
+
+.expand-event-btn:active {
+  transform: scale(0.96);
 }
 
 .event-meta {
@@ -434,6 +527,23 @@
   to { transform: rotate(360deg); }
 }
 
+/* Animation cho nội dung mở rộng */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.product-description.expanded,
+.event-description.expanded {
+  animation: fadeIn 0.3s ease forwards;
+}
+
 /* ==================== TABLET (768px - 1023px) ==================== */
 @media (min-width: 768px) {
   .trace-header {
@@ -449,7 +559,6 @@
     font-size: 15px;
   }
 
-  /* Trên tablet: chuyển sang hiển thị NGANG (ảnh trái, text phải) */
   .product-info-card {
     flex-direction: row;
     gap: 24px;
@@ -468,9 +577,8 @@
     font-size: 22px;
   }
   
-  .product-description {
-    font-size: 14px;
-    -webkit-line-clamp: unset;
+  .product-description.collapsed {
+    -webkit-line-clamp: 4;
   }
   
   .stages-grid {
@@ -507,6 +615,10 @@
     margin-left: 20px;
   }
   
+  .event-description.collapsed {
+    -webkit-line-clamp: 3;
+  }
+  
   .event-meta {
     flex-direction: row;
     gap: 16px;
@@ -525,6 +637,14 @@
   .basic-info {
     max-width: 400px;
     margin: 24px auto 0;
+  }
+
+  .expand-btn, .expand-event-btn {
+    cursor: pointer;
+  }
+  
+  .expand-btn:hover, .expand-event-btn:hover {
+    background: #e8f5e9;
   }
 }
 
@@ -558,6 +678,10 @@
   .stages-overview h3,
   .trace-timeline h3 {
     font-size: 20px;
+  }
+  
+  .product-description.collapsed {
+    -webkit-line-clamp: 5;
   }
   
   .stage-card:hover {
@@ -665,7 +789,6 @@
     position: static;
   }
   
-  /* Khi xoay ngang trên mobile, chuyển sang ngang */
   .product-info-card {
     flex-direction: row;
     gap: 16px;
@@ -717,14 +840,18 @@ html {
 @media (max-width: 768px) {
   button, 
   .stage-card,
-  .back-btn {
+  .back-btn,
+  .expand-btn,
+  .expand-event-btn {
     cursor: default;
     -webkit-tap-highlight-color: transparent;
   }
   
   button:active,
   .stage-card:active,
-  .back-btn:active {
+  .back-btn:active,
+  .expand-btn:active,
+  .expand-event-btn:active {
     opacity: 0.7;
   }
 }
