@@ -10,10 +10,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@react-oauth/google": "^0.13.5",
     "axios": "^1.13.6",
     "chart.js": "^4.5.1",
     "date-fns": "^4.1.0",
     "hashids": "^2.3.0",
+    "jwt-decode": "^4.0.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.577.0",
     "qrcode.react": "^4.2.0",

@@ -1,16 +1,21 @@
 // src/pages/user/account/signin.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
+import { jwtDecode } from 'jwt-decode';
 import Toast from '../../../components/common/Toast';
 import "../../../css/AdminManageLayout.css";
 import userApi from '../../../api/api';
 
-function Login() {
+const GOOGLE_CLIENT_ID = "298767992144-us7ot1ggmedj7t5092lhvueu0pr1ht2g.apps.googleusercontent.com";
+
+function LoginContent() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   
   // Toast states
   const [toast, setToast] = useState({
@@ -26,54 +31,107 @@ function Login() {
   };
 
   const handleLogin = async (e) => {
-  e.preventDefault();
-  setError("");
-  setLoading(true);
+    e.preventDefault();
+    setError("");
+    setLoading(true);
 
-  try {
-    const formData = new URLSearchParams();
-    formData.append("username", email);
-    formData.append("password", password);
+    try {
+      const formData = new URLSearchParams();
+      formData.append("username", email);
+      formData.append("password", password);
 
-    // DÙNG userApi (axios) - KHÔNG cần .json()
-    const response = await userApi.post("/api/v1/auth/login", formData.toString(), {
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-    });
+      const response = await userApi.post("/api/v1/auth/login", formData.toString(), {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      });
 
-    // VỚI AXIOS: data nằm trong response.data, KHÔNG cần response.json()
-    const data = response.data;
-    console.log("User login response:", data);
+      const data = response.data;
 
-    // Kiểm tra role
-    if (data.user && data.user.role === "shop_owner") {
-      throw new Error("Vui lòng đăng nhập qua cổng dành cho shop");
+      if (data.user && data.user.role === "shop_owner") {
+        throw new Error("Vui lòng đăng nhập qua cổng dành cho shop");
+      }
+      
+      if (data.user && data.user.role === "admin") {
+        throw new Error("Vui lòng đăng nhập qua cổng dành cho admin");
+      }
+
+      localStorage.setItem("user_token", data.access_token);
+      localStorage.setItem("user_data", JSON.stringify(data.user));
+      localStorage.setItem("user", JSON.stringify(data.user));
+
+      showToast("Đăng nhập thành công!", "success");
+      
+      setTimeout(() => {
+        navigate("/");
+      }, 1500);
+
+    } catch (err) {
+      const errorMsg = err.response?.data?.detail || err.message || "Đăng nhập thất bại";
+      setError(errorMsg);
+      showToast(errorMsg, "error");
+    } finally {
+      setLoading(false);
     }
+  };
+
+  // Xử lý đăng nhập Google thành công
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setGoogleLoading(true);
+    setError("");
     
-    if (data.user && data.user.role === "admin") {
-      throw new Error("Vui lòng đăng nhập qua cổng dành cho admin");
+    try {
+      // Decode token để lấy thông tin user
+      const decoded = jwtDecode(credentialResponse.credential);
+      console.log("Google user info:", decoded);
+      
+      const { email, name, picture, sub: googleId } = decoded;
+      
+      // Gọi API để login hoặc tạo tài khoản với Google
+      const response = await userApi.post("/api/v1/auth/google-login", {
+        email: email,
+        full_name: name,
+        avatar_url: picture,
+        google_id: googleId
+      });
+      
+      const data = response.data;
+      
+      // Kiểm tra role
+      if (data.user && data.user.role === "shop_owner") {
+        throw new Error("Vui lòng đăng nhập qua cổng dành cho shop");
+      }
+      
+      if (data.user && data.user.role === "admin") {
+        throw new Error("Vui lòng đăng nhập qua cổng dành cho admin");
+      }
+      
+      // Lưu token và thông tin user
+      localStorage.setItem("user_token", data.access_token);
+      localStorage.setItem("user_data", JSON.stringify(data.user));
+      localStorage.setItem("user", JSON.stringify(data.user));
+      
+      showToast("Đăng nhập với Google thành công!", "success");
+      
+      setTimeout(() => {
+        navigate("/");
+      }, 1500);
+      
+    } catch (err) {
+      const errorMsg = err.response?.data?.detail || err.message || "Đăng nhập với Google thất bại";
+      setError(errorMsg);
+      showToast(errorMsg, "error");
+    } finally {
+      setGoogleLoading(false);
     }
+  };
 
-    // Lưu token
-    localStorage.setItem("user_token", data.access_token);
-    localStorage.setItem("user_data", JSON.stringify(data.user));
-    localStorage.setItem("user", JSON.stringify(data.user));
-
-    showToast("Đăng nhập thành công!", "success");
-    
-    setTimeout(() => {
-      navigate("/");
-    }, 1500);
-
-  } catch (err) {
-    const errorMsg = err.response?.data?.detail || err.message || "Đăng nhập thất bại";
-    setError(errorMsg);
-    showToast(errorMsg, "error");
-  } finally {
-    setLoading(false);
-  }
-};
+  // Xử lý lỗi Google login
+  const handleGoogleError = () => {
+    console.error("Google login failed");
+    showToast("Đăng nhập với Google thất bại, vui lòng thử lại", "error");
+    setGoogleLoading(false);
+  };
 
   return (
     <div style={styles.container}>
@@ -195,14 +253,25 @@ function Login() {
             </div>
 
             <div style={styles.socialButtons}>
-              <button 
-                type="button"
-                style={styles.socialBtn}
-                onClick={() => {/* TODO: Implement Google login */}}
-              >
-                <span style={styles.googleIcon}>G</span>
-                <span>Google</span>
-              </button>
+              <div style={styles.googleBtnWrapper}>
+                {googleLoading ? (
+                  <div style={styles.googleLoadingBtn}>
+                    <span style={styles.spinner}></span>
+                    Đang xử lý...
+                  </div>
+                ) : (
+                  <GoogleLogin
+                    onSuccess={handleGoogleSuccess}
+                    onError={handleGoogleError}
+                    useOneTap={false}
+                    theme="outline"
+                    size="large"
+                    text="continue_with"
+                    shape="rectangular"
+                    width="100%"
+                  />
+                )}
+              </div>
               <button 
                 type="button"
                 style={styles.socialBtn}
@@ -222,6 +291,15 @@ function Login() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Wrap với GoogleOAuthProvider
+function Login() {
+  return (
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <LoginContent />
+    </GoogleOAuthProvider>
   );
 }
 
@@ -301,10 +379,6 @@ const styles = {
     transition: "all 0.3s ease",
     color: "#666",
     zIndex: 10,
-    ":hover": {
-      backgroundColor: "#e0e0e0",
-      transform: "rotate(90deg)",
-    },
   },
   
   header: {
@@ -401,11 +475,6 @@ const styles = {
     outline: "none",
     fontFamily: "inherit",
     backgroundColor: "#fafafa",
-    ":focus": {
-      borderColor: "#667eea",
-      backgroundColor: "white",
-      boxShadow: "0 0 0 3px rgba(102, 126, 234, 0.1)",
-    },
   },
   
   passwordToggle: {
@@ -434,10 +503,6 @@ const styles = {
     cursor: "pointer",
     textDecoration: "none",
     transition: "color 0.2s",
-    ":hover": {
-      color: "#764ba2",
-      textDecoration: "underline",
-    },
   },
   
   errorMessage: {
@@ -494,9 +559,6 @@ const styles = {
     cursor: "pointer",
     marginLeft: "5px",
     transition: "color 0.2s",
-    ":hover": {
-      color: "#764ba2",
-    },
   },
   
   divider: {
@@ -519,11 +581,31 @@ const styles = {
   
   socialButtons: {
     display: "flex",
+    flexDirection: "column",
     gap: "12px",
   },
   
+  googleBtnWrapper: {
+    width: "100%",
+  },
+  
+  googleLoadingBtn: {
+    width: "100%",
+    padding: "12px",
+    borderRadius: "12px",
+    border: "1.5px solid #e0e0e0",
+    backgroundColor: "#f5f5f5",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "8px",
+    fontSize: "14px",
+    color: "#666",
+    cursor: "not-allowed",
+  },
+  
   socialBtn: {
-    flex: 1,
+    width: "100%",
     padding: "12px",
     borderRadius: "12px",
     border: "1.5px solid #e0e0e0",
@@ -537,11 +619,6 @@ const styles = {
     gap: "8px",
     transition: "all 0.2s",
     color: "#555",
-    ":hover": {
-      backgroundColor: "#fafafa",
-      borderColor: "#667eea",
-      transform: "translateY(-1px)",
-    },
   },
   
   googleIcon: {
@@ -585,9 +662,6 @@ const styles = {
     color: "#999",
     cursor: "pointer",
     transition: "color 0.2s",
-    ":hover": {
-      color: "#667eea",
-    },
   },
   
   footerDot: {

@@ -92,7 +92,11 @@ adminApi.interceptors.request.use((config) => {
 userApi.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    // Không redirect nếu đang ở trang login/register
+    const isAuthPage = window.location.pathname.includes('/login') || 
+                       window.location.pathname.includes('/register');
+    
+    if (error.response?.status === 401 && !isAuthPage) {
       localStorage.removeItem('user_token');
       localStorage.removeItem('user_data');
       window.location.href = '/login';
@@ -104,7 +108,9 @@ userApi.interceptors.response.use(
 shopApi.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const isShopAuthPage = window.location.pathname.includes('/shop/login');
+    
+    if (error.response?.status === 401 && !isShopAuthPage) {
       localStorage.removeItem('shop_token');
       localStorage.removeItem('shop_data');
       localStorage.removeItem('shop_info');
@@ -117,7 +123,9 @@ shopApi.interceptors.response.use(
 adminApi.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const isAdminAuthPage = window.location.pathname.includes('/admin/login');
+    
+    if (error.response?.status === 401 && !isAdminAuthPage) {
       localStorage.removeItem('admin_token');
       localStorage.removeItem('admin_data');
       window.location.href = '/admin/login';
