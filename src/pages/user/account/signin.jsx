@@ -1,8 +1,7 @@
 // src/pages/user/account/signin.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
-import { jwtDecode } from 'jwt-decode';
+import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
 import Toast from '../../../components/common/Toast';
 import "../../../css/AdminManageLayout.css";
 import userApi from '../../../api/api';
@@ -75,63 +74,66 @@ function LoginContent() {
     }
   };
 
-  // Xử lý đăng nhập Google thành công
-  const handleGoogleSuccess = async (credentialResponse) => {
-    setGoogleLoading(true);
-    setError("");
-    
-    try {
-      // Decode token để lấy thông tin user
-      const decoded = jwtDecode(credentialResponse.credential);
-      console.log("Google user info:", decoded);
+  // Sử dụng custom hook để thiết kế lại hoàn toàn nút Google
+  const loginGoogle = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      setGoogleLoading(true);
+      setError("");
       
-      const { email, name, picture, sub: googleId } = decoded;
-      
-      // Gọi API để login hoặc tạo tài khoản với Google
-      const response = await userApi.post("/api/v1/auth/google-login", {
-        email: email,
-        full_name: name,
-        avatar_url: picture,
-        google_id: googleId
-      });
-      
-      const data = response.data;
-      
-      // Kiểm tra role
-      if (data.user && data.user.role === "shop_owner") {
-        throw new Error("Vui lòng đăng nhập qua cổng dành cho shop");
+      try {
+        // Dùng access_token để lấy thông tin user từ Google API
+        const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+        });
+        const userInfo = await userInfoResponse.json();
+        console.log("Google user info:", userInfo);
+        
+        const { email, name, picture, sub: googleId } = userInfo;
+        
+        // Gọi API để login hoặc tạo tài khoản với Google
+        const response = await userApi.post("/api/v1/auth/google-login", {
+          email: email,
+          full_name: name,
+          avatar_url: picture,
+          google_id: googleId
+        });
+        
+        const data = response.data;
+        
+        // Kiểm tra role
+        if (data.user && data.user.role === "shop_owner") {
+          throw new Error("Vui lòng đăng nhập qua cổng dành cho shop");
+        }
+        
+        if (data.user && data.user.role === "admin") {
+          throw new Error("Vui lòng đăng nhập qua cổng dành cho admin");
+        }
+        
+        // Lưu token và thông tin user
+        localStorage.setItem("user_token", data.access_token);
+        localStorage.setItem("user_data", JSON.stringify(data.user));
+        localStorage.setItem("user", JSON.stringify(data.user));
+        
+        showToast("Đăng nhập với Google thành công!", "success");
+        
+        setTimeout(() => {
+          navigate("/");
+        }, 1500);
+        
+      } catch (err) {
+        const errorMsg = err.response?.data?.detail || err.message || "Đăng nhập với Google thất bại";
+        setError(errorMsg);
+        showToast(errorMsg, "error");
+      } finally {
+        setGoogleLoading(false);
       }
-      
-      if (data.user && data.user.role === "admin") {
-        throw new Error("Vui lòng đăng nhập qua cổng dành cho admin");
-      }
-      
-      // Lưu token và thông tin user
-      localStorage.setItem("user_token", data.access_token);
-      localStorage.setItem("user_data", JSON.stringify(data.user));
-      localStorage.setItem("user", JSON.stringify(data.user));
-      
-      showToast("Đăng nhập với Google thành công!", "success");
-      
-      setTimeout(() => {
-        navigate("/");
-      }, 1500);
-      
-    } catch (err) {
-      const errorMsg = err.response?.data?.detail || err.message || "Đăng nhập với Google thất bại";
-      setError(errorMsg);
-      showToast(errorMsg, "error");
-    } finally {
+    },
+    onError: () => {
+      console.error("Google login failed");
+      showToast("Đăng nhập với Google thất bại, vui lòng thử lại", "error");
       setGoogleLoading(false);
     }
-  };
-
-  // Xử lý lỗi Google login
-  const handleGoogleError = () => {
-    console.error("Google login failed");
-    showToast("Đăng nhập với Google thất bại, vui lòng thử lại", "error");
-    setGoogleLoading(false);
-  };
+  });
 
   return (
     <div style={styles.container}>
@@ -253,32 +255,34 @@ function LoginContent() {
             </div>
 
             <div style={styles.socialButtons}>
-              <div style={styles.googleBtnWrapper}>
-                {googleLoading ? (
-                  <div style={styles.googleLoadingBtn}>
-                    <span style={styles.spinner}></span>
-                    Đang xử lý...
-                  </div>
-                ) : (
-                  <GoogleLogin
-                    onSuccess={handleGoogleSuccess}
-                    onError={handleGoogleError}
-                    useOneTap={false}
-                    theme="outline"
-                    size="large"
-                    text="continue_with"
-                    shape="rectangular"
-                    width="100%"
-                  />
-                )}
-              </div>
               <button 
                 type="button"
+                className="social-btn"
+                style={styles.socialBtn}
+                onClick={() => loginGoogle()}
+                disabled={googleLoading}
+              >
+                {googleLoading ? (
+                  <>
+                    <span style={styles.spinnerDark}></span>
+                    Đang xử lý...
+                  </>
+                ) : (
+                  <>
+                    <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" style={styles.socialIcon} />
+                    <span>Tiếp tục với Google</span>
+                  </>
+                )}
+              </button>
+
+              <button 
+                type="button"
+                className="social-btn"
                 style={styles.socialBtn}
                 onClick={() => {/* TODO: Implement Facebook login */}}
               >
-                <span style={styles.fbIcon}>f</span>
-                <span>Facebook</span>
+                <img src="https://www.svgrepo.com/show/475647/facebook-color.svg" alt="Facebook" style={styles.socialIcon} />
+                <span>Tiếp tục với Facebook</span>
               </button>
             </div>
           </form>
@@ -547,6 +551,18 @@ const styles = {
     verticalAlign: "middle",
   },
   
+  spinnerDark: {
+    display: "inline-block",
+    width: "16px",
+    height: "16px",
+    border: "2px solid #666",
+    borderTopColor: "transparent",
+    borderRadius: "50%",
+    animation: "spin 0.6s linear infinite",
+    marginRight: "8px",
+    verticalAlign: "middle",
+  },
+  
   registerRedirect: {
     textAlign: "center",
     fontSize: "13px",
@@ -585,66 +601,26 @@ const styles = {
     gap: "12px",
   },
   
-  googleBtnWrapper: {
-    width: "100%",
-  },
-  
-  googleLoadingBtn: {
-    width: "100%",
-    padding: "12px",
-    borderRadius: "12px",
-    border: "1.5px solid #e0e0e0",
-    backgroundColor: "#f5f5f5",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "8px",
-    fontSize: "14px",
-    color: "#666",
-    cursor: "not-allowed",
-  },
-  
   socialBtn: {
     width: "100%",
     padding: "12px",
-    borderRadius: "12px",
+    borderRadius: "14px", // Đồng bộ border radius với input
     border: "1.5px solid #e0e0e0",
     backgroundColor: "white",
     cursor: "pointer",
     fontSize: "14px",
-    fontWeight: "500",
+    fontWeight: "600",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: "8px",
+    gap: "12px",
     transition: "all 0.2s",
-    color: "#555",
+    color: "#333",
   },
   
-  googleIcon: {
-    width: "20px",
-    height: "20px",
-    backgroundColor: "#db4437",
-    color: "white",
-    borderRadius: "50%",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "12px",
-    fontWeight: "bold",
-  },
-  
-  fbIcon: {
-    width: "20px",
-    height: "20px",
-    backgroundColor: "#4267B2",
-    color: "white",
-    borderRadius: "50%",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "12px",
-    fontWeight: "bold",
+  socialIcon: {
+    width: "22px",
+    height: "22px",
   },
   
   footer: {
@@ -696,6 +672,11 @@ styleSheet.textContent = `
   
   button:hover {
     transform: translateY(-1px);
+  }
+  
+  .social-btn:hover {
+    background-color: #f9f9f9 !important;
+    border-color: #d0d0d0 !important;
   }
   
   .toast-container {
