@@ -274,16 +274,6 @@ function LoginContent() {
                   </>
                 )}
               </button>
-
-              <button 
-                type="button"
-                className="social-btn"
-                style={styles.socialBtn}
-                onClick={() => {/* TODO: Implement Facebook login */}}
-              >
-                <img src="https://www.svgrepo.com/show/475647/facebook-color.svg" alt="Facebook" style={styles.socialIcon} />
-                <span>Tiếp tục với Facebook</span>
-              </button>
             </div>
           </form>
 
