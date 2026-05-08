@@ -13,7 +13,6 @@ const ensureHttps = (url) => {
 
 // ✅ QUAN TRỌNG: DÙNG secureBackendUrl cho tất cả instances
 const secureBackendUrl = ensureHttps(BACKEND_URL);
-console.log('🔐 API Base URL:', secureBackendUrl);
 
 // Hàm tạo instance với HTTPS guarantee
 const createApiInstance = (baseURL) => {
@@ -40,7 +39,6 @@ const createApiInstance = (baseURL) => {
       
       // Ghi log đầy đủ URL để debug
       const fullUrl = (config.baseURL || '') + (config.url || '');
-      console.log('📡 [Request]', fullUrl);
       
       // Cảnh báo nếu vẫn còn HTTP
       if (fullUrl.includes('http://')) {

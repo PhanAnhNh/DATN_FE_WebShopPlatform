@@ -17,9 +17,7 @@ export const BACKEND_URL = (() => {
   // Đảm bảo không có trailing slash
   finalUrl = finalUrl.replace(/\/$/, '');
   
-  console.log('🔧 Backend URL (secure):', finalUrl);
   return finalUrl;
 })();
 
-// Export URL để dùng ở nhiều nơi
 export const SECURE_BACKEND_URL = BACKEND_URL;
