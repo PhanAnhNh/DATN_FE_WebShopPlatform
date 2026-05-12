@@ -69,42 +69,49 @@ const ChatWindow = ({ friend, onClose, onCloseModal }) => {
     }, [messages]);
 
     const sendMessage = async () => {
-        if (!newMessage.trim() || !friend?.user_id || !currentUserId) return;
+    if (!newMessage.trim() || !friend?.user_id || !currentUserId) return;
 
-        const content = newMessage.trim();
-        const tempId = 'temp-' + Date.now();
-        const tempMsg = {
-            id: tempId,
-            sender_id: currentUserId,
-            receiver_id: friend.user_id,
-            content: content,
-            created_at: new Date().toISOString(),
-            is_read: false
-        };
+    const content = newMessage.trim();
+    const tempId = 'temp-' + Date.now();
+    const tempMsg = {
+        id: tempId,
+        sender_id: currentUserId,
+        receiver_id: friend.user_id,
+        content: content,
+        created_at: new Date().toISOString(),
+        is_read: false
+    };
 
-        setMessages(prev => [...prev, tempMsg]);
-        setNewMessage('');
-        setLoading(true);
+    setMessages(prev => [...prev, tempMsg]);
+    setNewMessage('');
+    setLoading(true);
 
-        try {
-            await api.post('/api/v1/chat/send', {
+    try {
+        // ✅ SỬA: Gửi dưới dạng query params
+        await api.post('/api/v1/chat/send', null, {
+            params: {
                 receiver_id: friend.user_id,
                 content: content,
                 message_type: "text"
-            });
-            if (socket.connected) {
-                socket.emit('send_chat_message', {
-                    sender_id: currentUserId,
-                    receiver_id: friend.user_id,
-                    content: content
-                });
             }
-        } catch (err) {
-            setMessages(prev => prev.filter(msg => msg.id !== tempId));
-        } finally {
-            setLoading(false);
+        });
+        
+        if (socket.connected) {
+            socket.emit('send_chat_message', {
+                sender_id: currentUserId,
+                receiver_id: friend.user_id,
+                content: content
+            });
         }
-    };
+    } catch (err) {
+        console.error("Error sending message:", err);
+        setMessages(prev => prev.filter(msg => msg.id !== tempId));
+        // Hiển thị thông báo lỗi
+        alert("Không thể gửi tin nhắn. Vui lòng thử lại!");
+    } finally {
+        setLoading(false);
+    }
+};
 
     const handleClose = () => {
         if (onCloseModal) onCloseModal();

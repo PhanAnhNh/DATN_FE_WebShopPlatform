@@ -963,34 +963,10 @@ const UserProfile = () => {
                                 <span>📅 Tham gia {formatDate(user?.created_at)}</span>
                                 {user?.location && <span>📍 {user.location}</span>}
                             </div>
-                            <div style={{ display: 'flex', gap: '20px', marginTop: '10px' }}>
-                                <span><strong>{user?.followers_count || 0}</strong> người theo dõi</span>
-                                <span><strong>{user?.following_count || 0}</strong> đang theo dõi</span>
-                                <span><strong>{user?.posts_count || 0}</strong> bài viết</span>
-                            </div>
+                            
                         </div>
                         
-                        {!isOwnProfile && (
-                            <button 
-                                onClick={handleFollow}
-                                disabled={followingLoading}
-                                style={{
-                                    padding: '8px 20px',
-                                    borderRadius: '6px',
-                                    border: 'none',
-                                    background: isFollowing ? '#e4e6eb' : '#2e7d32',
-                                    color: isFollowing ? '#333' : 'white',
-                                    fontWeight: '500',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '8px'
-                                }}
-                            >
-                                {isFollowing ? <FaUserCheck /> : <FaUserPlus />}
-                                {isFollowing ? 'Đang theo dõi' : 'Theo dõi'}
-                            </button>
-                        )}
+        
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                             {!isOwnProfile && (
                                 <FriendButton 
