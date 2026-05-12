@@ -3,7 +3,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { FaBell, FaSpinner, FaCheck, FaTrash, FaCheckDouble, FaEye } from 'react-icons/fa';
 import api from '../../api/api';
 import { useNavigate } from 'react-router-dom';
-import socket from '../../socket'; // Import socket
 import '../../css/Notification.css';
 
 const NotificationBell = ({ userType = 'user' }) => {
@@ -77,60 +76,11 @@ const NotificationBell = ({ userType = 'user' }) => {
     }
   };
 
-  // Refresh toàn bộ (gọi khi có thông báo mới)
-  const refreshNotifications = async () => {
-    await fetchUnreadCount();
-    if (showDropdown) {
-      await fetchNotifications();
-    }
-  };
-
-  // Socket real-time listener
-  useEffect(() => {
-    const token = getToken();
-    if (!token) return;
-
-    // Lắng nghe sự kiện thông báo mới từ socket
-    const handleNewNotification = (data) => {
-      console.log('🔔 Received new notification via socket:', data);
-      
-      // Kiểm tra xem thông báo có dành cho user này không
-      if (data.user_id === token || data.user_id === getToken()) {
-        refreshNotifications();
-        
-        // Hiển thị thông báo trình duyệt (tùy chọn)
-        if (Notification.permission === 'granted') {
-          new Notification(data.title || 'Thông báo mới', {
-            body: data.message,
-            icon: data.image_url || '/favicon.ico'
-          });
-        }
-      }
-    };
-
-    socket.on('new_notification', handleNewNotification);
-    
-    // Request quyền thông báo trình duyệt
-    if (Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
-
-    return () => {
-      socket.off('new_notification', handleNewNotification);
-    };
-  }, [userType]);
-
   useEffect(() => {
     fetchUnreadCount();
     
-    // Polling mỗi 30 giây (fallback nếu socket không hoạt động)
-    const interval = setInterval(() => {
-      fetchUnreadCount();
-      if (showDropdown) {
-        fetchNotifications();
-      }
-    }, 30000);
-    
+    // Polling mỗi 30 giây
+    const interval = setInterval(fetchUnreadCount, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -191,102 +141,101 @@ const NotificationBell = ({ userType = 'user' }) => {
     }
   };
 
-  const handleNotificationClick = (notification) => {
+const handleNotificationClick = (notification) => {
     // Đánh dấu đã đọc
     if (!notification.is_read) {
-      markAsRead(notification._id);
+        markAsRead(notification._id);
     }
     
     // THÊM: Kiểm tra nếu là thông báo friend_request và userType là shop thì không xử lý
     if (userType === 'shop' && (notification.type === 'friend_request' || notification.type === 'friend_accepted')) {
-      console.log('Shop không nhận thông báo kết bạn');
-      setShowDropdown(false);
-      return;
-    }
-
-    if (notification.type === 'friend_request' || notification.type === 'friend_accepted') {
-      // Lấy sender_id từ extra_data
-      const senderId = notification.extra_data?.sender_id || notification.reference_id;
-      if (senderId) {
-        navigate(`/profile/${senderId}`);
-      } else {
-        console.warn('Không tìm thấy sender_id');
-      }
-      setShowDropdown(false);
-      return;
+        console.log('Shop không nhận thông báo kết bạn');
+        setShowDropdown(false);
+        return;
     }
     
     // Chuyển hướng dựa vào loại thông báo và userType
     if (notification.reference_id) {
-      switch (notification.type) {
-        case 'order':
-          if (userType === 'shop') {
-            navigate(`/shop/orders/${notification.reference_id}`);
-          } else if (userType === 'admin') {
-            navigate(`/admin/orders/${notification.reference_id}`);
-          } else {
-            navigate(`/orders/${notification.reference_id}`);
-          }
-          break;
-          
-        case 'payment':
-          if (userType === 'admin') {
-            navigate(`/admin/orders/${notification.reference_id}`);
-          } else {
-            navigate(`/orders/${notification.reference_id}`);
-          }
-          break;
-          
-        case 'shipping':
-          if (userType === 'shop') {
-            navigate(`/shop/orders/${notification.reference_id}`);
-          } else if (userType === 'admin') {
-            navigate(`/admin/orders/${notification.reference_id}`);
-          } else {
-            navigate(`/orders/${notification.reference_id}`);
-          }
-          break;
-          
-        case 'product':
-          if (userType === 'shop') {
-            navigate(`/shop/products/${notification.reference_id}`);
-          } else if (userType === 'admin') {
-            navigate(`/admin/products/${notification.reference_id}`);
-          } else {
-            navigate(`/product/${notification.reference_id}`);
-          }
-          break;
-          
-        case 'review':
-          if (userType === 'shop') {
-            navigate(`/shop/reviews/${notification.reference_id}`);
-          } else if (userType === 'admin') {
-            navigate(`/admin/reviews/${notification.reference_id}`);
-          } else {
-            navigate(`/product/${notification.reference_id}`);
-          }
-          break;
-          
-        case 'follow':
-          if (userType === 'shop') {
-            console.log('Shop không nhận thông báo follow');
-          } else {
-            navigate(`/profile/${notification.reference_id}`);
-          }
-          break;
-          
-        case 'system':
-          // Không chuyển hướng
-          break;
-          
-        default:
-          console.log('Unknown notification type:', notification.type);
-          break;
-      }
+        switch (notification.type) {
+            case 'order':
+                if (userType === 'shop') {
+                    navigate(`/shop/orders/${notification.reference_id}`);
+                } else if (userType === 'admin') {
+                    navigate(`/admin/orders/${notification.reference_id}`);
+                } else {
+                    navigate(`/orders/${notification.reference_id}`);
+                }
+                break;
+                
+            case 'payment':
+                if (userType === 'admin') {
+                    navigate(`/admin/orders/${notification.reference_id}`);
+                } else {
+                    navigate(`/orders/${notification.reference_id}`);
+                }
+                break;
+                
+            case 'shipping':
+                if (userType === 'shop') {
+                    navigate(`/shop/orders/${notification.reference_id}`);
+                } else if (userType === 'admin') {
+                    navigate(`/admin/orders/${notification.reference_id}`);
+                } else {
+                    navigate(`/orders/${notification.reference_id}`);
+                }
+                break;
+                
+            case 'product':
+                if (userType === 'shop') {
+                    navigate(`/shop/products/${notification.reference_id}`);
+                } else if (userType === 'admin') {
+                    navigate(`/admin/products/${notification.reference_id}`);
+                } else {
+                    navigate(`/product/${notification.reference_id}`);
+                }
+                break;
+                
+            case 'review':
+                if (userType === 'shop') {
+                    navigate(`/shop/reviews/${notification.reference_id}`);
+                } else if (userType === 'admin') {
+                    navigate(`/admin/reviews/${notification.reference_id}`);
+                } else {
+                    navigate(`/product/${notification.reference_id}`);
+                }
+                break;
+                
+            case 'friend_request':
+            case 'friend_accepted':
+                // THÊM: Kiểm tra userType trước khi chuyển hướng
+                if (userType === 'shop') {
+                    // Shop không xử lý thông báo kết bạn
+                    console.log('Shop không nhận thông báo kết bạn');
+                } else {
+                    // Chuyển đến trang profile của người gửi
+                    navigate(`/profile/${notification.reference_id}`);
+                }
+                break;
+                
+            case 'follow':
+                if (userType === 'shop') {
+                    console.log('Shop không nhận thông báo follow');
+                } else {
+                    navigate(`/profile/${notification.reference_id}`);
+                }
+                break;
+                
+            case 'system':
+                // Không chuyển hướng
+                break;
+                
+            default:
+                console.log('Unknown notification type:', notification.type);
+                break;
+        }
     }
     setShowDropdown(false);
-  };
-  
+};
   const getNotificationIcon = (type) => {
     switch (type) {
       case 'order': return '📦';
