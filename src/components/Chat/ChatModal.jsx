@@ -4,6 +4,7 @@ import { FaTimes, FaFilter } from 'react-icons/fa';
 import FriendList from './FriendList';
 import ChatWindow from './ChatWindow';
 import api from '../../api/api';
+import socket from '../../socket'; // ✅ THÊM DÒNG NÀY
 
 const ChatModal = ({ isOpen, onClose }) => {
     const [selectedFriend, setSelectedFriend] = useState(null);
@@ -18,11 +19,60 @@ const ChatModal = ({ isOpen, onClose }) => {
         }
     }, [isOpen]);
 
+    useEffect(() => {
+        const currentUserId = getCurrentUserId();
+
+        if (!currentUserId) return;
+
+        if (!socket.connected) {
+            socket.connect();
+        }
+
+        socket.emit('join', {
+            user_id: currentUserId
+        });
+
+        console.log("JOIN SOCKET:", currentUserId);
+
+    }, []);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        
+        const handleNewMessage = () => {
+            fetchRecentChats(); // Refresh danh sách khi có tin nhắn mới
+        };
+        
+        socket.on('new_message', handleNewMessage);
+        socket.on('message_edited', handleNewMessage);
+        socket.on('message_deleted', handleNewMessage);
+        
+        return () => {
+            socket.off('new_message', handleNewMessage);
+            socket.off('message_edited', handleNewMessage);
+            socket.off('message_deleted', handleNewMessage);
+        };
+    }, [isOpen]);
+
     const fetchFriends = async () => {
         try {
             const res = await api.get('/api/v1/friends/list');
             setFriends(res.data);
         } catch (err) { console.error(err); }
+    };
+
+    const getCurrentUserId = () => {
+        try {
+            const userData = localStorage.getItem("user_data");
+            if (userData) {
+                const user = JSON.parse(userData);
+                return user.id || user._id;
+            }
+        } catch (error) {
+            console.error(error);
+        }
+
+        return localStorage.getItem("user_id");
     };
 
     const fetchRecentChats = async () => {
@@ -51,7 +101,7 @@ const ChatModal = ({ isOpen, onClose }) => {
                 boxShadow: '0 -5px 25px rgba(0,0,0,0.15)',
                 display: 'flex', 
                 flexDirection: 'column',
-                overflow: 'hidden', // Ngăn con đè cha
+                overflow: 'hidden',
                 border: '1px solid #ddd'
             }}>
                 {/* Header Modal - Cố định */}
