@@ -1,7 +1,7 @@
 // components/layout/header.jsx
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { FaShoppingCart, FaBell, FaUser, FaBook, FaSignOutAlt, FaComment, FaSearch, FaBars } from 'react-icons/fa';
+import { FaShoppingCart, FaBell, FaUser, FaBook, FaSignOutAlt, FaComment, FaSearch, FaBars, FaUsers } from 'react-icons/fa';
 import api from "../../api/api";
 import NotificationBell from "../../pages/user/NotificationBell";
 import ChatModal from "../Chat/ChatModal";
@@ -16,10 +16,12 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
     const [unreadCount, setUnreadCount] = useState(0);
     const [searchKeyword, setSearchKeyword] = useState("");
     const [searchResults, setSearchResults] = useState([]);
+    const [userSearchResults, setUserSearchResults] = useState([]);
     const [showSearchResults, setShowSearchResults] = useState(false);
     const [isSearching, setIsSearching] = useState(false);
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
-    const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem("user_token")); // Thêm state này
+    const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem("user_token"));
+    const [activeSearchTab, setActiveSearchTab] = useState('all'); // 'all', 'posts', 'users'
     
     const menuRef = useRef(null);
     const searchRef = useRef(null);
@@ -33,27 +35,23 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
             setIsLoggedIn(!!token);
             
             if (!token) {
-                // Reset các state khi logout
                 setCartCount(0);
                 setFavoriteCount(0);
                 setIsMenuOpen(false);
             }
         };
         
-        // Check initial status
         checkLoginStatus();
         
-        // Lắng nghe sự kiện storage (khi logout ở tab khác)
         const handleStorageChange = (e) => {
             if (e.key === 'user_token') {
                 checkLoginStatus();
-                window.location.reload(); // Hoặc dùng navigate
+                window.location.reload();
             }
         };
         
         window.addEventListener('storage', handleStorageChange);
         
-        // Custom event cho logout
         const handleLogoutEvent = () => {
             checkLoginStatus();
             navigate("/login");
@@ -76,7 +74,7 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Fetch cart count - chỉ khi đã đăng nhập
+    // Fetch cart count
     const fetchCartCount = async () => {
         const token = localStorage.getItem("user_token");
         if (!token) {
@@ -93,7 +91,7 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
         }
     };
 
-    // Fetch favorite count - chỉ khi đã đăng nhập
+    // Fetch favorite count
     const fetchFavoriteCount = async () => {
         const token = localStorage.getItem("user_token");
         if (!token) {
@@ -110,28 +108,66 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
         }
     };
 
+    // Tìm kiếm bài viết
+    const searchPosts = async (keyword) => {
+        try {
+            const token = localStorage.getItem("user_token");
+            if (!token) return [];
+
+            const response = await api.get(`/api/v1/posts/search?keyword=${encodeURIComponent(keyword)}`);
+            return response.data || [];
+        } catch (error) {
+            console.error("Lỗi tìm kiếm bài viết:", error);
+            return [];
+        }
+    };
+
+    // Tìm kiếm người dùng
+    const searchUsers = async (keyword) => {
+        try {
+            const token = localStorage.getItem("user_token");
+            if (!token) return [];
+
+            // Gọi API tìm kiếm người dùng (cần thêm endpoint này ở backend)
+            const response = await api.get(`/api/v1/users/search?keyword=${encodeURIComponent(keyword)}`);
+            return response.data || [];
+        } catch (error) {
+            console.error("Lỗi tìm kiếm người dùng:", error);
+            // Fallback: nếu API chưa có, thử tìm qua endpoint khác
+            try {
+                const response = await api.get(`/api/v1/users?search=${encodeURIComponent(keyword)}`);
+                return response.data || [];
+            } catch (err) {
+                console.error("Fallback search also failed:", err);
+                return [];
+            }
+        }
+    };
+
     // Search function
     const handleSearch = async (keyword) => {
         if (!keyword.trim()) {
             setSearchResults([]);
+            setUserSearchResults([]);
             setShowSearchResults(false);
             return;
         }
 
         setIsSearching(true);
         try {
-            const token = localStorage.getItem("user_token");
-            if (!token) {
-                console.log("Chưa đăng nhập");
-                return;
-            }
-
-            const response = await api.get(`/api/v1/posts/search?keyword=${encodeURIComponent(keyword)}`);
-            setSearchResults(response.data);
+            // Tìm kiếm đồng thời bài viết và người dùng
+            const [posts, users] = await Promise.all([
+                searchPosts(keyword),
+                searchUsers(keyword)
+            ]);
+            
+            setSearchResults(posts);
+            setUserSearchResults(users);
             setShowSearchResults(true);
         } catch (error) {
             console.error("Lỗi tìm kiếm:", error);
             setSearchResults([]);
+            setUserSearchResults([]);
         } finally {
             setIsSearching(false);
         }
@@ -144,6 +180,7 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
                 handleSearch(searchKeyword);
             } else {
                 setSearchResults([]);
+                setUserSearchResults([]);
                 setShowSearchResults(false);
             }
         }, 500);
@@ -162,7 +199,7 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    // Initial fetch and intervals - chỉ khi đã đăng nhập
+    // Initial fetch
     useEffect(() => {
         if (isLoggedIn) {
             fetchCartCount();
@@ -207,32 +244,24 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
     };
 
     const handleLogout = () => {
-        // Clear localStorage
         localStorage.removeItem("user_token");
         localStorage.removeItem("user");
         localStorage.removeItem("user_data");
         
-        // Reset all states
         setIsMenuOpen(false);
         setCartCount(0);
         setFavoriteCount(0);
         setIsLoggedIn(false);
         
-        // Dispatch custom event để thông báo logout
         window.dispatchEvent(new CustomEvent('userLoggedOut'));
-        
-        // Navigate to home page
         navigate("/");
-        
-        // Force reload để reset toàn bộ app (optional)
-        // window.location.href = "/";
     };
 
     const handleCartClick = () => {
         navigate("/cart");
     };
 
-    const handleResultClick = (post) => {
+    const handlePostClick = (post) => {
         setShowSearchResults(false);
         setSearchKeyword("");
         if (post.author_id) {
@@ -253,6 +282,12 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
         }
     };
 
+    const handleUserClick = (user) => {
+        setShowSearchResults(false);
+        setSearchKeyword("");
+        navigate(`/profile/${user._id || user.id}`);
+    };
+
     const menuItemStyle = {
         display: "flex",
         alignItems: "center",
@@ -263,6 +298,20 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
         fontSize: "16px",
         transition: "background-color 0.2s",
     };
+
+    // Lọc kết quả theo tab
+    const getFilteredResults = () => {
+        switch(activeSearchTab) {
+            case 'posts':
+                return searchResults;
+            case 'users':
+                return userSearchResults;
+            default:
+                return [...searchResults, ...userSearchResults];
+        }
+    };
+
+    const totalResults = searchResults.length + userSearchResults.length;
 
     return (
         <>
@@ -281,7 +330,7 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
             zIndex: 1000,
             padding: "0 16px"
         }}>
-                {/* Nút hamburger - CHỈ hiển thị trên mobile */}
+                {/* Nút hamburger */}
                 <div style={{ marginRight: "12px", display: isMobile ? "block" : "none" }}>
                     <button 
                         onClick={onMenuToggle}
@@ -303,7 +352,7 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
                     </button>
                 </div>
 
-                {/* Logo - Ẩn hoàn toàn trên mobile, chỉ hiện trên desktop */}
+                {/* Logo */}
                 <div style={{ 
                     cursor: "pointer", 
                     flexShrink: 0,
@@ -318,7 +367,7 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
                     </div>
                 </div>
 
-                {/* Search Bar - Responsive - Chỉ hiển thị khi đã đăng nhập */}
+                {/* Search Bar */}
                 {isLoggedIn && (
                     <div style={{ 
                         flex: 1, 
@@ -330,11 +379,11 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
                     }} ref={searchRef}>
                         <div className="search-bar" style={{ 
                             position: "relative", 
-                            width: isMobile ? "100%" : "400px",
-                            maxWidth: isMobile ? "100%" : "400px"
+                            width: isMobile ? "100%" : "500px",
+                            maxWidth: isMobile ? "100%" : "500px"
                         }}>
                             <input
-                                placeholder={isMobile ? "Tìm kiếm..." : "Tìm kiếm bài viết, sản phẩm..."}
+                                placeholder={isMobile ? "Tìm kiếm..." : "Tìm kiếm bài viết, người dùng..."}
                                 value={searchKeyword}
                                 onChange={(e) => setSearchKeyword(e.target.value)}
                                 style={{
@@ -350,7 +399,7 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
                                 onFocus={(e) => {
                                     e.target.style.borderColor = "#2e7d32";
                                     e.target.style.backgroundColor = "white";
-                                    if (searchKeyword && searchResults.length > 0) {
+                                    if (searchKeyword && (searchResults.length > 0 || userSearchResults.length > 0)) {
                                         setShowSearchResults(true);
                                     }
                                 }}
@@ -382,7 +431,7 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
                                     backgroundColor: "white",
                                     borderRadius: "12px",
                                     boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
-                                    maxHeight: "400px",
+                                    maxHeight: "500px",
                                     overflowY: "auto",
                                     zIndex: 1001,
                                 }}>
@@ -390,9 +439,9 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
                                         <div style={{ padding: "20px", textAlign: "center", color: "#666" }}>
                                             Đang tìm kiếm...
                                         </div>
-                                    ) : searchResults.length === 0 ? (
+                                    ) : totalResults === 0 ? (
                                         <div style={{ padding: "20px", textAlign: "center", color: "#666" }}>
-                                            Không tìm thấy kết quả nào
+                                            Không tìm thấy kết quả nào cho "{searchKeyword}"
                                         </div>
                                     ) : (
                                         <>
@@ -403,62 +452,216 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
                                                 color: "#666",
                                                 fontWeight: "bold"
                                             }}>
-                                                Tìm thấy {searchResults.length} kết quả cho "{searchKeyword}"
+                                                Tìm thấy {totalResults} kết quả cho "{searchKeyword}"
                                             </div>
-                                            {searchResults.map((post) => (
-                                                <div
-                                                    key={post._id}
-                                                    onClick={() => handleResultClick(post)}
+                                            
+                                            {/* Tabs */}
+                                            <div style={{ 
+                                                display: "flex", 
+                                                borderBottom: "1px solid #eee",
+                                                padding: "0 10px"
+                                            }}>
+                                                <button
+                                                    onClick={() => setActiveSearchTab('all')}
                                                     style={{
-                                                        padding: "12px 15px",
-                                                        borderBottom: "1px solid #f0f0f0",
+                                                        padding: "10px 15px",
+                                                        background: "none",
+                                                        border: "none",
                                                         cursor: "pointer",
-                                                        transition: "background-color 0.2s"
+                                                        color: activeSearchTab === 'all' ? "#2e7d32" : "#666",
+                                                        fontWeight: activeSearchTab === 'all' ? "bold" : "normal",
+                                                        borderBottom: activeSearchTab === 'all' ? "2px solid #2e7d32" : "none"
                                                     }}
-                                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f5f5f5"}
-                                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "white"}
                                                 >
-                                                    <div style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
-                                                        <div style={{ 
-                                                            width: "40px", 
-                                                            height: "40px", 
-                                                            background: "#e4e6eb", 
-                                                            borderRadius: "50%", 
-                                                            display: "flex", 
-                                                            alignItems: "center", 
-                                                            justifyContent: "center",
-                                                            flexShrink: 0
-                                                        }}>
-                                                            {post.author_avatar ? (
-                                                                <img src={post.author_avatar} alt="avatar" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }}/>
-                                                            ) : (
-                                                                <span>👤</span>
-                                                            )}
-                                                        </div>
-                                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                                            <div style={{ fontWeight: "bold", fontSize: "14px", color: "#333", marginBottom: "4px" }}>
-                                                                {post.author_name}
-                                                            </div>
+                                                    Tất cả ({totalResults})
+                                                </button>
+                                                <button
+                                                    onClick={() => setActiveSearchTab('posts')}
+                                                    style={{
+                                                        padding: "10px 15px",
+                                                        background: "none",
+                                                        border: "none",
+                                                        cursor: "pointer",
+                                                        color: activeSearchTab === 'posts' ? "#2e7d32" : "#666",
+                                                        fontWeight: activeSearchTab === 'posts' ? "bold" : "normal",
+                                                        borderBottom: activeSearchTab === 'posts' ? "2px solid #2e7d32" : "none"
+                                                    }}
+                                                >
+                                                    Bài viết ({searchResults.length})
+                                                </button>
+                                                <button
+                                                    onClick={() => setActiveSearchTab('users')}
+                                                    style={{
+                                                        padding: "10px 15px",
+                                                        background: "none",
+                                                        border: "none",
+                                                        cursor: "pointer",
+                                                        color: activeSearchTab === 'users' ? "#2e7d32" : "#666",
+                                                        fontWeight: activeSearchTab === 'users' ? "bold" : "normal",
+                                                        borderBottom: activeSearchTab === 'users' ? "2px solid #2e7d32" : "none"
+                                                    }}
+                                                >
+                                                    Người dùng ({userSearchResults.length})
+                                                </button>
+                                            </div>
+                                            
+                                            {/* Kết quả tìm kiếm theo tab */}
+                                            <div>
+                                                {(activeSearchTab === 'all' || activeSearchTab === 'users') && userSearchResults.length > 0 && (
+                                                    <div>
+                                                        {activeSearchTab === 'all' && (
                                                             <div style={{ 
-                                                                fontSize: "13px", 
-                                                                color: "#666",
-                                                                overflow: "hidden",
-                                                                textOverflow: "ellipsis",
-                                                                whiteSpace: "nowrap"
+                                                                padding: "8px 15px", 
+                                                                backgroundColor: "#f8f9fa",
+                                                                fontSize: "13px",
+                                                                fontWeight: "bold",
+                                                                color: "#2e7d32",
+                                                                borderBottom: "1px solid #eee"
                                                             }}>
-                                                                {post.content || "Không có nội dung"}
+                                                                👤 Người dùng
                                                             </div>
-                                                            <div style={{ 
-                                                                fontSize: "11px", 
-                                                                color: "#999",
-                                                                marginTop: "4px"
-                                                            }}>
-                                                                {new Date(post.created_at).toLocaleDateString()} • {post.stats?.like_count || 0} thích
+                                                        )}
+                                                        {userSearchResults.map((user) => (
+                                                            <div
+                                                                key={user._id || user.id}
+                                                                onClick={() => handleUserClick(user)}
+                                                                style={{
+                                                                    padding: "12px 15px",
+                                                                    borderBottom: "1px solid #f0f0f0",
+                                                                    cursor: "pointer",
+                                                                    transition: "background-color 0.2s"
+                                                                }}
+                                                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f5f5f5"}
+                                                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "white"}
+                                                            >
+                                                                <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                                                                    <div style={{ 
+                                                                        width: "45px", 
+                                                                        height: "45px", 
+                                                                        background: "#e4e6eb", 
+                                                                        borderRadius: "50%", 
+                                                                        display: "flex", 
+                                                                        alignItems: "center", 
+                                                                        justifyContent: "center",
+                                                                        flexShrink: 0,
+                                                                        overflow: "hidden"
+                                                                    }}>
+                                                                        {user.avatar_url ? (
+                                                                            <img src={user.avatar_url} alt="avatar" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }}/>
+                                                                        ) : (
+                                                                            <FaUser size={20} color="#2e7d32" />
+                                                                        )}
+                                                                    </div>
+                                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                                        <div style={{ fontWeight: "bold", fontSize: "15px", color: "#333", marginBottom: "4px" }}>
+                                                                            {user.full_name || user.username}
+                                                                        </div>
+                                                                        {user.full_name && user.username && (
+                                                                            <div style={{ 
+                                                                                fontSize: "12px", 
+                                                                                color: "#888",
+                                                                                marginBottom: "4px"
+                                                                            }}>
+                                                                                @{user.username}
+                                                                            </div>
+                                                                        )}
+                                                                        {user.bio && (
+                                                                            <div style={{ 
+                                                                                fontSize: "12px", 
+                                                                                color: "#666",
+                                                                                overflow: "hidden",
+                                                                                textOverflow: "ellipsis",
+                                                                                whiteSpace: "nowrap"
+                                                                            }}>
+                                                                                {user.bio}
+                                                                            </div>
+                                                                        )}
+                                                                        <div style={{ 
+                                                                            fontSize: "11px", 
+                                                                            color: "#999",
+                                                                            marginTop: "4px"
+                                                                        }}>
+                                                                            {user.followers_count || 0} followers
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
                                                             </div>
-                                                        </div>
+                                                        ))}
                                                     </div>
-                                                </div>
-                                            ))}
+                                                )}
+                                                
+                                                {(activeSearchTab === 'all' || activeSearchTab === 'posts') && searchResults.length > 0 && (
+                                                    <div>
+                                                        {activeSearchTab === 'all' && (
+                                                            <div style={{ 
+                                                                padding: "8px 15px", 
+                                                                backgroundColor: "#f8f9fa",
+                                                                fontSize: "13px",
+                                                                fontWeight: "bold",
+                                                                color: "#2e7d32",
+                                                                borderBottom: "1px solid #eee",
+                                                                borderTop: userSearchResults.length > 0 ? "1px solid #eee" : "none"
+                                                            }}>
+                                                                📝 Bài viết
+                                                            </div>
+                                                        )}
+                                                        {searchResults.map((post) => (
+                                                            <div
+                                                                key={post._id}
+                                                                onClick={() => handlePostClick(post)}
+                                                                style={{
+                                                                    padding: "12px 15px",
+                                                                    borderBottom: "1px solid #f0f0f0",
+                                                                    cursor: "pointer",
+                                                                    transition: "background-color 0.2s"
+                                                                }}
+                                                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f5f5f5"}
+                                                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "white"}
+                                                            >
+                                                                <div style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+                                                                    <div style={{ 
+                                                                        width: "40px", 
+                                                                        height: "40px", 
+                                                                        background: "#e4e6eb", 
+                                                                        borderRadius: "50%", 
+                                                                        display: "flex", 
+                                                                        alignItems: "center", 
+                                                                        justifyContent: "center",
+                                                                        flexShrink: 0
+                                                                    }}>
+                                                                        {post.author_avatar ? (
+                                                                            <img src={post.author_avatar} alt="avatar" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }}/>
+                                                                        ) : (
+                                                                            <FaUser size={16} color="#2e7d32" />
+                                                                        )}
+                                                                    </div>
+                                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                                        <div style={{ fontWeight: "bold", fontSize: "14px", color: "#333", marginBottom: "4px" }}>
+                                                                            {post.author_name}
+                                                                        </div>
+                                                                        <div style={{ 
+                                                                            fontSize: "13px", 
+                                                                            color: "#666",
+                                                                            overflow: "hidden",
+                                                                            textOverflow: "ellipsis",
+                                                                            whiteSpace: "nowrap"
+                                                                        }}>
+                                                                            {post.content || "Không có nội dung"}
+                                                                        </div>
+                                                                        <div style={{ 
+                                                                            fontSize: "11px", 
+                                                                            color: "#999",
+                                                                            marginTop: "4px"
+                                                                        }}>
+                                                                            {new Date(post.created_at).toLocaleDateString()} • {post.stats?.like_count || 0} thích
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </>
                                     )}
                                 </div>
@@ -467,9 +670,8 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
                     </div>
                 )}
 
-                {/* Icons - HIỂN THỊ ĐẦY ĐỦ CÁC ICON */}
+                {/* Icons */}
                 <div style={{ display: "flex", gap: isMobile ? "8px" : "12px", alignItems: "center", flexShrink: 0 }}>
-                    {/* Chat Icon - Chỉ hiển thị khi đã đăng nhập */}
                     {isLoggedIn && (
                         <div 
                             style={{ position: "relative", cursor: "pointer" }}
@@ -500,7 +702,6 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
                         </div>
                     )}
                     
-                    {/* Cart Icon - Chỉ hiển thị khi đã đăng nhập */}
                     {isLoggedIn && (
                         <div style={{ position: "relative", cursor: "pointer" }} onClick={handleCartClick}>
                             <span style={{ 
@@ -535,7 +736,6 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
                         </div>
                     )}
 
-                    {/* Notification Icon - Chỉ hiển thị khi đã đăng nhập */}
                     {isLoggedIn && (
                         <div style={{ 
                             cursor: "pointer", 
@@ -572,7 +772,6 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
                             <FaUser size={18} color="#2e7d32" />
                         </span>
 
-                        {/* Menu Dropdown - Chỉ hiển thị khi đã đăng nhập */}
                         {isLoggedIn && isMenuOpen && (
                             <div style={{
                                 position: "absolute",
