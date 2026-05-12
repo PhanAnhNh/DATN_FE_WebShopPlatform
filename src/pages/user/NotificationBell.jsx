@@ -12,7 +12,6 @@ const NotificationBell = ({ userType = 'user' }) => {
   const [showDropdown, setShowDropdown] = useState(false);
   const [pagination, setPagination] = useState({ page: 1, total_pages: 1, total: 0 });
   const [markingAll, setMarkingAll] = useState(false);
-  const [loadingFriendRequest, setLoadingFriendRequest] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
 
@@ -28,20 +27,6 @@ const NotificationBell = ({ userType = 'user' }) => {
     }
   };
 
-  // Lấy current user ID
-  const getCurrentUserId = () => {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        const user = JSON.parse(userStr);
-        return user._id || user.id;
-      } catch (e) {
-        return null;
-      }
-    }
-    return null;
-  };
-
   // Cấu hình API headers
   const getApiConfig = () => {
     const token = getToken();
@@ -51,39 +36,6 @@ const NotificationBell = ({ userType = 'user' }) => {
       };
     }
     return {};
-  };
-
-  // Hiển thị toast message (tạo hàm đơn giản)
-  const showToast = (message, type = 'info') => {
-    // Kiểm tra nếu có toast container, nếu không thì tạo mới
-    let toastContainer = document.querySelector('.toast-container-custom');
-    if (!toastContainer) {
-      toastContainer = document.createElement('div');
-      toastContainer.className = 'toast-container-custom';
-      toastContainer.style.cssText = 'position: fixed; top: 70px; right: 20px; z-index: 9999;';
-      document.body.appendChild(toastContainer);
-    }
-    
-    const toast = document.createElement('div');
-    toast.className = `toast-notification toast-${type}`;
-    toast.style.cssText = `
-      background: ${type === 'error' ? '#dc3545' : type === 'success' ? '#28a745' : '#17a2b8'};
-      color: white;
-      padding: 12px 20px;
-      margin-bottom: 10px;
-      border-radius: 8px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-      animation: slideInRight 0.3s ease;
-      font-size: 14px;
-      min-width: 250px;
-    `;
-    toast.textContent = message;
-    toastContainer.appendChild(toast);
-    
-    setTimeout(() => {
-      toast.style.animation = 'slideOutRight 0.3s ease';
-      setTimeout(() => toast.remove(), 300);
-    }, 3000);
   };
 
   // Fetch unread count
@@ -189,65 +141,16 @@ const NotificationBell = ({ userType = 'user' }) => {
     }
   };
 
-  // Hàm xử lý click cho friend request
-  const handleFriendRequestClick = async (notification) => {
-    try {
-      setLoadingFriendRequest(true);
-      const config = getApiConfig();
-      
-      // Gọi API lấy thông tin chi tiết của friend request
-      const response = await api.get(`/api/v1/friends/request/${notification.reference_id}`, config);
-      const friendRequest = response.data;
-      
-      const currentUserId = getCurrentUserId();
-      if (!currentUserId) {
-        showToast("Không tìm thấy thông tin người dùng", "error");
-        return;
-      }
-      
-      // Xác định ID người dùng cần chuyển đến (người gửi nếu current user là người nhận, hoặc người nhận nếu current user là người gửi)
-      let targetUserId = null;
-      if (friendRequest.user_id === currentUserId) {
-        // Current user là người gửi -> chuyển đến profile người nhận
-        targetUserId = friendRequest.friend_id;
-      } else if (friendRequest.friend_id === currentUserId) {
-        // Current user là người nhận -> chuyển đến profile người gửi
-        targetUserId = friendRequest.user_id;
-      }
-      
-      if (targetUserId) {
-        navigate(`/profile/${targetUserId}`);
-      } else {
-        showToast("Không thể xác định người dùng", "error");
-      }
-    } catch (error) {
-      console.error('Error fetching friend request:', error);
-      // Fallback: thử lấy user ID từ message hoặc thông báo lỗi
-      showToast("Không thể tải thông tin người dùng", "error");
-    } finally {
-      setLoadingFriendRequest(false);
-      setShowDropdown(false);
-    }
-  };
-
-  const handleNotificationClick = async (notification) => {
+  const handleNotificationClick = (notification) => {
     // Đánh dấu đã đọc
     if (!notification.is_read) {
-      await markAsRead(notification._id);
+      markAsRead(notification._id);
     }
     
     // Kiểm tra nếu là thông báo friend_request và userType là shop thì không xử lý
     if (userType === 'shop' && (notification.type === 'friend_request' || notification.type === 'friend_accepted')) {
       console.log('Shop không nhận thông báo kết bạn');
       setShowDropdown(false);
-      return;
-    }
-    
-    // Xử lý đặc biệt cho friend_request và friend_accepted
-    if (notification.type === 'friend_request' || notification.type === 'friend_accepted') {
-      if (userType !== 'shop') {
-        await handleFriendRequestClick(notification);
-      }
       return;
     }
     
@@ -302,6 +205,15 @@ const NotificationBell = ({ userType = 'user' }) => {
           }
           break;
           
+        case 'friend_request':
+        case 'friend_accepted':
+          // ✅ SỬA: reference_id đã là user ID (người gửi hoặc người chấp nhận)
+          // Chuyển trực tiếp đến profile của người đó
+          if (userType !== 'shop') {
+            navigate(`/profile/${notification.reference_id}`);
+          }
+          break;
+          
         case 'follow':
           if (userType === 'shop') {
             console.log('Shop không nhận thông báo follow');
@@ -349,47 +261,16 @@ const NotificationBell = ({ userType = 'user' }) => {
     return date.toLocaleDateString('vi-VN');
   };
 
-  // Thêm CSS animation cho toast
-  React.useEffect(() => {
-    const style = document.createElement('style');
-    style.textContent = `
-      @keyframes slideInRight {
-        from {
-          transform: translateX(100%);
-          opacity: 0;
-        }
-        to {
-          transform: translateX(0);
-          opacity: 1;
-        }
-      }
-      @keyframes slideOutRight {
-        from {
-          transform: translateX(0);
-          opacity: 1;
-        }
-        to {
-          transform: translateX(100%);
-          opacity: 0;
-        }
-      }
-    `;
-    document.head.appendChild(style);
-    return () => style.remove();
-  }, []);
-
   return (
     <div className="notification-bell" ref={dropdownRef}>
       <button 
         className="notification-bell-btn"
         onClick={() => setShowDropdown(!showDropdown)}
-        disabled={loadingFriendRequest}
       >
         <FaBell />
         {unreadCount > 0 && (
           <span className="notification-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>
         )}
-        {loadingFriendRequest && <FaSpinner className="spinning" style={{ marginLeft: '5px', fontSize: '12px' }} />}
       </button>
 
       {showDropdown && (
