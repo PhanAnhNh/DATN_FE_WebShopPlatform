@@ -1,66 +1,29 @@
-@startuml DatabaseStructure
-!theme plain
-skinparam database {
-  BackgroundColor #E3F2FD
-  BorderColor #1565C0
-  FontColor #0D47A1
-}
-skinparam node {
-  BackgroundColor #F5F5F5
-  BorderColor #9E9E9E
-}
+@startuml business
+title Luồng Mua hàng và Thanh toán
 
-title <size:16><b>CẤU TRÚC DATABASE MONGODB</b></size>
+|Người dùng|
+start
+:Xem sản phẩm;
+:Thêm sản phẩm vào Giỏ hàng (Carts);
+:Chọn địa chỉ nhận hàng (Addresses);
+:Áp dụng mã giảm giá (Vouchers);
+:Tạo đơn hàng (Orders);
 
-database "MongoDB: dacsanquetoi_db" as MongoDB {
-  
-  node "User Management" as UserGroup {
-    database "users" as users
-    database "addresses" as addresses
-    database "shops" as shops
-    database "follows" as follows
-    database "friends" as friends
-  }
-  
-  node "Social Features" as SocialGroup {
-    database "social_posts" as posts
-    database "post_comments" as comments
-    database "post_likes" as likes
-    database "post_shares" as shares
-    database "saved_posts" as saves
-  }
-  
-  node "Chat System" as ChatGroup {
-    database "messages" as messages
-  }
-  
-  node "E-commerce" as EcomGroup {
-    database "products" as products
-    database "product_variants" as variants
-    database "categories" as categories
-    database "carts" as carts
-    database "orders" as orders
-    database "payments" as payments
-    database "returns" as returns
-    database "vouchers" as vouchers
-    database "reviews" as reviews
-  }
-  
-  node "Shipping" as ShipGroup {
-    database "shipping_units" as shipping_units
-    database "shipping_vouchers" as shipping_vouchers
-  }
-  
-  node "Notification & Report" as NotiGroup {
-    database "notifications" as notifications
-    database "admin_notifications" as admin_notifications
-    database "reports" as reports
-  }
-  
-  node "Settings" as SettingGroup {
-    database "shop_settings" as shop_settings
-    database "admin_settings" as admin_settings
-  }
-}
+|Hệ thống|
+:Tính toán tổng tiền & Phí vận chuyển;
+if (Chọn phương thức thanh toán?) then (Online - QR/Chuyển khoản)
+    :Tạo yêu cầu thanh toán (QR Payment);
+    :Chờ xác nhận từ Gateway (Sepay/Bank);
+else (COD)
+    :Xác nhận đơn hàng trực tiếp;
+endif
 
+|Chủ cửa hàng|
+:Tiếp nhận đơn hàng;
+:Đóng gói & Giao cho Đơn vị vận chuyển (Shipping Units);
+
+|Người dùng|
+:Nhận hàng & Cập nhật trạng thái;
+:Đánh giá sản phẩm (Reviews);
+stop
 @enduml

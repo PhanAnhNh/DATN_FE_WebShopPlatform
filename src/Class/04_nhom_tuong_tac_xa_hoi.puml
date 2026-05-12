@@ -1,0 +1,97 @@
+@startuml
+!theme plain
+title Nhóm lớp: Bài viết, Bình luận, Like, Share, Lưu trữ
+
+class SocialPost {
+  + id: ObjectId
+  + content: string
+  + author_url: string
+  + author_name: string
+  + author_image_url: string
+  + author_description: string
+  + author_phone: string
+  + author_email: string
+  + author_location: string
+  + author_created_at: date
+  + user_id: ObjectId
+  --
+  + add_comment(content, user_id): void
+  + get_comments(): List[PostComment]
+  + get_like_count(): int
+}
+
+class PostComment {
+  + id: ObjectId
+  + content: string
+  + author_url: string
+  + parent_id: ObjectId
+  + comments: string
+  + liked: boolean
+  + favorite: boolean
+  + share: boolean
+  + saved: boolean
+  + deleted: boolean
+  + like_count: int
+  + comment_count: int
+  + reply_count: int
+  + reply_to_user_id: ObjectId
+  + user_id: ObjectId
+  --
+  + add_reply(content, user_id): void
+  + like(): void
+  + delete_comment(): void
+}
+
+class PostLike {
+  + id: ObjectId
+  + post_id: ObjectId
+  + user_id: ObjectId
+  + created_at: date
+  --
+  + toggle_like(): void
+}
+
+class PostShare {
+  + id: ObjectId
+  + post_id: ObjectId
+  + user_id: ObjectId
+  + created_at: date
+  --
+  + share_post(): void
+}
+
+class Favorite {
+  + id: ObjectId
+  + product_id: ObjectId
+  + user_id: ObjectId
+  + created_at: date
+  --
+  + add_to_favorites(): void
+  + remove_from_favorites(): void
+}
+
+class Save {
+  + id: ObjectId
+  + post_id: ObjectId
+  + user_id: ObjectId
+  + created_at: date
+  --
+  + save_post(): void
+  + unsave_post(): void
+}
+
+' Quan hệ
+User "1" -- "0..*" SocialPost : creates
+User "1" -- "0..*" PostComment : writes
+User "1" -- "0..*" PostLike : likes
+User "1" -- "0..*" PostShare : shares
+User "1" -- "0..*" Favorite : favorites
+User "1" -- "0..*" Save : saves
+
+SocialPost "1" -- "0..*" PostComment : has
+SocialPost "1" -- "0..*" PostLike : receives
+SocialPost "1" -- "0..*" PostShare : receives
+
+PostComment "1" -- "0..*" PostComment : replies to
+
+@enduml

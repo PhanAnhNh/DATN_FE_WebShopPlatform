@@ -1,0 +1,77 @@
+@startuml
+!theme plain
+title Nhóm lớp: Đánh giá, Báo cáo, Truy xuất nguồn gốc
+
+class Review {
+  + id: ObjectId
+  + content: string
+  + rating: int
+  + user_id: ObjectId
+  + product_id: ObjectId
+  + images: string
+  + created_at: date
+  + updated_at: date
+  --
+  + update_review(content, rating): void
+  + delete_review(): void
+}
+
+class ReviewShop {
+  + id: ObjectId
+  + content: string
+  + rating: int
+  + user_id: ObjectId
+  + shop_id: ObjectId
+  + images: string
+  + created_at: date
+  --
+  + get_shop_rating(): float
+}
+
+class Report {
+  + id: ObjectId
+  + name: string
+  + type: string
+  + price: float
+  + stock: int
+  + product_id: ObjectId
+  + user_id: ObjectId
+  + image_url: string
+  + created_at: date
+  + updated_at: date
+  --
+  + submit_report(data): void
+  + resolve_report(): void
+}
+
+class ProductTraceability {
+  + id: ObjectId
+  + product_id: ObjectId
+  + user_id: ObjectId
+  + created_at: date
+  + trace_data: string
+  --
+  + add_trace_event(event): void
+  + get_trace_history(): List
+}
+
+class AdminStats {
+  + id: ObjectId
+  + total_users: int
+  + total_orders: int
+  + total_revenue: float
+  + date: date
+  --
+  + calculate_daily_stats(): void
+}
+
+' Quan hệ
+User "1" -- "0..*" Review : writes
+User "1" -- "0..*" ReviewShop : writes
+User "1" -- "0..*" Report : creates
+
+Product "1" -- "0..*" Review : has
+Product "1" -- "0..*" ProductTraceability : tracks
+Shop "1" -- "0..*" ReviewShop : receives
+
+@enduml

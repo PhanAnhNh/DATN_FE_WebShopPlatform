@@ -21,7 +21,7 @@ skinparam {
     UsecaseFontSize 13
 }
 
-actor "Shop" as Shop #E67E22
+actor "Shop manager" as Shop #E67E22
 
 ' Thêm màu nền trực tiếp cho rectangle bằng mã màu phía sau tên
 rectangle "Admin System" #FEFEFE {

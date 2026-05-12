@@ -1,0 +1,89 @@
+@startuml
+!theme plain
+title Nhóm lớp: Người dùng và quan hệ xã hội
+
+class User {
+  + id: ObjectId
+  + email: string
+  + password_hash: string
+  + full_name: string
+  + phone: string
+  + avatar_url: string
+  + role: string
+  + is_active: boolean
+  + created_at: date
+  + updated_at: date
+  --
+  + login(email, password): Token
+  + update_profile(data): void
+  + change_password(old_pwd, new_pwd): void
+  + follow_shop(shop_id): void
+  + unfollow_shop(shop_id): void
+}
+
+class UserAddress {
+  + id: ObjectId
+  + user_id: ObjectId
+  + address: string
+  + district: string
+  + province_name: string
+  + ward: string
+  + is_default: boolean
+  + phone: string
+  + receiver_name: string
+  --
+  + set_as_default(): void
+}
+
+class Follows {
+  + id: ObjectId
+  + user_id: ObjectId
+  + shop_id: ObjectId
+  + created_at: date
+  --
+  + is_following(user_id, shop_id): boolean
+}
+
+class Friend {
+  + id: ObjectId
+  + user_id: ObjectId
+  + friend_id: ObjectId
+  + status: string
+  + created_at: date
+  --
+  + accept_request(): void
+  + reject_request(): void
+}
+
+class Message {
+  + id: ObjectId
+  + sender_id: ObjectId
+  + receiver_id: ObjectId
+  + content: string
+  + is_read: boolean
+  + created_at: date
+  --
+  + mark_as_read(): void
+}
+
+class OTP {
+  + id: ObjectId
+  + email: string
+  + otp_code: string
+  + expires_at: date
+  + is_verified: boolean
+  --
+  + is_expired(): boolean
+  + verify(code): boolean
+}
+
+' Quan hệ
+User "1" -- "0..*" UserAddress : has
+User "1" -- "0..*" Follows : follows
+User "1" -- "0..*" Friend : has friends
+User "1" -- "0..*" Message : sends
+User "1" -- "0..*" OTP : requests
+
+Follows "1" -- "1" Shop : targets
+
+@enduml

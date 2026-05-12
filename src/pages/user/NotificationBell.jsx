@@ -153,6 +153,18 @@ const handleNotificationClick = (notification) => {
         setShowDropdown(false);
         return;
     }
+
+     if (notification.type === 'friend_request' || notification.type === 'friend_accepted') {
+        const senderId = notification.extra_data?.sender_id;
+        if (senderId) {
+            navigate(`/profile/${senderId}`);
+        } else {
+            // Fallback: thử lấy từ message hoặc bỏ qua
+            console.warn('Không tìm thấy sender_id');
+        }
+        setShowDropdown(false);
+        return;
+    }
     
     // Chuyển hướng dựa vào loại thông báo và userType
     if (notification.reference_id) {
