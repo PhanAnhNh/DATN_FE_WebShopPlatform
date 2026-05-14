@@ -1,6 +1,6 @@
 // components/Chat/ChatWindow.jsx
-import React, { useState, useEffect, useRef } from 'react';
-import { FaPaperPlane, FaTrash, FaEdit, FaCheck, FaTimes, FaEllipsisV, FaArrowLeft } from 'react-icons/fa';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { FaPaperPlane, FaTrash, FaEdit, FaEllipsisV, FaArrowLeft } from 'react-icons/fa';
 import api from '../../api/api';
 import socket from '../../socket';
 
@@ -10,13 +10,15 @@ const ChatWindow = ({ friend, onClose, onCloseModal }) => {
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
     const [loading, setLoading] = useState(false);
+    const [isLoadingMessages, setIsLoadingMessages] = useState(false);
     const [editingMessage, setEditingMessage] = useState(null);
     const [editContent, setEditContent] = useState('');
     const [menuOpenFor, setMenuOpenFor] = useState(null);
-    const messagesEndRef = useRef(null);
     const [avatarError, setAvatarError] = useState(false);
+    const messagesEndRef = useRef(null);
+    const isMounted = useRef(true);
 
-    const getCurrentUserId = () => {
+    const getCurrentUserId = useCallback(() => {
         try {
             const userData = localStorage.getItem("user_data");
             if (userData) {
@@ -28,11 +30,11 @@ const ChatWindow = ({ friend, onClose, onCloseModal }) => {
         }
         const directId = localStorage.getItem("user_id");
         return directId || null;
-    };
+    }, []);
     
     const currentUserId = getCurrentUserId();
 
-    const formatTime = (dateString) => {
+    const formatTime = useCallback((dateString) => {
         if (!dateString) return '';
         const date = new Date(dateString);
         const now = new Date();
@@ -43,59 +45,50 @@ const ChatWindow = ({ friend, onClose, onCloseModal }) => {
         if (diff < 86400) return `${Math.floor(diff / 3600)} giờ trước`;
         if (diff < 604800) return `${Math.floor(diff / 86400)} ngày trước`;
         return date.toLocaleDateString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-    };
+    }, []);
 
+    // Socket listeners
     useEffect(() => {
         if (!friend?.user_id || !currentUserId) return;
-        
 
         const handleNewMessage = (msg) => {
+            if (!isMounted.current) return;
+            
             const isCurrentChat =
-                (msg.sender_id === currentUserId &&
-                msg.receiver_id === friend.user_id) ||
-
-                (msg.sender_id === friend.user_id &&
-                msg.receiver_id === currentUserId);
+                (msg.sender_id === currentUserId && msg.receiver_id === friend.user_id) ||
+                (msg.sender_id === friend.user_id && msg.receiver_id === currentUserId);
 
             if (!isCurrentChat) return;
 
             setMessages(prev => {
                 const exists = prev.some(m =>
-                    (
-                        (m.id || m._id) === (msg.id || msg._id)
-                    ) ||
-
-                    (
-                        m.sender_id === msg.sender_id &&
-                        m.receiver_id === msg.receiver_id &&
-                        m.content === msg.content &&
-                        Math.abs(
-                            new Date(m.created_at) - new Date(msg.created_at)
-                        ) < 5000
-                    )
+                    (m.id || m._id) === (msg.id || msg._id) ||
+                    (m.sender_id === msg.sender_id &&
+                     m.receiver_id === msg.receiver_id &&
+                     m.content === msg.content &&
+                     Math.abs(new Date(m.created_at) - new Date(msg.created_at)) < 5000)
                 );
 
                 if (exists) return prev;
-
                 return [...prev, msg];
             });
 
             setTimeout(() => {
-                messagesEndRef.current?.scrollIntoView({
-                    behavior: "smooth"
-                });
+                messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
             }, 100);
         };
 
         const handleMessageEdited = (data) => {
+            if (!isMounted.current) return;
             setMessages(prev => prev.map(msg => 
-                msg.id === data.id || msg._id === data.id 
+                (msg.id === data.id || msg._id === data.id) 
                     ? { ...msg, content: data.content, is_edited: true }
                     : msg
             ));
         };
 
         const handleMessageDeleted = (data) => {
+            if (!isMounted.current) return;
             setMessages(prev => prev.filter(msg => (msg.id !== data.id && msg._id !== data.id)));
         };
 
@@ -110,60 +103,79 @@ const ChatWindow = ({ friend, onClose, onCloseModal }) => {
         };
     }, [friend?.user_id, currentUserId]);
 
+    // Fetch messages
     useEffect(() => {
+        isMounted.current = true;
+        
         const fetchMessages = async () => {
             if (!friend?.user_id || !currentUserId) return;
+            setIsLoadingMessages(true);
             try {
                 const res = await api.get(`/api/v1/chat/conversation/${friend.user_id}`);
-                setMessages(res.data);
+                if (isMounted.current) {
+                    setMessages(res.data || []);
+                }
             } catch (err) {
                 console.error("Error fetching messages:", err);
+                if (isMounted.current) {
+                    setMessages([]);
+                }
+            } finally {
+                if (isMounted.current) {
+                    setIsLoadingMessages(false);
+                }
             }
         };
+        
         fetchMessages();
+        
+        return () => {
+            isMounted.current = false;
+        };
     }, [friend?.user_id, currentUserId]);
 
+    // Auto scroll to bottom
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
-    const sendMessage = async () => {
-        if (!newMessage.trim() || !friend?.user_id || !currentUserId) return;
+    // components/Chat/ChatWindow.jsx - Sửa hàm sendMessage
 
-        const content = newMessage.trim();
-        const tempId = 'temp-' + Date.now();
-        const tempMsg = {
-            id: tempId,
-            _id: tempId,
-            sender_id: currentUserId,
-            receiver_id: friend.user_id,
-            content: content,
-            created_at: new Date().toISOString(),
-            is_read: false
-        };
+const sendMessage = async () => {
+    if (!newMessage.trim() || !friend?.user_id || !currentUserId) return;
 
-        setMessages(prev => [...prev, tempMsg]);
-        setNewMessage('');
-        setLoading(true);
+    const content = newMessage.trim();
+    const tempId = 'temp-' + Date.now() + '-' + Math.random();
+    const tempMsg = {
+        id: tempId,
+        _id: tempId,
+        sender_id: currentUserId,
+        receiver_id: friend.user_id,
+        content: content,
+        created_at: new Date().toISOString(),
+        is_read: false
+    };
 
-        try {
-            const response = await api.post('/api/v1/chat/send', null, {
-                params: {
-                    receiver_id: friend.user_id,
-                    content: content,
-                    message_type: "text"
-                }
-            });
-            
-            // Replace temp message with real one
-            const realMsg = response.data.data;
+    setMessages(prev => [...prev, tempMsg]);
+    setNewMessage('');
+    setLoading(true);
 
+    try {
+        // === SỬA: Gửi dưới dạng query params như backend yêu cầu ===
+        const response = await api.post('/api/v1/chat/send', null, {
+            params: {
+                receiver_id: friend.user_id,
+                content: content,
+                message_type: "text"
+            }
+        });
+        
+        const realMsg = response.data.data;
+
+        if (isMounted.current) {
             setMessages(prev => {
-
-                // replace temp message
                 const updated = prev.map(msg => {
-
-                    if (msg.id === tempId) {
+                    if (msg.id === tempId || msg._id === tempId) {
                         return {
                             id: realMsg._id,
                             _id: realMsg._id,
@@ -174,49 +186,52 @@ const ChatWindow = ({ friend, onClose, onCloseModal }) => {
                             is_read: false
                         };
                     }
-
                     return msg;
                 });
 
-                // remove duplicate ids
                 const uniqueMessages = updated.filter((msg, index, self) => {
-
                     const currentId = msg.id || msg._id;
-
-                    return index === self.findIndex(
-                        m => (m.id || m._id) === currentId
-                    );
+                    return index === self.findIndex(m => (m.id || m._id) === currentId);
                 });
 
                 return uniqueMessages;
             });
-            
-            
-        } catch (err) {
-            console.error("Error sending message:", err);
-            setMessages(prev => prev.filter(msg => msg.id !== tempId));
-            alert("Không thể gửi tin nhắn. Vui lòng thử lại!");
-        } finally {
+        }
+        
+    } catch (err) {
+        console.error("Error sending message:", err);
+        console.error("Response error:", err.response?.data);
+        
+        if (isMounted.current) {
+            setMessages(prev => prev.filter(msg => (msg.id !== tempId && msg._id !== tempId)));
+            const errorMsg = err.response?.data?.detail || err.response?.data?.message || "Không thể gửi tin nhắn. Vui lòng thử lại!";
+            alert(errorMsg);
+        }
+    } finally {
+        if (isMounted.current) {
             setLoading(false);
         }
-    };
+    }
+};
 
     const handleEditMessage = async (message) => {
         if (!editContent.trim()) return;
         
         try {
-            await api.put(`/api/v1/chat/${message.id || message._id}?content=${encodeURIComponent(editContent)}`);
+            await api.put(`/api/v1/chat/${message.id || message._id}`, {
+                content: editContent
+            });
             
-            // Update local state
-            setMessages(prev => prev.map(msg => 
-                (msg.id === message.id || msg._id === message._id)
-                    ? { ...msg, content: editContent, is_edited: true }
-                    : msg
-            ));
-            
-            setEditingMessage(null);
-            setEditContent('');
-            setMenuOpenFor(null);
+            if (isMounted.current) {
+                setMessages(prev => prev.map(msg => 
+                    (msg.id === message.id || msg._id === message._id)
+                        ? { ...msg, content: editContent, is_edited: true }
+                        : msg
+                ));
+                setEditingMessage(null);
+                setEditContent('');
+                setMenuOpenFor(null);
+            }
         } catch (err) {
             console.error("Error editing message:", err);
             alert("Không thể sửa tin nhắn");
@@ -227,8 +242,10 @@ const ChatWindow = ({ friend, onClose, onCloseModal }) => {
         if (window.confirm('Bạn có chắc chắn muốn xóa tin nhắn này?')) {
             try {
                 await api.delete(`/api/v1/chat/${message.id || message._id}`);
-                setMessages(prev => prev.filter(msg => (msg.id !== message.id && msg._id !== message._id)));
-                setMenuOpenFor(null);
+                if (isMounted.current) {
+                    setMessages(prev => prev.filter(msg => (msg.id !== message.id && msg._id !== message._id)));
+                    setMenuOpenFor(null);
+                }
             } catch (err) {
                 console.error("Error deleting message:", err);
                 alert("Không thể xóa tin nhắn");
@@ -287,9 +304,41 @@ const ChatWindow = ({ friend, onClose, onCloseModal }) => {
                 flexDirection: 'column',
                 gap: '12px'
             }}>
-                {messages.length === 0 ? (
+                {isLoadingMessages ? (
+                    <div style={{ 
+                        textAlign: 'center', 
+                        color: '#65676b', 
+                        fontSize: '13px', 
+                        marginTop: '20px',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        gap: '8px'
+                    }}>
+                        <div className="loading-dots">
+                            <span>.</span><span>.</span><span>.</span>
+                        </div>
+                        Đang tải tin nhắn...
+                        <style>{`
+                            .loading-dots span {
+                                animation: blink 1.4s infinite both;
+                            }
+                            .loading-dots span:nth-child(2) {
+                                animation-delay: 0.2s;
+                            }
+                            .loading-dots span:nth-child(3) {
+                                animation-delay: 0.4s;
+                            }
+                            @keyframes blink {
+                                0% { opacity: 0.2; }
+                                20% { opacity: 1; }
+                                100% { opacity: 0.2; }
+                            }
+                        `}</style>
+                    </div>
+                ) : messages.length === 0 ? (
                     <div style={{ textAlign: 'center', color: '#65676b', fontSize: '13px', marginTop: '20px' }}>
-                        Bắt đầu trò chuyện cùng {friend.full_name}
+                        Bắt đầu trò chuyện cùng {friend.full_name || friend.username}
                     </div>
                 ) : (
                     messages.map((msg) => {
@@ -326,8 +375,36 @@ const ChatWindow = ({ friend, onClose, onCloseModal }) => {
                                             }}
                                         />
                                         <div style={{ display: 'flex', gap: '8px', marginTop: '8px', justifyContent: 'flex-end' }}>
-                                            <button onClick={() => handleEditMessage(editingMessage)} style={{ background: '#2e7d32', color: 'white', border: 'none', padding: '4px 12px', borderRadius: '15px', cursor: 'pointer', fontSize: '12px' }}>Lưu</button>
-                                            <button onClick={() => { setEditingMessage(null); setEditContent(''); }} style={{ background: '#ccc', border: 'none', padding: '4px 12px', borderRadius: '15px', cursor: 'pointer', fontSize: '12px' }}>Hủy</button>
+                                            <button 
+                                                onClick={() => handleEditMessage(editingMessage)} 
+                                                style={{ 
+                                                    background: '#2e7d32', 
+                                                    color: 'white', 
+                                                    border: 'none', 
+                                                    padding: '4px 12px', 
+                                                    borderRadius: '15px', 
+                                                    cursor: 'pointer', 
+                                                    fontSize: '12px' 
+                                                }}
+                                            >
+                                                Lưu
+                                            </button>
+                                            <button 
+                                                onClick={() => { 
+                                                    setEditingMessage(null); 
+                                                    setEditContent(''); 
+                                                }} 
+                                                style={{ 
+                                                    background: '#ccc', 
+                                                    border: 'none', 
+                                                    padding: '4px 12px', 
+                                                    borderRadius: '15px', 
+                                                    cursor: 'pointer', 
+                                                    fontSize: '12px' 
+                                                }}
+                                            >
+                                                Hủy
+                                            </button>
                                         </div>
                                     </div>
                                 ) : (
@@ -348,7 +425,6 @@ const ChatWindow = ({ friend, onClose, onCloseModal }) => {
                                                 )}
                                             </div>
                                             
-                                            {/* Time stamp */}
                                             <div style={{
                                                 fontSize: '10px',
                                                 color: '#888',
@@ -359,7 +435,6 @@ const ChatWindow = ({ friend, onClose, onCloseModal }) => {
                                             </div>
                                         </div>
                                         
-                                        {/* Menu button for own messages */}
                                         {isMe && (
                                             <div style={{ position: 'absolute', top: '0', right: '-30px' }}>
                                                 <button
@@ -467,8 +542,8 @@ const ChatWindow = ({ friend, onClose, onCloseModal }) => {
                         style={{
                             background: 'none',
                             border: 'none',
-                            color: newMessage.trim() ? '#2e7d32' : '#ccc',
-                            cursor: 'pointer',
+                            color: newMessage.trim() && !loading ? '#2e7d32' : '#ccc',
+                            cursor: newMessage.trim() && !loading ? 'pointer' : 'not-allowed',
                             display: 'flex'
                         }}
                     >

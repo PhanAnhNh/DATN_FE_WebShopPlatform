@@ -59,43 +59,49 @@ const ShareModal = ({ post, onClose, onShareSuccess }) => {
     };
 
     // Chia sẻ qua Messenger
-    const handleShareToMessenger = async () => {
-        if (selectedFriends.size === 0) return;
-        setLoading(true);
-        try {
-            const postUrl = `${window.location.origin}/post/${post._id}`;
-            const shareContent = message 
-                ? `${message}\n\n📌 ${post.content || 'Chia sẻ bài viết'}\n🔗 ${postUrl}`
-                : `📌 ${post.content || 'Chia sẻ bài viết'}\n🔗 ${postUrl}`;
+    // components/share/ShareModal.jsx - Sửa phần gửi tin nhắn
 
-            const sharePromises = Array.from(selectedFriends).map(friendId => 
-                api.post('/api/v1/chat/send', { 
+const handleShareToMessenger = async () => {
+    if (selectedFriends.size === 0) return;
+    setLoading(true);
+    try {
+        const postUrl = `${window.location.origin}/post/${post._id}`;
+        const shareContent = message 
+            ? `${message}\n\n📌 ${post.content || 'Chia sẻ bài viết'}\n🔗 ${postUrl}`
+            : `📌 ${post.content || 'Chia sẻ bài viết'}\n🔗 ${postUrl}`;
+
+        // === SỬA: Gửi dưới dạng query params như backend yêu cầu ===
+        const sharePromises = Array.from(selectedFriends).map(friendId => 
+            api.post('/api/v1/chat/send', null, {
+                params: { 
                     receiver_id: friendId, 
                     content: shareContent, 
                     message_type: "share" 
-                })
-            );
-            await Promise.all(sharePromises);
+                }
+            })
+        );
+        await Promise.all(sharePromises);
 
-            if (socket.connected) {
-                Array.from(selectedFriends).forEach(friendId => {
-                    socket.emit('send_chat_message', {
-                        sender_id: currentUserId, 
-                        receiver_id: friendId,
-                        content: shareContent, 
-                        message_type: "share"
-                    });
+        if (socket.connected) {
+            Array.from(selectedFriends).forEach(friendId => {
+                socket.emit('send_chat_message', {
+                    sender_id: currentUserId, 
+                    receiver_id: friendId,
+                    content: shareContent, 
+                    message_type: "share"
                 });
-            }
-            await api.post(`/api/v1/shares/${post._id}`);
-            onShareSuccess?.();
-            onClose();
-        } catch (err) { 
-            alert("Lỗi chia sẻ, vui lòng thử lại!");
-        } finally { 
-            setLoading(false); 
+            });
         }
-    };
+        await api.post(`/api/v1/shares/${post._id}`);
+        onShareSuccess?.();
+        onClose();
+    } catch (err) { 
+        console.error("Share error:", err);
+        alert(err.response?.data?.detail || "Lỗi chia sẻ, vui lòng thử lại!");
+    } finally { 
+        setLoading(false); 
+    }
+};
 
     // Chia sẻ lên Timeline (đăng bài viết mới)
     const handleShareToTimeline = async () => {
