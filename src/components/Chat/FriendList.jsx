@@ -1,11 +1,26 @@
+// components/Chat/FriendList.jsx
 import React, { useState } from 'react';
-import { FaSearch } from 'react-icons/fa'; // Nhớ cài react-icons nếu chưa có
+import { FaSearch, FaTrash, FaEllipsisV } from 'react-icons/fa';
+import api from '../../api/api';
+import Toast from '../common/Toast';
+import ConfirmDialog from '../common/ConfirmDialog';
 
 const DEFAULT_AVATAR = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="%23ccc"%3E%3Cpath d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/%3E%3C/svg%3E';
 
-const FriendList = ({ friends, recentChats, onSelectFriend, filterUnread }) => {
+const FriendList = ({ friends, recentChats, onSelectFriend, filterUnread, onConversationDeleted }) => {
     const [avatarErrors, setAvatarErrors] = useState({});
-    const [searchTerm, setSearchTerm] = useState(''); // State cho thanh tìm kiếm
+    const [searchTerm, setSearchTerm] = useState('');
+    const [menuOpenFor, setMenuOpenFor] = useState(null);
+    const [deletingId, setDeletingId] = useState(null);
+    const [toast, setToast] = useState(null);
+    const [confirmDialog, setConfirmDialog] = useState({
+        isOpen: false,
+        userToDelete: null
+    });
+
+    const showToast = (message, type = 'success') => {
+        setToast({ message, type });
+    };
 
     const handleAvatarError = (userId) => {
         setAvatarErrors(prev => ({ ...prev, [userId]: true }));
@@ -17,6 +32,36 @@ const FriendList = ({ friends, recentChats, onSelectFriend, filterUnread }) => {
             return user.avatar_url;
         }
         return DEFAULT_AVATAR;
+    };
+
+    const handleDeleteConversation = async (user) => {
+        setDeletingId(user.user_id);
+        try {
+            await api.delete(`/api/v1/chat/conversation/${user.user_id}`);
+            
+            if (onConversationDeleted) {
+                onConversationDeleted(user.user_id);
+            }
+            
+            // Không hiển thị toast khi xóa thành công
+            
+        } catch (err) {
+            console.error("Error deleting conversation:", err);
+            showToast(err.response?.data?.message || 'Không thể xóa hội thoại', 'error');
+        } finally {
+            setDeletingId(null);
+            setMenuOpenFor(null);
+            setConfirmDialog({ isOpen: false, userToDelete: null });
+        }
+    };
+
+    const openConfirmDialog = (user, e) => {
+        e.stopPropagation();
+        setConfirmDialog({
+            isOpen: true,
+            userToDelete: user
+        });
+        setMenuOpenFor(null); // Đóng menu sau khi mở dialog
     };
 
     // Kết hợp danh sách, ưu tiên recent chats
@@ -41,7 +86,7 @@ const FriendList = ({ friends, recentChats, onSelectFriend, filterUnread }) => {
         displayList = displayList.filter(user => user.unread_count > 0);
     }
 
-    // 2. Lọc theo từ khóa tìm kiếm (Tên hoặc Username)
+    // 2. Lọc theo từ khóa tìm kiếm
     if (searchTerm.trim() !== '') {
         const term = searchTerm.toLowerCase();
         displayList = displayList.filter(user => 
@@ -51,8 +96,8 @@ const FriendList = ({ friends, recentChats, onSelectFriend, filterUnread }) => {
     }
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            {/* Thanh tìm kiếm cố định ở trên */}
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
+            {/* Thanh tìm kiếm */}
             <div style={{ padding: '10px 16px', borderBottom: '1px solid #eee' }}>
                 <div style={{
                     display: 'flex',
@@ -89,8 +134,8 @@ const FriendList = ({ friends, recentChats, onSelectFriend, filterUnread }) => {
                     displayList.map((user) => (
                         <div
                             key={user.user_id}
-                            onClick={() => onSelectFriend(user)}
                             style={{
+                                position: 'relative',
                                 padding: '12px 16px',
                                 display: 'flex',
                                 alignItems: 'center',
@@ -102,19 +147,35 @@ const FriendList = ({ friends, recentChats, onSelectFriend, filterUnread }) => {
                             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f0f2f5'}
                             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                         >
-                            <img
-                                src={getAvatarUrl(user)}
-                                alt={user.full_name}
-                                style={{
-                                    width: '45px',
-                                    height: '45px',
-                                    borderRadius: '50%',
-                                    objectFit: 'cover'
+                            {/* Avatar - cố định kích thước */}
+                            <div style={{ flexShrink: 0 }}>
+                                <img
+                                    src={getAvatarUrl(user)}
+                                    alt={user.full_name}
+                                    style={{
+                                        width: '45px',
+                                        height: '45px',
+                                        borderRadius: '50%',
+                                        objectFit: 'cover'
+                                    }}
+                                    onError={() => handleAvatarError(user.user_id)}
+                                />
+                            </div>
+                            
+                            {/* Nội dung chính - chiếm phần còn lại */}
+                            <div 
+                                style={{ 
+                                    flex: 1, 
+                                    minWidth: 0,
+                                    cursor: 'pointer'
                                 }}
-                                onError={() => handleAvatarError(user.user_id)}
-                            />
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontWeight: '600', fontSize: '15px' }}>
+                                onClick={() => onSelectFriend(user)}
+                            >
+                                <div style={{ 
+                                    fontWeight: '600', 
+                                    fontSize: '15px',
+                                    marginBottom: '4px'
+                                }}>
                                     {user.full_name || user.username || 'Người dùng'}
                                 </div>
                                 {user.last_message && (
@@ -123,33 +184,126 @@ const FriendList = ({ friends, recentChats, onSelectFriend, filterUnread }) => {
                                         color: '#65676b',
                                         whiteSpace: 'nowrap',
                                         overflow: 'hidden',
-                                        textOverflow: 'ellipsis'
+                                        textOverflow: 'ellipsis',
+                                        width: '100%'
                                     }}>
                                         {user.last_message}
                                     </div>
                                 )}
                             </div>
-                            {user.unread_count > 0 && (
-                                <div style={{
-                                    background: '#e41e3f',
-                                    color: 'white',
-                                    fontSize: '11px',
-                                    fontWeight: 'bold',
-                                    minWidth: '18px',
-                                    height: '18px',
-                                    borderRadius: '50%',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    padding: '0 4px'
-                                }}>
-                                    {user.unread_count > 99 ? '99+' : user.unread_count}
+                            
+                            {/* Badge và nút menu - cố định bên phải */}
+                            <div style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '8px',
+                                flexShrink: 0
+                            }}>
+                                {user.unread_count > 0 && (
+                                    <div style={{
+                                        background: '#e41e3f',
+                                        color: 'white',
+                                        fontSize: '11px',
+                                        fontWeight: 'bold',
+                                        minWidth: '18px',
+                                        height: '18px',
+                                        borderRadius: '50%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        padding: '0 4px'
+                                    }}>
+                                        {user.unread_count > 99 ? '99+' : user.unread_count}
+                                    </div>
+                                )}
+                                
+                                {/* Nút menu xóa */}
+                                <div style={{ position: 'relative' }}>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setMenuOpenFor(menuOpenFor === user.user_id ? null : user.user_id);
+                                        }}
+                                        style={{
+                                            background: 'transparent',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            color: '#888',
+                                            padding: '8px',
+                                            borderRadius: '50%',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            width: '32px',
+                                            height: '32px'
+                                        }}
+                                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e4e6e9'}
+                                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                                    >
+                                        <FaEllipsisV size={14} />
+                                    </button>
+                                    
+                                    {menuOpenFor === user.user_id && (
+                                        <div style={{
+                                            position: 'absolute',
+                                            top: '100%',
+                                            right: '0',
+                                            background: 'white',
+                                            border: '1px solid #ddd',
+                                            borderRadius: '8px',
+                                            boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+                                            zIndex: 10,
+                                            minWidth: '150px',
+                                            marginTop: '5px'
+                                        }}>
+                                            <button
+                                                onClick={(e) => openConfirmDialog(user, e)}
+                                                disabled={deletingId === user.user_id}
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '8px',
+                                                    padding: '10px 12px',
+                                                    border: 'none',
+                                                    background: 'white',
+                                                    cursor: deletingId === user.user_id ? 'not-allowed' : 'pointer',
+                                                    width: '100%',
+                                                    textAlign: 'left',
+                                                    borderRadius: '8px',
+                                                    color: '#dc3545'
+                                                }}
+                                            >
+                                                <FaTrash size={12} />
+                                                {deletingId === user.user_id ? 'Đang xóa...' : 'Xóa hội thoại'}
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
-                            )}
+                            </div>
                         </div>
                     ))
                 )}
             </div>
+
+            {/* ConfirmDialog */}
+            <ConfirmDialog
+                isOpen={confirmDialog.isOpen}
+                onClose={() => setConfirmDialog({ isOpen: false, userToDelete: null })}
+                onConfirm={() => confirmDialog.userToDelete && handleDeleteConversation(confirmDialog.userToDelete)}
+                title="Xóa hội thoại"
+                message={`Bạn có chắc chắn muốn xóa toàn bộ tin nhắn với ${confirmDialog.userToDelete?.full_name || confirmDialog.userToDelete?.username || 'người dùng'}?`}
+                type="warning"
+            />
+
+            {/* Toast Component */}
+            {toast && (
+                <Toast
+                    message={toast.message}
+                    type={toast.type}
+                    onClose={() => setToast(null)}
+                    duration={3000}
+                />
+            )}
         </div>
     );
 };

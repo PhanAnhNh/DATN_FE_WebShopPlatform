@@ -57,25 +57,24 @@ const ShareModal = ({ post, onClose, onShareSuccess }) => {
         else newSelected.add(friendId);
         setSelectedFriends(newSelected);
     };
-
-    // Chia sẻ qua Messenger
-    // components/share/ShareModal.jsx - Sửa phần gửi tin nhắn
-
-const handleShareToMessenger = async () => {
+    const handleShareToMessenger = async () => {
     if (selectedFriends.size === 0) return;
     setLoading(true);
     try {
         const postUrl = `${window.location.origin}/post/${post._id}`;
-        const shareContent = message 
-            ? `${message}\n\n📌 ${post.content || 'Chia sẻ bài viết'}\n🔗 ${postUrl}`
-            : `📌 ${post.content || 'Chia sẻ bài viết'}\n🔗 ${postUrl}`;
-
-        // === SỬA: Gửi dưới dạng query params như backend yêu cầu ===
+        
+        // Chỉ gửi link đơn giản + tin nhắn kèm theo (nếu có)
+        let finalContent = postUrl;
+        if (message) {
+            finalContent = `${message}\n\n${postUrl}`;
+        }
+        
+        // Gửi tin nhắn
         const sharePromises = Array.from(selectedFriends).map(friendId => 
             api.post('/api/v1/chat/send', null, {
                 params: { 
                     receiver_id: friendId, 
-                    content: shareContent, 
+                    content: finalContent, 
                     message_type: "share" 
                 }
             })
@@ -87,14 +86,16 @@ const handleShareToMessenger = async () => {
                 socket.emit('send_chat_message', {
                     sender_id: currentUserId, 
                     receiver_id: friendId,
-                    content: shareContent, 
+                    content: finalContent, 
                     message_type: "share"
                 });
             });
         }
+        
         await api.post(`/api/v1/shares/${post._id}`);
         onShareSuccess?.();
         onClose();
+        
     } catch (err) { 
         console.error("Share error:", err);
         alert(err.response?.data?.detail || "Lỗi chia sẻ, vui lòng thử lại!");
@@ -102,7 +103,6 @@ const handleShareToMessenger = async () => {
         setLoading(false); 
     }
 };
-
     // Chia sẻ lên Timeline (đăng bài viết mới)
     const handleShareToTimeline = async () => {
     if (!timelineContent.trim() && timelineImages.length === 0) {

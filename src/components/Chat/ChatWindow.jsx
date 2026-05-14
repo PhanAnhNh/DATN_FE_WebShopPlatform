@@ -3,8 +3,35 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { FaPaperPlane, FaTrash, FaEdit, FaEllipsisV, FaArrowLeft } from 'react-icons/fa';
 import api from '../../api/api';
 import socket from '../../socket';
+import LinkPreview from '../../components/Chat/LinkPreview';
 
 const DEFAULT_AVATAR = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="%23ccc"%3E%3Cpath d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/%3E%3C/svg%3E';
+
+const extractLinks = (text) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const matches = text.match(urlRegex);
+    if (!matches) return { parts: [{ type: 'text', content: text }], links: [] };
+    
+    let lastIndex = 0;
+    const parts = [];
+    const links = [];
+    
+    matches.forEach((url) => {
+        const startIndex = text.indexOf(url, lastIndex);
+        if (startIndex > lastIndex) {
+            parts.push({ type: 'text', content: text.substring(lastIndex, startIndex) });
+        }
+        parts.push({ type: 'link', content: url, url: url });
+        links.push(url);
+        lastIndex = startIndex + url.length;
+    });
+    
+    if (lastIndex < text.length) {
+        parts.push({ type: 'text', content: text.substring(lastIndex) });
+    }
+    
+    return { parts, links };
+};
 
 const ChatWindow = ({ friend, onClose, onCloseModal }) => {
     const [messages, setMessages] = useState([]);
@@ -17,6 +44,8 @@ const ChatWindow = ({ friend, onClose, onCloseModal }) => {
     const [avatarError, setAvatarError] = useState(false);
     const messagesEndRef = useRef(null);
     const isMounted = useRef(true);
+    const friendIdRef = useRef(null);
+    const isDeletingRef = useRef(false); // Thêm ref để tránh xóa nhiều lần
 
     const getCurrentUserId = useCallback(() => {
         try {
@@ -36,7 +65,9 @@ const ChatWindow = ({ friend, onClose, onCloseModal }) => {
 
     const formatTime = useCallback((dateString) => {
         if (!dateString) return '';
-        const date = new Date(dateString);
+        const date = new Date(
+            dateString.includes('Z') ? dateString : dateString + 'Z'
+        );
         const now = new Date();
         const diff = Math.floor((now - date) / 1000);
         
@@ -89,9 +120,19 @@ const ChatWindow = ({ friend, onClose, onCloseModal }) => {
 
         const handleMessageDeleted = (data) => {
             if (!isMounted.current) return;
-            setMessages(prev => prev.filter(msg => (msg.id !== data.id && msg._id !== data.id)));
+            
+            // Chỉ xóa nếu message id tồn tại trong state
+            setMessages(prev => {
+                const messageExists = prev.some(msg => (msg.id === data.id || msg._id === data.id));
+                if (!messageExists) return prev; // Không xóa nếu message không tồn tại
+                
+                const filtered = prev.filter(msg => (msg.id !== data.id && msg._id !== data.id));
+                console.log('Message deleted via socket:', data.id, 'Remaining:', filtered.length);
+                return filtered;
+            });
         };
 
+        // Đảm bảo chỉ đăng ký listener một lần
         socket.on('new_message', handleNewMessage);
         socket.on('message_edited', handleMessageEdited);
         socket.on('message_deleted', handleMessageDeleted);
@@ -106,14 +147,18 @@ const ChatWindow = ({ friend, onClose, onCloseModal }) => {
     // Fetch messages
     useEffect(() => {
         isMounted.current = true;
+        isDeletingRef.current = false; // Reset deleting flag
         
         const fetchMessages = async () => {
             if (!friend?.user_id || !currentUserId) return;
+            
+            friendIdRef.current = friend.user_id;
+            
             setIsLoadingMessages(true);
             try {
                 const res = await api.get(`/api/v1/chat/conversation/${friend.user_id}`);
-                if (isMounted.current) {
-                    setMessages(res.data || []);
+                if (isMounted.current && res.data) {
+                    setMessages(res.data);
                 }
             } catch (err) {
                 console.error("Error fetching messages:", err);
@@ -139,80 +184,77 @@ const ChatWindow = ({ friend, onClose, onCloseModal }) => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
-    // components/Chat/ChatWindow.jsx - Sửa hàm sendMessage
+    const sendMessage = async () => {
+        if (!newMessage.trim() || !friend?.user_id || !currentUserId) return;
 
-const sendMessage = async () => {
-    if (!newMessage.trim() || !friend?.user_id || !currentUserId) return;
+        const content = newMessage.trim();
+        const tempId = 'temp-' + Date.now() + '-' + Math.random();
+        const tempMsg = {
+            id: tempId,
+            _id: tempId,
+            sender_id: currentUserId,
+            receiver_id: friend.user_id,
+            content: content,
+            created_at: new Date().toISOString(),
+            is_read: false
+        };
 
-    const content = newMessage.trim();
-    const tempId = 'temp-' + Date.now() + '-' + Math.random();
-    const tempMsg = {
-        id: tempId,
-        _id: tempId,
-        sender_id: currentUserId,
-        receiver_id: friend.user_id,
-        content: content,
-        created_at: new Date().toISOString(),
-        is_read: false
-    };
+        setMessages(prev => [...prev, tempMsg]);
+        setNewMessage('');
+        setLoading(true);
 
-    setMessages(prev => [...prev, tempMsg]);
-    setNewMessage('');
-    setLoading(true);
-
-    try {
-        // === SỬA: Gửi dưới dạng query params như backend yêu cầu ===
-        const response = await api.post('/api/v1/chat/send', null, {
-            params: {
-                receiver_id: friend.user_id,
-                content: content,
-                message_type: "text"
-            }
-        });
-        
-        const realMsg = response.data.data;
-
-        if (isMounted.current) {
-            setMessages(prev => {
-                const updated = prev.map(msg => {
-                    if (msg.id === tempId || msg._id === tempId) {
-                        return {
-                            id: realMsg._id,
-                            _id: realMsg._id,
-                            sender_id: realMsg.sender_id,
-                            receiver_id: realMsg.receiver_id,
-                            content: realMsg.content,
-                            created_at: realMsg.created_at,
-                            is_read: false
-                        };
-                    }
-                    return msg;
-                });
-
-                const uniqueMessages = updated.filter((msg, index, self) => {
-                    const currentId = msg.id || msg._id;
-                    return index === self.findIndex(m => (m.id || m._id) === currentId);
-                });
-
-                return uniqueMessages;
+        try {
+            const response = await api.post('/api/v1/chat/send', null, {
+                params: {
+                    receiver_id: friend.user_id,
+                    content: content,
+                    message_type: "text"
+                }
             });
+            
+            const realMsg = response.data.data;
+
+            if (isMounted.current) {
+                setMessages(prev => {
+                    const updated = prev.map(msg => {
+                        if (msg.id === tempId || msg._id === tempId) {
+                            return {
+                                id: realMsg._id,
+                                _id: realMsg._id,
+                                sender_id: realMsg.sender_id,
+                                receiver_id: realMsg.receiver_id,
+                                content: realMsg.content,
+                                created_at: realMsg.created_at,
+                                is_read: false
+                            };
+                        }
+                        return msg;
+                    });
+
+                    const uniqueMessages = updated.filter((msg, index, self) => {
+                        const currentId = msg.id || msg._id;
+                        return index === self.findIndex(m => (m.id || m._id) === currentId);
+                    });
+
+                    return uniqueMessages;
+                });
+            }
+            
+        } catch (err) {
+            console.error("Error sending message:", err);
+            console.error("Response error:", err.response?.data);
+            
+            if (isMounted.current) {
+                setMessages(prev => prev.filter(msg => (msg.id !== tempId && msg._id !== tempId)));
+                const errorMsg = err.response?.data?.detail || err.response?.data?.message || "Không thể gửi tin nhắn. Vui lòng thử lại!";
+                alert(errorMsg);
+            }
+        } finally {
+            if (isMounted.current) {
+                setLoading(false);
+            }
         }
-        
-    } catch (err) {
-        console.error("Error sending message:", err);
-        console.error("Response error:", err.response?.data);
-        
-        if (isMounted.current) {
-            setMessages(prev => prev.filter(msg => (msg.id !== tempId && msg._id !== tempId)));
-            const errorMsg = err.response?.data?.detail || err.response?.data?.message || "Không thể gửi tin nhắn. Vui lòng thử lại!";
-            alert(errorMsg);
-        }
-    } finally {
-        if (isMounted.current) {
-            setLoading(false);
-        }
-    }
-};
+    };
 
     const handleEditMessage = async (message) => {
         if (!editContent.trim()) return;
@@ -239,16 +281,36 @@ const sendMessage = async () => {
     };
 
     const handleDeleteMessage = async (message) => {
+        // Tránh xóa nhiều lần
+        if (isDeletingRef.current) {
+            console.log('Already deleting, skip');
+            return;
+        }
+        
         if (window.confirm('Bạn có chắc chắn muốn xóa tin nhắn này?')) {
+            isDeletingRef.current = true;
+            const messageId = message.id || message._id;
+            
             try {
-                await api.delete(`/api/v1/chat/${message.id || message._id}`);
+                await api.delete(`/api/v1/chat/${messageId}`);
+                
                 if (isMounted.current) {
-                    setMessages(prev => prev.filter(msg => (msg.id !== message.id && msg._id !== message._id)));
+                    // Chỉ xóa một lần
+                    setMessages(prev => {
+                        const newMessages = prev.filter(msg => (msg.id !== messageId && msg._id !== messageId));
+                        console.log('Deleted message locally, remaining:', newMessages.length);
+                        return newMessages;
+                    });
                     setMenuOpenFor(null);
                 }
             } catch (err) {
                 console.error("Error deleting message:", err);
                 alert("Không thể xóa tin nhắn");
+            } finally {
+                // Reset flag sau khi xóa xong
+                setTimeout(() => {
+                    isDeletingRef.current = false;
+                }, 500);
             }
         }
     };
@@ -256,6 +318,37 @@ const sendMessage = async () => {
     const handleClose = () => {
         if (onCloseModal) onCloseModal();
         else if (onClose) onClose();
+    };
+
+    const renderMessageContent = (content, isMe) => {
+        const { parts } = extractLinks(content);
+        
+        return parts.map((part, idx) => {
+            if (part.type === 'text') {
+                return <span key={idx}>{part.content}</span>;
+            } else if (part.type === 'link') {
+                const isPostLink = part.url.includes('/post/');
+                if (isPostLink) {
+                    return <LinkPreview key={idx} url={part.url} />;
+                }
+                return (
+                    <a 
+                        key={idx}
+                        href={part.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        style={{ 
+                            color: isMe ? '#ffeb3b' : '#2e7d32',
+                            textDecoration: 'underline'
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {part.url}
+                    </a>
+                );
+            }
+            return null;
+        });
     };
 
     return (
@@ -419,7 +512,7 @@ const sendMessage = async () => {
                                                 boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
                                                 wordBreak: 'break-word'
                                             }}>
-                                                {msg.content}
+                                                {renderMessageContent(msg.content, isMe)}
                                                 {msg.is_edited && (
                                                     <span style={{ fontSize: '10px', opacity: 0.7, marginLeft: '6px' }}>(đã sửa)</span>
                                                 )}
@@ -436,7 +529,7 @@ const sendMessage = async () => {
                                         </div>
                                         
                                         {isMe && (
-                                            <div style={{ position: 'absolute', top: '0', right: '-30px' }}>
+                                            <div style={{ position: 'absolute', top: '-5px', left: '-30px' }}>
                                                 <button
                                                     onClick={() => setMenuOpenFor(showMenu ? null : (msg.id || msg._id))}
                                                     style={{
