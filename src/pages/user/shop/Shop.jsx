@@ -465,7 +465,8 @@ const ShopPage = () => {
                     borderRadius: "16px",
                     padding: "20px",
                     marginBottom: "20px",
-                    boxShadow: "0 2px 8px rgba(0,0,0,0.05)"
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+                    marginTop: "20px"
                 }}>
                     <h3 style={{ marginBottom: "15px", fontSize: isMobileView ? "16px" : "18px" }}>Khám phá các tỉnh thành</h3>
                     {provinces.length === 0 ? (

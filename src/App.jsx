@@ -45,6 +45,8 @@ import ProvinceDetail from "./pages/user/shop/ProvinceDetail.jsx";
 import AdminLocations from "./pages/admin/AdminShopLocations.jsx";
 import ProductTracePage from "./pages/user/ProductTracePage.jsx";
 import FavoriteProductsPage from "./pages/user/FavoriteProductsPage.jsx";
+import GroupDetail from "./pages/user/GroupDetail.jsx";
+import Groups from "./pages/user/Groups.jsx";
 
 function App() {
   return (
@@ -74,7 +76,9 @@ function App() {
             <Route path="/province/:provinceId" element={<ProvinceDetail />} />
             <Route path="/product/:product_id/trace" element={<ProductTracePage />} />
             <Route path="/products/favorites" element={<FavoriteProductsPage />} />
-
+            <Route path="/groups" element={<Groups />} />
+            <Route path="/groups/:groupId" element={<GroupDetail />} />
+            
             {/* Admin Routes */}
             <Route 
               path="/admin/dashboard" 

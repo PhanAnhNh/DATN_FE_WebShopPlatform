@@ -188,6 +188,8 @@ function SidebarLeft({ userProfile = null, onClose = null }) {
 
         if (categoryType === "saved") {
             isActive = location.pathname === "/user/saved-posts";
+        } else if (categoryType === "groups") {
+            isActive = location.pathname === "/groups" || location.pathname.startsWith("/groups/");
         } else {
             const isHome = location.pathname === "/";
             isActive = isHome && currentCategory === categoryType;
@@ -381,6 +383,15 @@ function SidebarLeft({ userProfile = null, onClose = null }) {
                         <li style={getMenuItemStyle("specialty")} onClick={() => handleCategoryClick("specialty")}>
                             <span style={{ fontSize: "20px" }}>📦</span> <span>Đặc sản</span>
                         </li>
+                        
+                        {/* ✅ ĐÃ SỬA: Nút Nhóm - chuyển đến trang /groups */}
+                        <li style={getMenuItemStyle("groups")} onClick={() => {
+                            if (onClose) onClose();
+                            navigate("/groups");
+                        }}>
+                            <span style={{ fontSize: "20px" }}>👥</span> <span>Nhóm</span>
+                        </li>
+
                         <li style={getMenuItemStyle("saved")} onClick={() => {
                             if (onClose) onClose();
                             navigate("/user/saved-posts");
