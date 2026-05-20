@@ -17,11 +17,12 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
     const [searchKeyword, setSearchKeyword] = useState("");
     const [searchResults, setSearchResults] = useState([]);
     const [userSearchResults, setUserSearchResults] = useState([]);
+    const [groupSearchResults, setGroupSearchResults] = useState([]);
     const [showSearchResults, setShowSearchResults] = useState(false);
     const [isSearching, setIsSearching] = useState(false);
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
     const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem("user_token"));
-    const [activeSearchTab, setActiveSearchTab] = useState('all'); // 'all', 'posts', 'users'
+    const [activeSearchTab, setActiveSearchTab] = useState('all'); // 'all', 'posts', 'users', 'groups'
     
     const menuRef = useRef(null);
     const searchRef = useRef(null);
@@ -128,17 +129,37 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
             const token = localStorage.getItem("user_token");
             if (!token) return [];
 
-            // Gọi API tìm kiếm người dùng (cần thêm endpoint này ở backend)
+            // Thử gọi API tìm kiếm người dùng
             const response = await api.get(`/api/v1/users/search?keyword=${encodeURIComponent(keyword)}`);
             return response.data || [];
         } catch (error) {
-            console.error("Lỗi tìm kiếm người dùng:", error);
-            // Fallback: nếu API chưa có, thử tìm qua endpoint khác
+            console.error("Lỗi tìm kiếm người dùng (API chưa có):", error);
+            // Trả về mảng rỗng thay vì fallback gây lỗi
+            return [];
+        }
+    };
+
+    // Tìm kiếm nhóm
+    const searchGroups = async (keyword) => {
+        try {
+            const token = localStorage.getItem("user_token");
+            if (!token) return [];
+
+            // Thử gọi API tìm kiếm nhóm
+            const response = await api.get(`/api/v1/groups/search?keyword=${encodeURIComponent(keyword)}`);
+            return response.data || [];
+        } catch (error) {
+            console.error("Lỗi tìm kiếm nhóm (API chưa có):", error);
+            // Fallback: lấy danh sách nhóm công khai và lọc theo keyword
             try {
-                const response = await api.get(`/api/v1/users?search=${encodeURIComponent(keyword)}`);
-                return response.data || [];
+                const response = await api.get('/api/v1/groups/public?limit=50');
+                const groups = response.data || [];
+                return groups.filter(group => 
+                    group.name?.toLowerCase().includes(keyword.toLowerCase()) ||
+                    group.description?.toLowerCase().includes(keyword.toLowerCase())
+                );
             } catch (err) {
-                console.error("Fallback search also failed:", err);
+                console.error("Fallback group search failed:", err);
                 return [];
             }
         }
@@ -149,25 +170,29 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
         if (!keyword.trim()) {
             setSearchResults([]);
             setUserSearchResults([]);
+            setGroupSearchResults([]);
             setShowSearchResults(false);
             return;
         }
 
         setIsSearching(true);
         try {
-            // Tìm kiếm đồng thời bài viết và người dùng
-            const [posts, users] = await Promise.all([
+            // Tìm kiếm đồng thời bài viết, người dùng và nhóm
+            const [posts, users, groups] = await Promise.all([
                 searchPosts(keyword),
-                searchUsers(keyword)
+                searchUsers(keyword),
+                searchGroups(keyword)
             ]);
             
             setSearchResults(posts);
             setUserSearchResults(users);
+            setGroupSearchResults(groups);
             setShowSearchResults(true);
         } catch (error) {
             console.error("Lỗi tìm kiếm:", error);
             setSearchResults([]);
             setUserSearchResults([]);
+            setGroupSearchResults([]);
         } finally {
             setIsSearching(false);
         }
@@ -181,6 +206,7 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
             } else {
                 setSearchResults([]);
                 setUserSearchResults([]);
+                setGroupSearchResults([]);
                 setShowSearchResults(false);
             }
         }, 500);
@@ -288,6 +314,12 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
         navigate(`/profile/${user._id || user.id}`);
     };
 
+    const handleGroupClick = (group) => {
+        setShowSearchResults(false);
+        setSearchKeyword("");
+        navigate(`/groups/${group._id}`);
+    };
+
     const menuItemStyle = {
         display: "flex",
         alignItems: "center",
@@ -306,12 +338,14 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
                 return searchResults;
             case 'users':
                 return userSearchResults;
+            case 'groups':
+                return groupSearchResults;
             default:
-                return [...searchResults, ...userSearchResults];
+                return [...searchResults, ...userSearchResults, ...groupSearchResults];
         }
     };
 
-    const totalResults = searchResults.length + userSearchResults.length;
+    const totalResults = searchResults.length + userSearchResults.length + groupSearchResults.length;
 
     return (
         <>
@@ -383,7 +417,7 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
                             maxWidth: isMobile ? "100%" : "500px"
                         }}>
                             <input
-                                placeholder={isMobile ? "Tìm kiếm..." : "Tìm kiếm bài viết, người dùng..."}
+                                placeholder={isMobile ? "Tìm kiếm..." : "Tìm kiếm bài viết, người dùng, nhóm..."}
                                 value={searchKeyword}
                                 onChange={(e) => setSearchKeyword(e.target.value)}
                                 style={{
@@ -399,7 +433,7 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
                                 onFocus={(e) => {
                                     e.target.style.borderColor = "#2e7d32";
                                     e.target.style.backgroundColor = "white";
-                                    if (searchKeyword && (searchResults.length > 0 || userSearchResults.length > 0)) {
+                                    if (searchKeyword && totalResults > 0) {
                                         setShowSearchResults(true);
                                     }
                                 }}
@@ -459,7 +493,8 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
                                             <div style={{ 
                                                 display: "flex", 
                                                 borderBottom: "1px solid #eee",
-                                                padding: "0 10px"
+                                                padding: "0 10px",
+                                                flexWrap: "wrap"
                                             }}>
                                                 <button
                                                     onClick={() => setActiveSearchTab('all')}
@@ -503,11 +538,26 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
                                                 >
                                                     Người dùng ({userSearchResults.length})
                                                 </button>
+                                                <button
+                                                    onClick={() => setActiveSearchTab('groups')}
+                                                    style={{
+                                                        padding: "10px 15px",
+                                                        background: "none",
+                                                        border: "none",
+                                                        cursor: "pointer",
+                                                        color: activeSearchTab === 'groups' ? "#2e7d32" : "#666",
+                                                        fontWeight: activeSearchTab === 'groups' ? "bold" : "normal",
+                                                        borderBottom: activeSearchTab === 'groups' ? "2px solid #2e7d32" : "none"
+                                                    }}
+                                                >
+                                                    Nhóm ({groupSearchResults.length})
+                                                </button>
                                             </div>
                                             
                                             {/* Kết quả tìm kiếm theo tab */}
                                             <div>
-                                                {(activeSearchTab === 'all' || activeSearchTab === 'users') && userSearchResults.length > 0 && (
+                                                {/* Kết quả nhóm */}
+                                                {(activeSearchTab === 'all' || activeSearchTab === 'groups') && groupSearchResults.length > 0 && (
                                                     <div>
                                                         {activeSearchTab === 'all' && (
                                                             <div style={{ 
@@ -517,6 +567,85 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
                                                                 fontWeight: "bold",
                                                                 color: "#2e7d32",
                                                                 borderBottom: "1px solid #eee"
+                                                            }}>
+                                                                👥 Nhóm
+                                                            </div>
+                                                        )}
+                                                        {groupSearchResults.map((group) => (
+                                                            <div
+                                                                key={group._id}
+                                                                onClick={() => handleGroupClick(group)}
+                                                                style={{
+                                                                    padding: "12px 15px",
+                                                                    borderBottom: "1px solid #f0f0f0",
+                                                                    cursor: "pointer",
+                                                                    transition: "background-color 0.2s"
+                                                                }}
+                                                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f5f5f5"}
+                                                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "white"}
+                                                            >
+                                                                <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                                                                    <div style={{ 
+                                                                        width: "45px", 
+                                                                        height: "45px", 
+                                                                        background: "#e8f5e9", 
+                                                                        borderRadius: "12px", 
+                                                                        display: "flex", 
+                                                                        alignItems: "center", 
+                                                                        justifyContent: "center",
+                                                                        flexShrink: 0,
+                                                                        overflow: "hidden"
+                                                                    }}>
+                                                                        {group.avatar_url || group.avatar ? (
+                                                                            <img src={group.avatar_url || group.avatar} alt="group avatar" style={{ width: "100%", height: "100%", borderRadius: "12px", objectFit: "cover" }}/>
+                                                                        ) : (
+                                                                            <FaUsers size={20} color="#2e7d32" />
+                                                                        )}
+                                                                    </div>
+                                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                                        <div style={{ fontWeight: "bold", fontSize: "15px", color: "#333", marginBottom: "4px" }}>
+                                                                            {group.name}
+                                                                        </div>
+                                                                        {group.description && (
+                                                                            <div style={{ 
+                                                                                fontSize: "12px", 
+                                                                                color: "#666",
+                                                                                overflow: "hidden",
+                                                                                textOverflow: "ellipsis",
+                                                                                whiteSpace: "nowrap"
+                                                                            }}>
+                                                                                {group.description}
+                                                                            </div>
+                                                                        )}
+                                                                        <div style={{ 
+                                                                            display: "flex", 
+                                                                            gap: "12px",
+                                                                            fontSize: "11px", 
+                                                                            color: "#999",
+                                                                            marginTop: "4px"
+                                                                        }}>
+                                                                            <span>👥 {group.members?.length || group.member_count || 0} thành viên</span>
+                                                                            <span>{group.privacy === 'public' ? '🌍 Công khai' : '🔒 Riêng tư'}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                
+                                                {/* Kết quả người dùng */}
+                                                {(activeSearchTab === 'all' || activeSearchTab === 'users') && userSearchResults.length > 0 && (
+                                                    <div>
+                                                        {activeSearchTab === 'all' && (
+                                                            <div style={{ 
+                                                                padding: "8px 15px", 
+                                                                backgroundColor: "#f8f9fa",
+                                                                fontSize: "13px",
+                                                                fontWeight: "bold",
+                                                                color: "#2e7d32",
+                                                                borderBottom: "1px solid #eee",
+                                                                borderTop: activeSearchTab === 'all' && groupSearchResults.length > 0 ? "1px solid #eee" : "none"
                                                             }}>
                                                                 👤 Người dùng
                                                             </div>
@@ -576,13 +705,6 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
                                                                                 {user.bio}
                                                                             </div>
                                                                         )}
-                                                                        <div style={{ 
-                                                                            fontSize: "11px", 
-                                                                            color: "#999",
-                                                                            marginTop: "4px"
-                                                                        }}>
-                                                                            {user.followers_count || 0} followers
-                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -590,6 +712,7 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
                                                     </div>
                                                 )}
                                                 
+                                                {/* Kết quả bài viết */}
                                                 {(activeSearchTab === 'all' || activeSearchTab === 'posts') && searchResults.length > 0 && (
                                                     <div>
                                                         {activeSearchTab === 'all' && (
@@ -600,7 +723,7 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
                                                                 fontWeight: "bold",
                                                                 color: "#2e7d32",
                                                                 borderBottom: "1px solid #eee",
-                                                                borderTop: userSearchResults.length > 0 ? "1px solid #eee" : "none"
+                                                                borderTop: (activeSearchTab === 'all' && (userSearchResults.length > 0 || groupSearchResults.length > 0)) ? "1px solid #eee" : "none"
                                                             }}>
                                                                 📝 Bài viết
                                                             </div>
