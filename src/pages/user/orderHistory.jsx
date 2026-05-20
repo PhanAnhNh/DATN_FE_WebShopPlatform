@@ -30,7 +30,7 @@ import {
 } from 'react-icons/fa';
 import api from '../../api/api';
 import '../../css/Orders.css';
-import ShopDetailLayout from '../../components/layout/ShopDetailLayout';
+import ShopDetailLayout from '../../layout/layoutUser/ShopDetailLayout';
 import Toast from '../../components/common/Toast';
 
 const Orders = () => {

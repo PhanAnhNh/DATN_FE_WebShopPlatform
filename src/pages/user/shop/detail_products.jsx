@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import Layout from "../../../components/layout/Layout";
+import Layout from "../../../layout/layoutUser/Layout";
 import api from "../../../api/api";
 import { 
   FaStar, 
@@ -41,7 +41,7 @@ import {
   FaSpinner
 } from 'react-icons/fa';
 import { QRCodeCanvas } from 'qrcode.react';
-import ShopDetailLayout from "../../../components/layout/ShopDetailLayout";
+import ShopDetailLayout from "../../../layout/layoutUser/ShopDetailLayout";
 import "../../../css/detail_product_page.css";
 
 const ProductDetailPage = () => {

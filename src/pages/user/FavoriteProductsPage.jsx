@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../api/api";
-import ShopDetailLayout from "../../components/layout/ShopDetailLayout";
+import ShopDetailLayout from "../../layout/layoutUser/ShopDetailLayout";
 import { 
   FaHeart, 
   FaShoppingCart, 

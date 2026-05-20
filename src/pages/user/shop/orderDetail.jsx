@@ -24,7 +24,7 @@ import {
   FaExclamationTriangle
 } from 'react-icons/fa';
 import api from '../../../api/api';
-import ShopDetailLayout from "../../../components/layout/ShopDetailLayout";
+import ShopDetailLayout from "../../../layout/layoutUser/ShopDetailLayout";
 import Toast from '../../../components/common/Toast'; // Import Toast component
 import "../../../css/orderDetail.css";
 

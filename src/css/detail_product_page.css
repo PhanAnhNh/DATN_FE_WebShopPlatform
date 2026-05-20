@@ -12,13 +12,7 @@ body {
     background-color: #f5f5f5;
 }
 
-/* Container chính */
-.product-detail-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    background: #f5f5f5;
-    min-height: 100vh;
-}
+
 
 /* Breadcrumb - Ẩn trên mobile */
 .breadcrumb {
@@ -138,7 +132,7 @@ body {
 }
 
 .product-name {
-    font-size: 18px;
+    font-size: 25px;
     font-weight: 500;
     line-height: 1.4;
     margin-bottom: 8px;
@@ -160,7 +154,7 @@ body {
 }
 
 .product-price {
-    background: #fff9f5;
+    background: #ffffff;
     padding: 12px;
     margin: 8px -12px 12px;
     border-radius: 4px;
@@ -215,7 +209,7 @@ body {
 
 .variant-btn.active {
     border-color: #2e7d32;
-    background: #fff9f5;
+    background: #ffffff;
     color: #2e7d32;
     font-weight: 500;
 }
@@ -297,7 +291,7 @@ body {
 .btn-cart {
     flex: 2;
     padding: 12px;
-    background: #fff9f5;
+    background: #ffffff;
     border: 1px solid #2e7d32;
     border-radius: 25px;
     color: #2e7d32;
@@ -359,10 +353,11 @@ body {
 
 /* Highlight info */
 .highlight-info {
-    background: #fafafa;
+    background: #ffffff;
     border-radius: 8px;
     padding: 12px;
     margin: 0 12px 12px;
+    margin-top: 20px;
 }
 
 .highlight-title {

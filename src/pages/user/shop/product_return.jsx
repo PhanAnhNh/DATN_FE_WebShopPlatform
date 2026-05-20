@@ -13,7 +13,7 @@ import {
     FaClock
 } from 'react-icons/fa';
 import api from '../../../api/api';
-import ShopDetailLayout from '../../../components/layout/ShopDetailLayout';
+import ShopDetailLayout from '../../../layout/layoutUser/ShopDetailLayout';
 import '../../../css/ProductReturns.css';
 
 const ProductReturns = () => {

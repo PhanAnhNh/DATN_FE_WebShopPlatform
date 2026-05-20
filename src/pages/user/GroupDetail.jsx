@@ -1,7 +1,7 @@
 // src/pages/GroupDetail.jsx
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import Layout from '../../components/layout/Layout';
+import Layout from '../../layout/layoutUser/Layout';
 import groupService from '../../api/groupApi';
 import Toast from '../../components/common/Toast';
 import GroupSettingsModal from '../../components/groups/GroupSettingsModal';

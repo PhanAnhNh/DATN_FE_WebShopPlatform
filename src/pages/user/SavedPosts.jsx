@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../api/api";
-import Layout from "../../components/layout/Layout";
+import Layout from "../../layout/layoutUser/Layout";
 
 function SavedPosts() {
     const navigate = useNavigate();

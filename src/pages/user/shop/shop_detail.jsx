@@ -1,7 +1,6 @@
-// pages/user/shop/ShopDetailPage.jsx
 import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import ShopDetailLayout from "../../../components/layout/ShopDetailLayout";
+import ShopDetailLayout from "../../../layout/layoutUser/ShopDetailLayout";
 import api from "../../../api/api";
 import io from "socket.io-client";
 import socket from "../../../socket"; 
@@ -14,13 +13,12 @@ import {
   FaFilter, FaSortAmountDown, FaSortAmountUp, FaSortAmountDownAlt,
   FaPaperPlane, FaTimes
 } from 'react-icons/fa';
-import '../../../css/shop_detail_page.css'; // Import CSS file
+import '../../../css/shop_detail_page.css';
 
 const ShopDetailPage = () => {
     const { shop_id } = useParams();
     const navigate = useNavigate();
     
-    // State
     const [activeTab, setActiveTab] = useState("products");
     const [shop, setShop] = useState(null);
     const [products, setProducts] = useState([]);
@@ -42,7 +40,6 @@ const ShopDetailPage = () => {
     const [productReviews, setProductReviews] = useState({});
     const [loadingReviews, setLoadingReviews] = useState(false);
     
-    // Chat state
     const [chatMessages, setChatMessages] = useState([]);
     const [showChatModal, setShowChatModal] = useState(false);
     const [chatLoading, setChatLoading] = useState(false);
@@ -54,7 +51,6 @@ const ShopDetailPage = () => {
     const [actionMenuMessageId, setActionMenuMessageId] = useState(null);
     const token = localStorage.getItem('user_token');
 
-    // Lọc và sắp xếp sản phẩm
     const getFilteredAndSortedProducts = () => {
         let filtered = [...products];
         
@@ -522,7 +518,6 @@ const ShopDetailPage = () => {
     return (
         <ShopDetailLayout shop={shop}>
             <div className="shop-detail-container">
-                {/* Hero Section */}
                 <div className="hero-section">
                     <div className="hero-banner" style={{
                         backgroundImage: `linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.6)), url(${shop?.banner_url || "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1200&h=400&fit=crop"})`
@@ -594,7 +589,6 @@ const ShopDetailPage = () => {
                     </div>
                 </div>
 
-                {/* Search Bar và Sort */}
                 <div className="search-section">
                     <div className="search-wrapper">
                         <FaSearch className="search-icon" />
@@ -650,7 +644,6 @@ const ShopDetailPage = () => {
                     </div>
                 </div>
 
-                {/* Tabs */}
                 <div className="tabs-container">
                     {[
                         { id: "about", label: "Giới thiệu", icon: <FaStore size={16} /> },
@@ -667,9 +660,7 @@ const ShopDetailPage = () => {
                     ))}
                 </div>
 
-                {/* Tab Content */}
                 <div className="tab-content">
-                    {/* About Tab */}
                     {activeTab === "about" && (
                         <div>
                             <div className="about-card">
@@ -721,7 +712,6 @@ const ShopDetailPage = () => {
                         </div>
                     )}
 
-                    {/* Products Tab - Phiên bản cải thiện */}
                     {activeTab === "products" && (
                     <div>
                         <div className="products-header">
@@ -776,10 +766,10 @@ const ShopDetailPage = () => {
                                 <div className="product-info">
                                     <h4 className="product-name">{product.name}</h4>
                                     <div className="product-price-row">
-                                    <span className="product-price">{formatCurrency(product.price)}</span>
-                                    {soldCount > 0 && (
-                                        <span className="product-sold">Đã bán {soldCount}</span>
-                                    )}
+                                        <span className="product-price">{formatCurrency(product.price)}</span>
+                                        {soldCount > 0 && (
+                                            <span className="product-sold">Đã bán {soldCount}</span>
+                                        )}
                                     </div>
                                     <div className="product-rating">
                                     {renderStars(productRating)}
@@ -797,10 +787,8 @@ const ShopDetailPage = () => {
                     </div>
                     )}
 
-                    {/* Q&A Tab */}
                     {activeTab === "qa" && (
                         <div>
-                            {/* Rating Summary Card */}
                             <div className="rating-summary">
                                 <div className="rating-summary-content">
                                     <div className="rating-score-section">
@@ -827,7 +815,6 @@ const ShopDetailPage = () => {
                                 </div>
                             </div>
 
-                            {/* Rating Filters */}
                             <div className="rating-filters">
                                 <button onClick={() => setRatingFilter(null)} className={`filter-chip ${!ratingFilter ? 'active' : ''}`}>
                                     Tất cả
@@ -839,7 +826,6 @@ const ShopDetailPage = () => {
                                 ))}
                             </div>
 
-                            {/* Comments List */}
                             <div className="comments-section">
                                 <h3><FaCommentDots /> Bình luận ({filteredReviews.length})</h3>
                                 {filteredReviews.length > 0 ? filteredReviews.map(review => {
@@ -890,7 +876,6 @@ const ShopDetailPage = () => {
                                 }) : <div className="empty-state">Chưa có bình luận nào</div>}
                             </div>
 
-                            {/* Add Comment */}
                             <div className="add-comment-form">
                                 <h3><FaEdit /> Viết bình luận</h3>
                                 
@@ -930,11 +915,9 @@ const ShopDetailPage = () => {
                 </div>
             </div>
 
-            {/* Chat Modal */}
             {showChatModal && (
                 <div className="chat-modal-overlay">
                     <div className="chat-modal">
-                        {/* Chat Header */}
                         <div className="chat-header">
                             <div className="chat-header-info">
                                 <img 
@@ -953,7 +936,6 @@ const ShopDetailPage = () => {
                             />
                         </div>
 
-                        {/* Messages Area */}
                         <div className="chat-messages">
                             {chatLoading ? (
                                 <div className="chat-loading">
@@ -1030,7 +1012,6 @@ const ShopDetailPage = () => {
                             <div ref={messagesEndRef} />
                         </div>
 
-                        {/* Input Area */}
                         <div className="chat-input-area">
                             <div className="chat-input-wrapper">
                                 <input

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "../../api/api";
-import Layout from "../../components/layout/Layout";
+import Layout from "../../layout/layoutUser/Layout";
 import Toast from "../../components/common/Toast";
 import ShareModal from "./ShareModal";
 import SharedPostCard from "./SharedPostCard";

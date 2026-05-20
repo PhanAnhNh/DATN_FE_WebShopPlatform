@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../../api/api";
-import Layout from "../../components/layout/Layout";
+import Layout from "../../layout/layoutUser/Layout.jsx";
 import ShareModal from "./ShareModal";
 import SharedPostCard from "./SharedPostCard";
 import ReportModal from "../admin/reportModal";
 import Toast from "../../components/common/Toast";
-import NavigationTabs from "../../components/Shoplayout/NavigationTabs";
+import NavigationTabs from "../../layout/Shoplayout/NavigationTabs";
 
 function Home() {
     const navigate = useNavigate();

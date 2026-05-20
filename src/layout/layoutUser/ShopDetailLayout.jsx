@@ -172,7 +172,7 @@ function ShopDetailLayout({ children, shop }) {
             minHeight: "100vh",
             display: "flex",
             flexDirection: "column",
-            background: "#f3f4f6"
+            background: "#ffffff"
         }}>
             {/* Header - chỉ hiển thị nút menu khi là mobile */}
             <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 1000, width: "100%" }}>

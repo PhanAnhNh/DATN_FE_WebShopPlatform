@@ -7,7 +7,7 @@ import {
   FaSpinner, FaTrash, FaSave, FaTimes, FaHome, FaShoppingCart,
   FaMobileAlt, FaCreditCard
 } from 'react-icons/fa';
-import ShopDetailLayout from "../../../components/layout/ShopDetailLayout";
+import ShopDetailLayout from "../../../layout/layoutUser/ShopDetailLayout";
 
 const CheckoutPage = () => {
   const navigate = useNavigate();

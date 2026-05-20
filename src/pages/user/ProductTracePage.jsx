@@ -9,7 +9,7 @@ import {
   FaChevronDown, FaChevronUp
 } from 'react-icons/fa';
 import { QRCodeCanvas } from 'qrcode.react';
-import ShopDetailLayout from '../../components/layout/ShopDetailLayout';
+import ShopDetailLayout from '../../layout/layoutUser/ShopDetailLayout';
 import '../../css/ProductTracePage.css';
 
 const ProductTracePage = () => {

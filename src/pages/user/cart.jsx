@@ -14,7 +14,7 @@ import {
   FaRegCheckCircle,
   FaSpinner
 } from 'react-icons/fa';
-import ShopDetailLayout from "../../components/layout/ShopDetailLayout";
+import ShopDetailLayout from "../../layout/layoutUser/ShopDetailLayout";
 
 const CartPage = () => {
     const navigate = useNavigate();

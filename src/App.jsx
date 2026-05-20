@@ -5,12 +5,10 @@ import Login from "./pages/user/account/signin.jsx";
 import Profile from "./pages/user/profile.jsx";
 import Register from "./pages/user/account/signup.jsx";
 import AdminLogin from "./pages/admin/Admin_login.jsx";
-import AdminLayout from "./components/Adminlayout/LayoutAdmin.jsx";
 import DashboardPage from "./pages/admin/Dashboard.jsx";
 import UsersManagement from "./pages/admin/ManageUsers.jsx";
 import ShopsManagement from "./pages/admin/ManageShop.jsx";
 import PostsManagement from "./pages/admin/ManagePosts.jsx";
-import ShopLayout from "./components/Shoplayout/ShopLayout.jsx";
 import ShopDashboard from "./pages/shop_manager/shop_dashboard.jsx";
 import ShopLogin from "./pages/shop_manager/shop_login.jsx";
 import ShopProfile from "./pages/shop_manager/shop_profile.jsx";
@@ -47,6 +45,8 @@ import ProductTracePage from "./pages/user/ProductTracePage.jsx";
 import FavoriteProductsPage from "./pages/user/FavoriteProductsPage.jsx";
 import GroupDetail from "./pages/user/GroupDetail.jsx";
 import Groups from "./pages/user/Groups.jsx";
+import AdminLayout from "./layout/Adminlayout/LayoutAdmin.jsx";
+import ShopLayout from "./layout/Shoplayout/ShopLayout.jsx";
 
 function App() {
   return (

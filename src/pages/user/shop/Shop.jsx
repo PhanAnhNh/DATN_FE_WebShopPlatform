@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import Layout from "../../../components/layout/Layout";
+import Layout from "../../../layout/layoutUser/Layout";
 import {userApi} from "../../../api/api";
 import locationApi from "../../../api/locationApi";
 import { useUserLocation } from "../../../components/Hooks/useUserLocation";
-import NavigationTabs from "../../../components/Shoplayout/NavigationTabs";
+import NavigationTabs from "../../../layout/Shoplayout/NavigationTabs";
 
 const ShopPage = () => {
     const navigate = useNavigate();

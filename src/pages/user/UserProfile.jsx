@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import Layout from '../../components/layout/Layout';
+import Layout from '../../layout/layoutUser/Layout';
 import { 
     FaUser, FaEnvelope, FaPhone, FaMapMarkerAlt, FaCalendarAlt, 
     FaSpinner, FaCamera, FaPencilAlt, FaUserPlus, FaUserCheck,

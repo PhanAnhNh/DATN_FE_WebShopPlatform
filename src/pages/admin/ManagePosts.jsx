@@ -92,7 +92,7 @@ const PostsManagement = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await adminApi.get('/api/v1/admin/posts?limit=100');
+      const response = await adminApi.get('/api/v1/admin/posts/?limit=100');
       console.log('Posts data:', response.data);
       setPosts(response.data);
       setTotalPosts(response.data.length);

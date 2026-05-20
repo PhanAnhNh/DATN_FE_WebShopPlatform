@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async'; // Cài đặt: npm install react-helmet-async
 import api from '../../api/api';
-import Layout from '../../components/layout/Layout';
+import Layout from '../../layout/layoutUser/Layout';
 
 const PostDetailPage = () => {
     const { postId } = useParams();
