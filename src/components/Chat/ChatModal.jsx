@@ -1,4 +1,3 @@
-// components/Chat/ChatModal.jsx
 import React, { useState, useEffect } from 'react';
 import { FaTimes, FaFilter } from 'react-icons/fa';
 import FriendList from './FriendList';
