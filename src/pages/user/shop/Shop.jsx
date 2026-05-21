@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import Layout from "../../../layout/layoutUser/Layout";
 import {userApi} from "../../../api/api";
 import locationApi from "../../../api/locationApi";
-import { useUserLocation } from "../../../components/Hooks/useUserLocation";
+import { useUserLocation } from "../../../hooks/useUserLocation";
 import NavigationTabs from "../../../layout/Shoplayout/NavigationTabs";
 
 const ShopPage = () => {
