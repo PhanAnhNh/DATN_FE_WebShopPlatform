@@ -20,7 +20,7 @@ import {
     FaRegNewspaper
 } from 'react-icons/fa';
 import api from '../../api/api';
-import socket from '../../socket';
+import socket from '../../utils/socket';
 
 const ShareModal = ({ post, onClose, onShareSuccess }) => {
     const [shareType, setShareType] = useState('messenger'); // 'messenger' hoặc 'timeline'

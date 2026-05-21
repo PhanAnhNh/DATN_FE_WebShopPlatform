@@ -4,7 +4,7 @@ import { FaTimes, FaFilter } from 'react-icons/fa';
 import FriendList from './FriendList';
 import ChatWindow from './ChatWindow';
 import api from '../../api/api';
-import socket from '../../socket'; // ✅ THÊM DÒNG NÀY
+import socket from '../../utils/socket'; 
 
 const ChatModal = ({ isOpen, onClose }) => {
     const [selectedFriend, setSelectedFriend] = useState(null);

@@ -4,7 +4,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { FaShoppingCart, FaBell, FaUser, FaBook, FaSignOutAlt, FaComment, FaSearch, FaBars, FaUsers } from 'react-icons/fa';
 import api from "../../api/api";
 import NotificationBell from "../../pages/user/NotificationBell";
-import ChatModal from "../../components/Chat/ChatModal";
+import ChatModal from "../../components/chat/ChatModal";
 import { GrFavorite } from "react-icons/gr";
 import '../../css/home_page.css';
 

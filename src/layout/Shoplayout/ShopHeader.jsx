@@ -18,7 +18,7 @@ import '../../css/ShopHeader.css';
 import NotificationBell from '../../pages/user/NotificationBell';
 import { shopApi } from '../../api/api';
 import ShopInbox from './ShopInbox';
-import socket from '../../socket'; // THÊM DÒNG NÀY
+import socket from '../../utils/socket'; // THÊM DÒNG NÀY
 
 const ShopHeader = ({ toggleSidebar }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);

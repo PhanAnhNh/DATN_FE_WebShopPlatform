@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FaEnvelope, FaTimes, FaPaperPlane, FaArrowLeft, FaUserCircle, FaEllipsisV } from 'react-icons/fa';
 import { shopApi } from '../../api/api';
-import socket from '../../socket';
+import socket from '../../utils/socket';
 
 const ShopInbox = ({ isOpen, onClose }) => {
     const [conversations, setConversations] = useState([]);

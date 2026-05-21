@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import ShopDetailLayout from "../../../layout/layoutUser/ShopDetailLayout";
 import api from "../../../api/api";
 import io from "socket.io-client";
-import socket from "../../../socket"; 
+import socket from "../../../utils/socket"; 
 import { 
   FaStore, FaUsers, FaCommentDots, FaStar, FaStarHalfAlt,
   FaRegStar, FaMapMarkerAlt, FaPhone, FaEnvelope, FaCalendarAlt,
