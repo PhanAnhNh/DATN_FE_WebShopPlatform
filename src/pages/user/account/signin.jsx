@@ -9,7 +9,7 @@ import userApi from '../../../api/api';
 const GOOGLE_CLIENT_ID = "298767992144-us7ot1ggmedj7t5092lhvueu0pr1ht2g.apps.googleusercontent.com";
 
 function LoginContent() {
-  const [email, setEmail] = useState("");
+  const [loginInput, setLoginInput] = useState(""); // Thay đổi từ email thành loginInput
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -36,7 +36,8 @@ function LoginContent() {
 
     try {
       const formData = new URLSearchParams();
-      formData.append("username", email);
+      // Gửi loginInput (có thể là email hoặc username) vào trường username
+      formData.append("username", loginInput);
       formData.append("password", password);
 
       const response = await userApi.post("/api/v1/auth/login", formData.toString(), {
@@ -172,15 +173,15 @@ function LoginContent() {
           <form onSubmit={handleLogin} style={styles.form}>
             <div style={styles.inputGroup}>
               <label style={styles.label}>
-                Email <span style={styles.required}>*</span>
+                Email hoặc Tên đăng nhập <span style={styles.required}>*</span>
               </label>
               <div style={styles.inputWrapper}>
-                <span style={styles.inputIcon}>📧</span>
+                <span style={styles.inputIcon}>👤</span>
                 <input
                   type="text"
-                  placeholder="example@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="example@email.com hoặc username"
+                  value={loginInput}
+                  onChange={(e) => setLoginInput(e.target.value)}
                   required
                   style={styles.input}
                 />
@@ -594,7 +595,7 @@ const styles = {
   socialBtn: {
     width: "100%",
     padding: "12px",
-    borderRadius: "14px", // Đồng bộ border radius với input
+    borderRadius: "14px",
     border: "1.5px solid #e0e0e0",
     backgroundColor: "white",
     cursor: "pointer",

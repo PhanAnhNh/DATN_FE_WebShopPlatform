@@ -3,38 +3,16 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { FaTimes } from 'react-icons/fa';
 import api from "../../api/api";
 import Toast from "../../components/common/Toast";
+import { useAuth } from "../../hooks/useAuth.js";
 
 function SidebarLeft({ userProfile = null, onClose = null }) {
-    const [user, setUser] = useState(() => {
-        const cachedUser = sessionStorage.getItem("sidebar_user");
-        if (cachedUser) {
-            try {
-                const parsed = JSON.parse(cachedUser);
-                const cacheTime = sessionStorage.getItem("sidebar_user_cache_time");
-                if (cacheTime && (Date.now() - parseInt(cacheTime) < 300000)) {
-                    return parsed;
-                }
-            } catch (e) {
-                console.error("Error parsing cached user:", e);
-            }
-        }
-        return {
-            full_name: "",
-            username: "",
-            avatar_url: "",
-            gender: "",
-            dob: "",
-            email: "",
-            phone: "",
-            address: ""
-        };
-    });
-
+    const { user: authUser, isAuthenticated } = useAuth();
+    const [user, setUser] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
     const [editData, setEditData] = useState({});
     const [loading, setLoading] = useState(false);
     const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
-
+    
     const location = useLocation();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
@@ -51,6 +29,23 @@ function SidebarLeft({ userProfile = null, onClose = null }) {
         setToast({ show: false, message: '', type: 'success' });
     };
 
+    // Lấy thông tin user từ authUser hoặc userProfile
+    useEffect(() => {
+        if (!isAuthenticated) {
+            setUser(null);
+            return;
+        }
+        
+        if (userProfile) {
+            setUser(userProfile);
+            setEditData(userProfile);
+        } else if (authUser) {
+            setUser(authUser);
+            setEditData(authUser);
+        }
+    }, [authUser, userProfile, isAuthenticated]);
+
+    // Cache user data
     useEffect(() => {
         if (user && (user.full_name || user.username)) {
             sessionStorage.setItem("sidebar_user", JSON.stringify(user));
@@ -58,19 +53,35 @@ function SidebarLeft({ userProfile = null, onClose = null }) {
         }
     }, [user]);
 
+    // Fetch profile nếu chưa có userProfile
     useEffect(() => {
+        // Nếu đã có userProfile từ props, không cần fetch
         if (userProfile) {
             setUser(userProfile);
             setEditData(userProfile);
             return;
         }
 
+        // Nếu đã có authUser từ hook, không cần fetch
+        if (authUser) {
+            return;
+        }
+
+        const token = localStorage.getItem("user_token");
+        
+        // Nếu không có token, không hiển thị thông tin user
+        if (!token) {
+            setUser(null);
+            return;
+        }
+
+        // Lấy từ cache hoặc API
         const fetchMyProfile = async () => {
             const cachedUser = sessionStorage.getItem("sidebar_user");
             const cacheTime = sessionStorage.getItem("sidebar_user_cache_time");
             const isCacheValid = cachedUser && cacheTime && (Date.now() - parseInt(cacheTime) < 300000);
             
-            if (isCacheValid && !user.full_name) {
+            if (isCacheValid && !user?.full_name) {
                 try {
                     const parsedUser = JSON.parse(cachedUser);
                     setUser(parsedUser);
@@ -87,15 +98,35 @@ function SidebarLeft({ userProfile = null, onClose = null }) {
                 setEditData(res.data);
             } catch (error) {
                 console.error("Lỗi khi lấy thông tin cá nhân:", error);
-                showToast("Không thể tải thông tin cá nhân", "error");
+                // Nếu lỗi 401 (unauthorized), không hiển thị user
+                if (error.response?.status === 401) {
+                    setUser(null);
+                } else {
+                    showToast("Không thể tải thông tin cá nhân", "error");
+                }
             }
         };
 
-        const token = localStorage.getItem("user_token");
-        if (token && !isUserProfilePage) {
-            fetchMyProfile();
-        }
-    }, [userProfile, isUserProfilePage]);
+        fetchMyProfile();
+    }, [userProfile, authUser, isUserProfilePage]);
+
+    // Lắng nghe sự kiện logout
+    useEffect(() => {
+        const handleLogout = () => {
+            setUser(null);
+            setEditData({});
+            setIsEditing(false);
+            // Xóa cache
+            sessionStorage.removeItem("sidebar_user");
+            sessionStorage.removeItem("sidebar_user_cache_time");
+        };
+        
+        window.addEventListener('userLoggedOut', handleLogout);
+        
+        return () => {
+            window.removeEventListener('userLoggedOut', handleLogout);
+        };
+    }, []);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -104,11 +135,7 @@ function SidebarLeft({ userProfile = null, onClose = null }) {
 
     const handleProfileClick = () => {
         if (onClose) onClose();
-        if (user && (user.id || user._id)) {
-            navigate(`/profile`);
-        } else {
-            navigate("/profile");
-        }
+        navigate("/profile");
     };
 
     const handleSave = async () => {
@@ -116,6 +143,7 @@ function SidebarLeft({ userProfile = null, onClose = null }) {
         try {
             const res = await api.put("/api/v1/auth/update-profile", editData);
             setUser(res.data.user);
+            setEditData(res.data.user);
             setIsEditing(false);
             showToast("Cập nhật thành công!", "success");
         } catch (error) {
@@ -127,9 +155,9 @@ function SidebarLeft({ userProfile = null, onClose = null }) {
         }
     };
 
-    const firstLetter = user.full_name 
+    const firstLetter = user?.full_name 
         ? user.full_name.charAt(0).toUpperCase() 
-        : (user.username ? user.username.charAt(0).toUpperCase() : "U");
+        : (user?.username ? user.username.charAt(0).toUpperCase() : "U");
 
     const handleCategoryClick = (categoryType) => {
         if (onClose) onClose();
@@ -211,6 +239,23 @@ function SidebarLeft({ userProfile = null, onClose = null }) {
 
     const shouldShowProfileInfo = isProfilePage || (isUserProfilePage && userProfile);
 
+    // Nếu chưa có user và không phải trang profile, hiển thị loading
+    if (!user && !userProfile && isAuthenticated) {
+        return (
+            <div style={{ padding: "20px", textAlign: "center" }}>
+                <div style={{ 
+                    width: "30px", 
+                    height: "30px", 
+                    border: "3px solid #f3f3f3", 
+                    borderTop: "3px solid #2e7d32", 
+                    borderRadius: "50%", 
+                    animation: "spin 1s linear infinite",
+                    margin: "0 auto"
+                }}></div>
+            </div>
+        );
+    }
+
     const sidebarContent = (
         <div style={{ padding: "16px" }}>
             {/* Close button for mobile */}
@@ -250,7 +295,7 @@ function SidebarLeft({ userProfile = null, onClose = null }) {
                 <div style={cardStyle}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px" }}>
                         <h3 style={{ margin: 0, fontSize: "18px" }}>Giới thiệu</h3>
-                        {isProfilePage && !isEditing && (
+                        {isProfilePage && !isEditing && user && (
                             <button 
                                 onClick={() => setIsEditing(true)}
                                 style={{ border: "none", background: "#e4e6eb", padding: "6px 12px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", fontWeight: "600" }}
@@ -261,145 +306,150 @@ function SidebarLeft({ userProfile = null, onClose = null }) {
                     </div>
 
                     {!isEditing ? (
-                        <>
-                            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "15px" }}>
-                                {user.avatar_url ? (
-                                    <img 
-                                        src={user.avatar_url} 
-                                        alt="avatar" 
-                                        style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover", cursor: "pointer" }}
-                                        onClick={handleProfileClick}
-                                    />
-                                ) : (
-                                    <div onClick={handleProfileClick} style={{ width: "50px", height: "50px", background: "#2e7d32", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: "bold", fontSize: "20px" }}>
-                                        {firstLetter}
+                        user && (
+                            <>
+                                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "15px" }}>
+                                    {user.avatar_url ? (
+                                        <img 
+                                            src={user.avatar_url} 
+                                            alt="avatar" 
+                                            style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover", cursor: "pointer" }}
+                                            onClick={handleProfileClick}
+                                        />
+                                    ) : (
+                                        <div onClick={handleProfileClick} style={{ width: "50px", height: "50px", background: "#2e7d32", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: "bold", fontSize: "20px" }}>
+                                            {firstLetter}
+                                        </div>
+                                    )}
+                                    <div>
+                                        <h4 onClick={handleProfileClick} style={{ margin: 0, fontSize: "16px", cursor: "pointer", color: "#2e7d32" }}>{user.full_name || user.username}</h4>
+                                        <span style={{ fontSize: "12px", color: "#65676b" }}>@{user.username}</span>
                                     </div>
-                                )}
-                                <div>
-                                    <h4 onClick={handleProfileClick} style={{ margin: 0, fontSize: "16px", cursor: "pointer", color: "#2e7d32" }}>{user.full_name || user.username}</h4>
-                                    <span style={{ fontSize: "12px", color: "#65676b" }}>@{user.username}</span>
+                                </div>
+                                <div style={{ fontSize: "14px", lineHeight: "1.8", color: "#050505" }}>
+                                    {user.gender && <p style={{ margin: "5px 0" }}>🚻 <strong>Giới tính:</strong> {user.gender === 'Male' ? 'Nam' : user.gender === 'Female' ? 'Nữ' : user.gender}</p>}
+                                    {user.dob && <p style={{ margin: "5px 0" }}>📅 <strong>Ngày sinh:</strong> {new Date(user.dob).toLocaleDateString('vi-VN')}</p>}
+                                    {user.email && <p style={{ margin: "5px 0" }}>📧 <strong>Email:</strong> {user.email}</p>}
+                                    {user.phone && <p style={{ margin: "5px 0" }}>📞 <strong>SĐT:</strong> {user.phone}</p>}
+                                    {user.address && <p style={{ margin: "5px 0" }}>📍 <strong>Đến từ:</strong> {user.address}</p>}
+                                </div>
+                            </>
+                        )
+                    ) : (
+                        user && (
+                            <div style={{ display: "flex", flexDirection: "column" }}>
+                                <label style={labelStyle}>Họ và tên</label>
+                                <input style={inputStyle} name="full_name" value={editData.full_name || ""} onChange={handleChange} placeholder="Nhập họ tên..." />
+                                
+                                <label style={labelStyle}>Email</label>
+                                <input 
+                                    style={inputStyle} 
+                                    name="email" 
+                                    value={editData.email || ""} 
+                                    onChange={handleChange} 
+                                    placeholder="Nhập email..."
+                                    type="email"
+                                />
+
+                                <label style={labelStyle}>Giới tính</label>
+                                <select style={inputStyle} name="gender" value={editData.gender || ""} onChange={handleChange}>
+                                    <option value="">Chọn giới tính</option>
+                                    <option value="Male">Nam</option>
+                                    <option value="Female">Nữ</option>
+                                    <option value="Other">Khác</option>
+                                </select>
+
+                                <label style={labelStyle}>Ngày sinh</label>
+                                <input type="date" style={inputStyle} name="dob" value={editData.dob ? editData.dob.split('T')[0] : ""} onChange={handleChange} />
+
+                                <label style={labelStyle}>Số điện thoại</label>
+                                <input style={inputStyle} name="phone" value={editData.phone || ""} onChange={handleChange} placeholder="Nhập số điện thoại..." />
+
+                                <label style={labelStyle}>Địa chỉ</label>
+                                <input style={inputStyle} name="address" value={editData.address || ""} onChange={handleChange} placeholder="Nhập địa chỉ..." />
+
+                                <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
+                                    <button 
+                                        onClick={handleSave} 
+                                        disabled={loading}
+                                        style={{ flex: 1, background: "#0866ff", color: "white", border: "none", padding: "8px", borderRadius: "6px", fontWeight: "600", cursor: "pointer" }}
+                                    >
+                                        {loading ? "Đang lưu..." : "Lưu"}
+                                    </button>
+                                    <button 
+                                        onClick={() => { setIsEditing(false); setEditData(user); }} 
+                                        style={{ flex: 1, background: "#e4e6eb", color: "#050505", border: "none", padding: "8px", borderRadius: "6px", fontWeight: "600", cursor: "pointer" }}
+                                    >
+                                        Hủy
+                                    </button>
                                 </div>
                             </div>
-                            <div style={{ fontSize: "14px", lineHeight: "1.8", color: "#050505" }}>
-                                {user.gender && <p style={{ margin: "5px 0" }}>🚻 <strong>Giới tính:</strong> {user.gender === 'Male' ? 'Nam' : user.gender === 'Female' ? 'Nữ' : user.gender}</p>}
-                                {user.dob && <p style={{ margin: "5px 0" }}>📅 <strong>Ngày sinh:</strong> {new Date(user.dob).toLocaleDateString('vi-VN')}</p>}
-                                {user.email && <p style={{ margin: "5px 0" }}>📧 <strong>Email:</strong> {user.email}</p>}
-                                {user.phone && <p style={{ margin: "5px 0" }}>📞 <strong>SĐT:</strong> {user.phone}</p>}
-                                {user.address && <p style={{ margin: "5px 0" }}>📍 <strong>Đến từ:</strong> {user.address}</p>}
-                            </div>
-                        </>
-                    ) : (
-                        <div style={{ display: "flex", flexDirection: "column" }}>
-                            <label style={labelStyle}>Họ và tên</label>
-                            <input style={inputStyle} name="full_name" value={editData.full_name || ""} onChange={handleChange} placeholder="Nhập họ tên..." />
-                            
-                            <label style={labelStyle}>Email</label>
-                            <input 
-                                style={inputStyle} 
-                                name="email" 
-                                value={editData.email || ""} 
-                                onChange={handleChange} 
-                                placeholder="Nhập email..."
-                                type="email"
-                            />
-
-                            <label style={labelStyle}>Giới tính</label>
-                            <select style={inputStyle} name="gender" value={editData.gender || ""} onChange={handleChange}>
-                                <option value="">Chọn giới tính</option>
-                                <option value="Male">Nam</option>
-                                <option value="Female">Nữ</option>
-                                <option value="Other">Khác</option>
-                            </select>
-
-                            <label style={labelStyle}>Ngày sinh</label>
-                            <input type="date" style={inputStyle} name="dob" value={editData.dob ? editData.dob.split('T')[0] : ""} onChange={handleChange} />
-
-                            <label style={labelStyle}>Số điện thoại</label>
-                            <input style={inputStyle} name="phone" value={editData.phone || ""} onChange={handleChange} placeholder="Nhập số điện thoại..." />
-
-                            <label style={labelStyle}>Địa chỉ</label>
-                            <input style={inputStyle} name="address" value={editData.address || ""} onChange={handleChange} placeholder="Nhập địa chỉ..." />
-
-                            <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
-                                <button 
-                                    onClick={handleSave} 
-                                    disabled={loading}
-                                    style={{ flex: 1, background: "#0866ff", color: "white", border: "none", padding: "8px", borderRadius: "6px", fontWeight: "600", cursor: "pointer" }}
-                                >
-                                    {loading ? "Đang lưu..." : "Lưu"}
-                                </button>
-                                <button 
-                                    onClick={() => { setIsEditing(false); setEditData(user); }} 
-                                    style={{ flex: 1, background: "#e4e6eb", color: "#050505", border: "none", padding: "8px", borderRadius: "6px", fontWeight: "600", cursor: "pointer" }}
-                                >
-                                    Hủy
-                                </button>
-                            </div>
-                        </div>
+                        )
                     )}
                 </div>
             ) : (
-                <div style={cardStyle}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "15px" }}>
-                        {user.avatar_url ? (
-                            <img 
-                                src={user.avatar_url} 
-                                alt="avatar" 
-                                style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover", cursor: "pointer" }}
+                user && (
+                    <div style={cardStyle}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "15px" }}>
+                            {user.avatar_url ? (
+                                <img 
+                                    src={user.avatar_url} 
+                                    alt="avatar" 
+                                    style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover", cursor: "pointer" }}
+                                    onClick={handleProfileClick}
+                                />
+                            ) : (
+                                <div 
+                                    onClick={handleProfileClick}
+                                    style={{ width: "36px", height: "36px", background: "#2e7d32", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: "bold", cursor: "pointer" }}
+                                >
+                                    {firstLetter}
+                                </div>
+                            )}
+                            <h4 
                                 onClick={handleProfileClick}
-                            />
-                        ) : (
-                            <div 
-                                onClick={handleProfileClick}
-                                style={{ width: "36px", height: "36px", background: "#2e7d32", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: "bold", cursor: "pointer" }}
+                                style={{ 
+                                    margin: 0, 
+                                    fontSize: "15px", 
+                                    fontWeight: "600",
+                                    cursor: "pointer",
+                                    color: "#2e7d32"
+                                }}
                             >
-                                {firstLetter}
-                            </div>
-                        )}
-                        <h4 
-                            onClick={handleProfileClick}
-                            style={{ 
-                                margin: 0, 
-                                fontSize: "15px", 
-                                fontWeight: "600",
-                                cursor: "pointer",
-                                color: "#2e7d32"
-                            }}
-                        >
-                            {user.full_name || user.username}
-                        </h4>
+                                {user.full_name || user.username}
+                            </h4>
+                        </div>
+
+                        <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "5px" }}>
+                            <li style={getMenuItemStyle("general")} onClick={() => handleCategoryClick("general")}>
+                                <span style={{ fontSize: "20px" }}>🏠</span> <span>Trang Chủ</span>
+                            </li>
+                            <li style={getMenuItemStyle("agriculture")} onClick={() => handleCategoryClick("agriculture")}>
+                                <span style={{ fontSize: "20px" }}>🌾</span> <span>Nông sản</span>
+                            </li>
+                            <li style={getMenuItemStyle("seafood")} onClick={() => handleCategoryClick("seafood")}>
+                                <span style={{ fontSize: "20px" }}>🦐</span> <span>Hải sản</span>
+                            </li>
+                            <li style={getMenuItemStyle("specialty")} onClick={() => handleCategoryClick("specialty")}>
+                                <span style={{ fontSize: "20px" }}>📦</span> <span>Đặc sản</span>
+                            </li>
+                            
+                            <li style={getMenuItemStyle("groups")} onClick={() => {
+                                if (onClose) onClose();
+                                navigate("/groups");
+                            }}>
+                                <span style={{ fontSize: "20px" }}>👥</span> <span>Nhóm</span>
+                            </li>
+
+                            <li style={getMenuItemStyle("saved")} onClick={() => {
+                                if (onClose) onClose();
+                                navigate("/user/saved-posts");
+                            }}>
+                                <span style={{ fontSize: "20px" }}>📌</span> <span>Đã lưu</span>
+                            </li>
+                        </ul>
                     </div>
-
-                    <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "5px" }}>
-                        <li style={getMenuItemStyle("general")} onClick={() => handleCategoryClick("general")}>
-                            <span style={{ fontSize: "20px" }}>🏠</span> <span>Trang Chủ</span>
-                        </li>
-                        <li style={getMenuItemStyle("agriculture")} onClick={() => handleCategoryClick("agriculture")}>
-                            <span style={{ fontSize: "20px" }}>🌾</span> <span>Nông sản</span>
-                        </li>
-                        <li style={getMenuItemStyle("seafood")} onClick={() => handleCategoryClick("seafood")}>
-                            <span style={{ fontSize: "20px" }}>🦐</span> <span>Hải sản</span>
-                        </li>
-                        <li style={getMenuItemStyle("specialty")} onClick={() => handleCategoryClick("specialty")}>
-                            <span style={{ fontSize: "20px" }}>📦</span> <span>Đặc sản</span>
-                        </li>
-                        
-                        {/* ✅ ĐÃ SỬA: Nút Nhóm - chuyển đến trang /groups */}
-                        <li style={getMenuItemStyle("groups")} onClick={() => {
-                            if (onClose) onClose();
-                            navigate("/groups");
-                        }}>
-                            <span style={{ fontSize: "20px" }}>👥</span> <span>Nhóm</span>
-                        </li>
-
-                        <li style={getMenuItemStyle("saved")} onClick={() => {
-                            if (onClose) onClose();
-                            navigate("/user/saved-posts");
-                        }}>
-                            <span style={{ fontSize: "20px" }}>📌</span> <span>Đã lưu</span>
-                        </li>
-                    </ul>
-                </div>
+                )
             )}
                
             <h4 style={{ fontSize: "16px", margin: "15px 0 10px 5px", color: "#65676b", fontWeight: "600" }}>Được quan tâm</h4>

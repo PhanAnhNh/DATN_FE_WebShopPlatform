@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../../api/api";
 import { BACKEND_URL } from '../../../config'
+import provincesData from '../../../../public/locales/location/address.json';
 
 const DEFAULT_AVATAR = "https://cdn2.fptshop.com.vn/small/avatar_trang_1_cd729c335b.jpg";
 
@@ -12,7 +13,10 @@ function Register() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-
+  const [provinces, setProvinces] = useState([]);
+  const [wards, setWards] = useState([]);
+  const [selectedProvince, setSelectedProvince] = useState('');
+  const [selectedWard, setSelectedWard] = useState('');
   // Avatar states
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(DEFAULT_AVATAR);
@@ -36,6 +40,17 @@ function Register() {
     city: "",
     country: "Việt Nam"
   });
+
+useEffect(() => {
+    console.log('Loading new address data...');
+    // Kiểm tra cấu trúc file JSON
+    if (provincesData && provincesData.length > 0) {
+        setProvinces(provincesData);
+        console.log('Loaded provinces:', provincesData.length);
+    } else {
+        console.error('Failed to load address data');
+    }
+}, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -102,7 +117,6 @@ function Register() {
     if (formData.password !== formData.confirmPassword) return setError("Mật khẩu không khớp");
     if (!formData.street.trim()) return setError("Vui lòng nhập số nhà và tên đường");
     if (!formData.ward.trim()) return setError("Vui lòng nhập phường/xã");
-    if (!formData.district.trim()) return setError("Vui lòng nhập quận/huyện");
     if (!formData.city.trim()) return setError("Vui lòng nhập tỉnh/thành phố");
    
     setLoading(true);
@@ -139,6 +153,28 @@ function Register() {
       setUploadingAvatar(false);
     }
   };
+
+  const handleProvinceChange = (e) => {
+      const provinceCode = e.target.value;
+      const selectedProvinceData = provinces.find(p => p.code === provinceCode);
+      
+      setSelectedProvince(provinceCode);
+      setSelectedWard(''); // Reset giá trị của dropdown Phường/Xã
+      // Cập nhật danh sách phường/xã dựa trên tỉnh được chọn
+      setWards(selectedProvinceData ? selectedProvinceData.wards : []);
+      
+      // Cập nhật giá trị city trong formData của bạn
+      setFormData(prev => ({ ...prev, city: selectedProvinceData?.name || '' }));
+  };
+
+  const handleWardChange = (e) => {
+      const wardName = e.target.value;
+      setSelectedWard(wardName);
+      // Cập nhật giá trị ward trong formData của bạn
+      setFormData(prev => ({ ...prev, ward: wardName }));
+  };
+
+
 
   return (
     <div style={styles.container}>
@@ -241,16 +277,35 @@ function Register() {
 
             {/* Address Section */}
             <div style={styles.addressSection}>
-              <h3 style={styles.sectionTitle}>Địa chỉ thường trú <span style={styles.required}>*</span></h3>
-              
-              <input name="street" placeholder="Số nhà, tên đường" required style={styles.fullWidthInput} onChange={handleChange} />
-              
-              <div style={styles.addressGrid}>
-                <input name="ward" placeholder="Phường/Xã" required style={styles.input} onChange={handleChange} />
-                <input name="district" placeholder="Quận/Huyện" required style={styles.input} onChange={handleChange} />
-                <input name="city" placeholder="Tỉnh/Thành phố" required style={styles.input} onChange={handleChange} />
-                <input name="country" value={formData.country} style={styles.input} onChange={handleChange} />
-              </div>
+                <h3 style={styles.sectionTitle}>Địa chỉ thường trú <span style={styles.required}>*</span></h3>
+                
+                {/* Ô nhập Số nhà, tên đường - giữ nguyên */}
+                <input name="street" placeholder="Số nhà, tên đường" required style={styles.fullWidthInput} onChange={handleChange} />
+                
+                <div style={styles.addressGrid}>
+                    {/* Dropdown chọn Tỉnh/Thành phố */}
+                    <select name="city" required style={styles.input} value={selectedProvince} onChange={handleProvinceChange}>
+                        <option value="">Chọn Tỉnh/Thành phố</option>
+                        {provinces.map(province => (
+                            <option key={province.code} value={province.code}>
+                                {province.name}
+                            </option>
+                        ))}
+                    </select>
+
+                    {/* Dropdown chọn Phường/Xã */}
+                    <select name="ward" required style={styles.input} value={selectedWard} onChange={handleWardChange} disabled={!selectedProvince}>
+                        <option value="">Chọn Phường/Xã</option>
+                        {wards.map(ward => (
+                            <option key={ward.code} value={ward.name}>
+                                {ward.name}
+                            </option>
+                        ))}
+                    </select>
+                    
+                    {/* Quốc gia - giữ nguyên hoặc ẩn đi nếu không cần */}
+                    {/* <input name="country" value={formData.country} style={styles.input} onChange={handleChange} /> */}
+                </div>
             </div>
 
             {/* Password Section */}

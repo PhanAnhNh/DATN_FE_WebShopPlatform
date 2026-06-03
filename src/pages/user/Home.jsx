@@ -8,6 +8,7 @@ import ReportModal from "../admin/reportModal";
 import Toast from "../../components/common/Toast";
 import NavigationTabs from "../../layout/Shoplayout/NavigationTabs";
 import ReactMarkdown from 'react-markdown';
+import { useAuth } from '../../hooks/useAuth.js';
 
 function Home() {
     const navigate = useNavigate();
@@ -18,16 +19,6 @@ function Home() {
     const [posts, setPosts] = useState([]);
     const [likedPosts, setLikedPosts] = useState({});
     const [loading, setLoading] = useState(true);
-    const [currentUser, setCurrentUser] = useState(() => {
-        const storedUserData = localStorage.getItem("user_data");
-        const storedUserLegacy = localStorage.getItem("user");
-        if (storedUserData) {
-            return JSON.parse(storedUserData);
-        } else if (storedUserLegacy) {
-            return JSON.parse(storedUserLegacy);
-        }
-        return null;
-    });
     const [activePostMenu, setActivePostMenu] = useState(null);
     const [editingPost, setEditingPost] = useState(null);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -53,18 +44,15 @@ function Home() {
     const [confirmMessage, setConfirmMessage] = useState("");
     const [showShareModal, setShowShareModal] = useState(false);
     const [showHiddenComments, setShowHiddenComments] = useState({});
-    const [commentFilter, setCommentFilter] = useState("relevant"); // "all", "relevant", "newest"
+    const [commentFilter, setCommentFilter] = useState("relevant");
     const [originalComments, setOriginalComments] = useState([]);
     const [lightboxImages, setLightboxImages] = useState([]);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [isLightboxOpen, setIsLightboxOpen] = useState(false);
     
-    const clearCache = () => {
-        sessionStorage.removeItem(`home_posts_${category}`);
-        sessionStorage.removeItem(`home_cache_time_${category}`);
-        sessionStorage.removeItem(`home_liked_${category}`);
-    };
-
+    // Sử dụng useAuth hook để lấy thông tin user
+    const { user: currentUser, isAuthenticated, loading: authLoading } = useAuth();
+    
     const [newPost, setNewPost] = useState({
         content: "",
         images: [],
@@ -89,12 +77,17 @@ function Home() {
         setTimeout(() => setToastConfig({ show: false, message: '', type: 'success' }), 3000);
     };
 
+    const clearCache = () => {
+        sessionStorage.removeItem(`home_posts_${category}`);
+        sessionStorage.removeItem(`home_cache_time_${category}`);
+        sessionStorage.removeItem(`home_liked_${category}`);
+    };
+
     // Hàm mở lightbox xem ảnh
     const openLightbox = (images, startIndex) => {
         setLightboxImages(images);
         setCurrentImageIndex(startIndex);
         setIsLightboxOpen(true);
-        // Ngăn scroll body khi mở lightbox
         document.body.style.overflow = 'hidden';
     };
 
@@ -118,7 +111,14 @@ function Home() {
         setCurrentImageIndex((prev) => (prev - 1 + lightboxImages.length) % lightboxImages.length);
     };
 
-    // Xử lý phím mũi tên
+    // Kiểm tra authentication
+    useEffect(() => {
+        if (!authLoading && !isAuthenticated) {
+            navigate("/login");
+        }
+    }, [isAuthenticated, authLoading, navigate]);
+
+    // Xử lý phím mũi tên cho lightbox
     useEffect(() => {
         const handleKeyDown = (e) => {
             if (!isLightboxOpen) return;
@@ -136,7 +136,6 @@ function Home() {
 
     // Lưu cache khi posts thay đổi
     useEffect(() => {
-        
         if (posts.length > 0) {
             sessionStorage.setItem(`home_posts_${category}`, JSON.stringify(posts));
             sessionStorage.setItem(`home_cache_time_${category}`, Date.now().toString());
@@ -150,6 +149,19 @@ function Home() {
         }
     }, [likedPosts, category]);
 
+    // Lắng nghe sự kiện logout
+    useEffect(() => {
+        const handleLogoutEvent = () => {
+            navigate("/login");
+        };
+        
+        window.addEventListener('userLoggedOut', handleLogoutEvent);
+        
+        return () => {
+            window.removeEventListener('userLoggedOut', handleLogoutEvent);
+        };
+    }, [navigate]);
+
     const toggleShowHiddenComment = (commentId) => {
         setShowHiddenComments(prev => ({
             ...prev,
@@ -158,18 +170,14 @@ function Home() {
     };
 
     useEffect(() => {
-        
         const loadPosts = async () => {
             setLoading(true);
            
-            // === ĐÃ SỬA: KHÔNG xóa cache khi reload/F5 nữa ===
-            // Chỉ clear cache khi thực sự đổi category (để dữ liệu mới)
             const cachedPosts = sessionStorage.getItem(`home_posts_${category}`);
             const cacheTime = sessionStorage.getItem(`home_cache_time_${category}`);
            
             const isCacheValid = cachedPosts && cacheTime && (Date.now() - parseInt(cacheTime) < 60000);
            
-            // Nếu cache còn hạn → load ngay từ cache (F5 sẽ dùng cache)
             if (isCacheValid && category === lastLoadedCategory) {
                 try {
                     const parsedPosts = JSON.parse(cachedPosts);
@@ -181,7 +189,6 @@ function Home() {
                 } catch(e) { console.error("Lỗi parse cache", e); }
             }
            
-            // Không có cache hoặc hết hạn → fetch API
             await fetchFeedAndLikes();
             setLastLoadedCategory(category);
             setLoading(false);
@@ -203,7 +210,7 @@ function Home() {
 
             const token = localStorage.getItem("user_token");
             if (!token) {
-                window.location.href = "/login";
+                navigate("/login");
                 return;
             }
 
@@ -226,12 +233,11 @@ function Home() {
             sessionStorage.setItem(`home_liked_${category}`, JSON.stringify(likeMap));
 
         } catch (err) {
-            
             if (err.response?.status === 401) {
                 localStorage.removeItem("user_token");
                 localStorage.removeItem("user_data");
                 localStorage.removeItem("user");
-                window.location.href = "/login";
+                navigate("/login");
             }
         } finally {
             setLoading(false);
@@ -262,38 +268,26 @@ function Home() {
     }, [posts, currentUser]);
 
     useEffect(() => {
-    // Set title dựa trên category hiện tại
-    if (category === "general") {
-        document.title = "Trang chủ";
-    } else {
-        // Nếu có category cụ thể
-        const categoryNames = {
-            "agriculture": "Nông sản",
-            "seafood": "Hải sản", 
-            "specialty": "Đặc sản"
+        if (category === "general") {
+            document.title = "Trang chủ";
+        } else {
+            const categoryNames = {
+                "agriculture": "Nông sản",
+                "seafood": "Hải sản", 
+                "specialty": "Đặc sản"
+            };
+            const categoryName = categoryNames[category] || category;
+            document.title = `${categoryName}`;
+        }
+        
+        return () => {
+            document.title = "Home";
         };
-        const categoryName = categoryNames[category] || category;
-        document.title = `${categoryName}`;
-    }
-    
-    // Cleanup function (không bắt buộc nhưng tốt để dọn dẹp)
-    return () => {
-        // Có thể reset về title mặc định nếu cần
-         document.title = "Home";
-    };
-}, [category]);
+    }, [category]);
 
     const handleOpenShare = (post) => {
         setSharePost(post);
         setShowShareModal(true);
-    };
-
-    const goToForum = () => {
-        navigate('/');
-    };
-
-    const goToShop = () => {
-        navigate('/use/shop');
     };
 
     const handleEditModalComment = (comment) => {
@@ -326,7 +320,6 @@ function Home() {
             
             showToast("Đã sửa bình luận thành công", "success");
         } catch (error) {
-            
             showToast("Không thể sửa bình luận. Vui lòng thử lại!", "error");
         }
     };
@@ -353,7 +346,6 @@ function Home() {
                 setActiveCommentMenu(null);
                 showToast("Đã xóa bình luận thành công", "success");
             } catch (error) {
-                
                 showToast("Không thể xóa bình luận!", "error");
             }
         });
@@ -391,7 +383,6 @@ function Home() {
                 images: [...prev.images, ...urls]
             }));
         } catch (error) {
-            
             showToast('Không thể upload ảnh. Vui lòng thử lại!', "error");
         } finally {
             setUploadingImages(false);
@@ -420,7 +411,6 @@ function Home() {
         try {
             await api.post(`/api/v1/likes/${postId}`);
         } catch (error) {
-            
             setLikedPosts(prev => ({ ...prev, [postId]: isCurrentlyLiked }));
             setPosts(prevPosts => prevPosts.map(p => {
                 if (p._id === postId) {
@@ -462,129 +452,117 @@ function Home() {
             await fetchModalComments(post._id, 1);
             
         } catch (error) {
-            
             setSelectedPost(post);
             setIsPostModalOpen(true);
         }
     };
 
-const fetchModalComments = async (postId, page) => {
-    try {
-        const token = localStorage.getItem("user_token");
-        const commentsRes = await api.get(`/api/v1/comments/${postId}`, {
-            headers: { Authorization: `Bearer ${token}` }
-        });
-        const allComments = commentsRes.data;
-        
-        // Lưu comments gốc
-        setOriginalComments(allComments);
-        
-        // Lọc và sắp xếp comments dựa trên filter
-        let filteredComments = [...allComments];
-        
-        // === QUAN TRỌNG: Ẩn comment có is_hidden_by_ai = true ===
-        // KHÔNG phân biệt người dùng, ai cũng không thấy comment bị ẩn
-        if (commentFilter !== "all") {
-            // Chỉ lọc bỏ comment bị AI đánh dấu, KHÔNG quan tâm user role
-            filteredComments = filteredComments.filter(c => !c.is_hidden_by_ai);
-        }
-        
-        // Sắp xếp
-        if (commentFilter === "newest") {
-            filteredComments.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-        } else if (commentFilter === "relevant") {
-            filteredComments.sort((a, b) => {
-                const aLikes = a.like_count || 0;
-                const bLikes = b.like_count || 0;
-                return bLikes - aLikes;
+    const fetchModalComments = async (postId, page) => {
+        try {
+            const token = localStorage.getItem("user_token");
+            const commentsRes = await api.get(`/api/v1/comments/${postId}`, {
+                headers: { Authorization: `Bearer ${token}` }
             });
-        }
-        
-        // Phân tách parent và child comments
-        const parentComments = filteredComments.filter(c => !c.parent_id);
-        const childComments = filteredComments.filter(c => c.parent_id);
-        
-        const repliesMap = {};
-        childComments.forEach(reply => {
-            const parentId = reply.parent_id;
-            if (!repliesMap[parentId]) {
-                repliesMap[parentId] = [];
-            }
-            repliesMap[parentId].push(reply);
-        });
-        
-        setAllRepliesData(repliesMap);
-        
-        const start = (page - 1) * commentLimit;
-        const end = start + commentLimit;
-        const paginatedComments = parentComments.slice(start, end);
-        
-        setModalComments(paginatedComments);
-        setTotalComments(parentComments.length);
-        
-    } catch(e) { 
-        
-        setModalComments([]);
-        setTotalComments(0);
-    }
-};
-
-const handleFilterChange = async (filter) => {
-    setCommentFilter(filter);
-    setCommentPage(1);
-    
-    if (selectedPost) {
-        // Lọc và sắp xếp lại từ originalComments
-        let filteredComments = [...originalComments];
-        
-        // Lọc bỏ comment bị ẩn
-        if (filter !== "all") {
-            const isPostOwner = currentUser && selectedPost && 
-                String(currentUser._id || currentUser.id) === String(selectedPost.author_id);
-            const isAdmin = currentUser && currentUser.role === "admin";
-            const canSeeHidden = isPostOwner || isAdmin;
+            const allComments = commentsRes.data;
             
-            if (!canSeeHidden) {
+            setOriginalComments(allComments);
+            
+            let filteredComments = [...allComments];
+            
+            if (commentFilter !== "all") {
                 filteredComments = filteredComments.filter(c => !c.is_hidden_by_ai);
             }
-        }
-        
-        // Sắp xếp
-        if (filter === "newest") {
-            filteredComments.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-        } else if (filter === "relevant") {
-            filteredComments.sort((a, b) => {
-                if (a.is_hidden_by_ai !== b.is_hidden_by_ai) {
-                    return a.is_hidden_by_ai ? 1 : -1;
-                }
-                const aLikes = a.like_count || 0;
-                const bLikes = b.like_count || 0;
-                return bLikes - aLikes;
-            });
-        }
-        
-        const parentComments = filteredComments.filter(c => !c.parent_id);
-        const childComments = filteredComments.filter(c => c.parent_id);
-        
-        const repliesMap = {};
-        childComments.forEach(reply => {
-            const parentId = reply.parent_id;
-            if (!repliesMap[parentId]) {
-                repliesMap[parentId] = [];
+            
+            if (commentFilter === "newest") {
+                filteredComments.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            } else if (commentFilter === "relevant") {
+                filteredComments.sort((a, b) => {
+                    const aLikes = a.like_count || 0;
+                    const bLikes = b.like_count || 0;
+                    return bLikes - aLikes;
+                });
             }
-            repliesMap[parentId].push(reply);
-        });
+            
+            const parentComments = filteredComments.filter(c => !c.parent_id);
+            const childComments = filteredComments.filter(c => c.parent_id);
+            
+            const repliesMap = {};
+            childComments.forEach(reply => {
+                const parentId = reply.parent_id;
+                if (!repliesMap[parentId]) {
+                    repliesMap[parentId] = [];
+                }
+                repliesMap[parentId].push(reply);
+            });
+            
+            setAllRepliesData(repliesMap);
+            
+            const start = (page - 1) * commentLimit;
+            const end = start + commentLimit;
+            const paginatedComments = parentComments.slice(start, end);
+            
+            setModalComments(paginatedComments);
+            setTotalComments(parentComments.length);
+            
+        } catch(e) { 
+            setModalComments([]);
+            setTotalComments(0);
+        }
+    };
+
+    const handleFilterChange = async (filter) => {
+        setCommentFilter(filter);
+        setCommentPage(1);
         
-        setAllRepliesData(repliesMap);
-        
-        const start = 0;
-        const end = commentLimit;
-        const paginatedComments = parentComments.slice(start, end);
-        
-        setModalComments(paginatedComments);
-        setTotalComments(parentComments.length);
-    }
-};
+        if (selectedPost) {
+            let filteredComments = [...originalComments];
+            
+            if (filter !== "all") {
+                const isPostOwner = currentUser && selectedPost && 
+                    String(currentUser._id || currentUser.id) === String(selectedPost.author_id);
+                const isAdmin = currentUser && currentUser.role === "admin";
+                const canSeeHidden = isPostOwner || isAdmin;
+                
+                if (!canSeeHidden) {
+                    filteredComments = filteredComments.filter(c => !c.is_hidden_by_ai);
+                }
+            }
+            
+            if (filter === "newest") {
+                filteredComments.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            } else if (filter === "relevant") {
+                filteredComments.sort((a, b) => {
+                    if (a.is_hidden_by_ai !== b.is_hidden_by_ai) {
+                        return a.is_hidden_by_ai ? 1 : -1;
+                    }
+                    const aLikes = a.like_count || 0;
+                    const bLikes = b.like_count || 0;
+                    return bLikes - aLikes;
+                });
+            }
+            
+            const parentComments = filteredComments.filter(c => !c.parent_id);
+            const childComments = filteredComments.filter(c => c.parent_id);
+            
+            const repliesMap = {};
+            childComments.forEach(reply => {
+                const parentId = reply.parent_id;
+                if (!repliesMap[parentId]) {
+                    repliesMap[parentId] = [];
+                }
+                repliesMap[parentId].push(reply);
+            });
+            
+            setAllRepliesData(repliesMap);
+            
+            const start = 0;
+            const end = commentLimit;
+            const paginatedComments = parentComments.slice(start, end);
+            
+            setModalComments(paginatedComments);
+            setTotalComments(parentComments.length);
+        }
+    };
 
     const loadMoreComments = async () => {
         const nextPage = commentPage + 1;
@@ -648,7 +626,6 @@ const handleFilterChange = async (filter) => {
                 stats: { ...prev.stats, comment_count: (prev.stats?.comment_count || 0) + 1 }
             }));
         } catch(err) {
-            
             showToast("Không thể đăng bình luận", "error");
         }
     };
@@ -721,7 +698,6 @@ const handleFilterChange = async (filter) => {
             setImageUrls([]);
             setEditingPost(null);
         } catch (error) {
-            
             showToast("Không thể lưu bài viết. Hãy kiểm tra lại!", "error");
         } finally {
             setIsSubmitting(false);
@@ -739,7 +715,6 @@ const handleFilterChange = async (filter) => {
                 
                 showToast("Đã xóa bài viết thành công", "success");
             } catch (error) {
-                
                 showToast("Không thể xóa bài viết. Vui lòng thử lại!", "error");
             }
         });
@@ -822,7 +797,7 @@ const handleFilterChange = async (filter) => {
     };
     
     // Loading state
-    if (loading && posts.length === 0) {
+    if ((loading || authLoading) && posts.length === 0) {
         return (
             <Layout>
                 <div style={{ textAlign: "center", padding: "60px 20px" }}>
@@ -1377,470 +1352,470 @@ const handleFilterChange = async (filter) => {
                             </div>
 
                             <div style={{ marginTop: "15px" }}>
-    {/* Header với dropdown filter */}
-    <div style={{ 
-        display: "flex", 
-        justifyContent: "space-between", 
-        alignItems: "center", 
-        marginBottom: "16px",
-        flexWrap: "wrap",
-        gap: "10px"
-    }}>
-        <h4 style={{ fontSize: "16px", margin: 0, fontWeight: "600" }}>Bình luận</h4>
-        
-        <select
-            value={commentFilter}
-            onChange={(e) => handleFilterChange(e.target.value)}
-            style={{
-                padding: "6px 12px",
-                borderRadius: "20px",
-                border: "1px solid #ddd",
-                background: "white",
-                fontSize: "13px",
-                cursor: "pointer",
-                outline: "none",
-                backgroundColor: "#f8f9fa"
-            }}
-        >
-            <option value="relevant">✨ Phù hợp nhất</option>
-            <option value="newest">🕐 Mới nhất</option>
-            <option value="all">📋 Tất cả bình luận</option>
-        </select>
-    </div>
-    
-    {replyingTo && (
-        <div style={{ 
-            background: "#e8f5e9", 
-            padding: "12px", 
-            borderRadius: "12px", 
-            marginBottom: "12px",
-            display: "flex",
-            alignItems: "center",
-            gap: "10px",
-            flexWrap: "wrap"
-        }}>
-            <span style={{ fontSize: "14px", color: "#2e7d32" }}>
-                💬 Trả lời <strong>{replyingTo.author_name}</strong>:
-            </span>
-            <input
-                type="text"
-                placeholder="Viết câu trả lời..."
-                value={replyInput}
-                onChange={(e) => setReplyInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleModalComment(replyingTo._id)}
-                style={{
-                    flex: 1,
-                    minWidth: "200px",
-                    padding: "8px 12px",
-                    borderRadius: "20px",
-                    border: "1px solid #c8e6c9",
-                    background: "white",
-                    outline: "none",
-                    fontSize: "14px"
-                }}
-                autoFocus
-            />
-            <button
-                onClick={() => handleModalComment(replyingTo._id)}
-                style={{ border: "none", background: "#2e7d32", color: "white", padding: "6px 16px", borderRadius: "20px", cursor: "pointer", fontSize: "13px", fontWeight: "500" }}
-            >
-                Gửi
-            </button>
-            <button
-                onClick={() => setReplyingTo(null)}
-                style={{ border: "none", background: "#e0e0e0", color: "#333", padding: "6px 16px", borderRadius: "20px", cursor: "pointer", fontSize: "13px" }}
-            >
-                Hủy
-            </button>
-        </div>
-    )}
-
-    {modalComments.length === 0 ? (
-    <div style={{ textAlign: "center", color: "#888", padding: "40px 20px", background: "#fafafa", borderRadius: "12px" }}>
-        <span style={{ fontSize: "32px" }}>💬</span>
-        <p style={{ marginTop: "8px" }}>Chưa có bình luận nào. Hãy là người đầu tiên bình luận!</p>
-    </div>
-) : (
-    <>                                        
-        {modalComments.map(cmt => {
-            const isCommentOwner = currentUser && String(currentUser._id || currentUser.id) === String(cmt.author_id);
-            const isAdmin = currentUser && currentUser.role === "admin";
-            
-            // Chỉ admin hoặc chủ comment mới thấy menu 3 chấm
-            const showMenu = isCommentOwner || isAdmin;
-            
-            const replies = getRepliesForComment(cmt._id);
-            const isExpanded = expandedReplies[cmt._id] || false;
-            
-            return (
-                <div key={cmt._id} style={{ marginBottom: "20px", transition: "all 0.2s" }}>
-                    <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
-                        <div style={{ 
-                            width: "40px", 
-                            height: "40px", 
-                            background: "#e8f5e9", 
-                            borderRadius: "50%", 
-                            display: "flex", 
-                            alignItems: "center", 
-                            justifyContent: "center", 
-                            color: "#2e7d32", 
-                            fontSize: "16px", 
-                            fontWeight: "bold", 
-                            flexShrink: 0,
-                            border: "1px solid #c8e6c9"
-                        }}>
-                            {cmt.author_name ? cmt.author_name.charAt(0).toUpperCase() : "U"}
-                        </div>
-                        <div style={{ flex: 1 }}>
-                            {editingCommentId === cmt._id ? (
-                                <div style={{ background: "#f0f2f5", padding: "12px 16px", borderRadius: "20px" }}>
-                                    <input
-                                        type="text"
-                                        value={editCommentContent}
-                                        onChange={(e) => setEditCommentContent(e.target.value)}
+                                {/* Header với dropdown filter */}
+                                <div style={{ 
+                                    display: "flex", 
+                                    justifyContent: "space-between", 
+                                    alignItems: "center", 
+                                    marginBottom: "16px",
+                                    flexWrap: "wrap",
+                                    gap: "10px"
+                                }}>
+                                    <h4 style={{ fontSize: "16px", margin: 0, fontWeight: "600" }}>Bình luận</h4>
+                                    
+                                    <select
+                                        value={commentFilter}
+                                        onChange={(e) => handleFilterChange(e.target.value)}
                                         style={{
-                                            width: "100%",
-                                            padding: "10px 14px",
-                                            borderRadius: "12px",
-                                            border: "1px solid #2e7d32",
+                                            padding: "6px 12px",
+                                            borderRadius: "20px",
+                                            border: "1px solid #ddd",
+                                            background: "white",
+                                            fontSize: "13px",
+                                            cursor: "pointer",
                                             outline: "none",
-                                            fontSize: "14px",
-                                            background: "white"
+                                            backgroundColor: "#f8f9fa"
                                         }}
-                                        autoFocus
-                                        onKeyDown={(e) => e.key === "Enter" && handleSaveModalComment(selectedPost._id, cmt._id)}
-                                    />
-                                    <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
-                                        <button
-                                            onClick={() => handleSaveModalComment(selectedPost._id, cmt._id)}
+                                    >
+                                        <option value="relevant">✨ Phù hợp nhất</option>
+                                        <option value="newest">🕐 Mới nhất</option>
+                                        <option value="all">📋 Tất cả bình luận</option>
+                                    </select>
+                                </div>
+                                
+                                {replyingTo && (
+                                    <div style={{ 
+                                        background: "#e8f5e9", 
+                                        padding: "12px", 
+                                        borderRadius: "12px", 
+                                        marginBottom: "12px",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "10px",
+                                        flexWrap: "wrap"
+                                    }}>
+                                        <span style={{ fontSize: "14px", color: "#2e7d32" }}>
+                                            💬 Trả lời <strong>{replyingTo.author_name}</strong>:
+                                        </span>
+                                        <input
+                                            type="text"
+                                            placeholder="Viết câu trả lời..."
+                                            value={replyInput}
+                                            onChange={(e) => setReplyInput(e.target.value)}
+                                            onKeyDown={(e) => e.key === "Enter" && handleModalComment(replyingTo._id)}
                                             style={{
-                                                padding: "6px 16px",
-                                                background: "#2e7d32",
-                                                color: "white",
-                                                border: "none",
+                                                flex: 1,
+                                                minWidth: "200px",
+                                                padding: "8px 12px",
                                                 borderRadius: "20px",
-                                                cursor: "pointer",
-                                                fontSize: "13px",
-                                                fontWeight: "500"
+                                                border: "1px solid #c8e6c9",
+                                                background: "white",
+                                                outline: "none",
+                                                fontSize: "14px"
                                             }}
+                                            autoFocus
+                                        />
+                                        <button
+                                            onClick={() => handleModalComment(replyingTo._id)}
+                                            style={{ border: "none", background: "#2e7d32", color: "white", padding: "6px 16px", borderRadius: "20px", cursor: "pointer", fontSize: "13px", fontWeight: "500" }}
                                         >
-                                            Lưu
+                                            Gửi
                                         </button>
                                         <button
-                                            onClick={() => {
-                                                setEditingCommentId(null);
-                                                setEditCommentContent("");
-                                            }}
-                                            style={{
-                                                padding: "6px 16px",
-                                                background: "#e4e6eb",
-                                                color: "#333",
-                                                border: "none",
-                                                borderRadius: "20px",
-                                                cursor: "pointer",
-                                                fontSize: "13px"
-                                            }}
+                                            onClick={() => setReplyingTo(null)}
+                                            style={{ border: "none", background: "#e0e0e0", color: "#333", padding: "6px 16px", borderRadius: "20px", cursor: "pointer", fontSize: "13px" }}
                                         >
                                             Hủy
                                         </button>
                                     </div>
+                                )}
+
+                                {modalComments.length === 0 ? (
+                                <div style={{ textAlign: "center", color: "#888", padding: "40px 20px", background: "#fafafa", borderRadius: "12px" }}>
+                                    <span style={{ fontSize: "32px" }}>💬</span>
+                                    <p style={{ marginTop: "8px" }}>Chưa có bình luận nào. Hãy là người đầu tiên bình luận!</p>
                                 </div>
                             ) : (
-                                <>
-                                    <div style={{ 
-                                        background: "#f0f2f5", 
-                                        padding: "10px 14px", 
-                                        borderRadius: "18px"
-                                    }}>
-                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px", marginBottom: "6px" }}>
-                                            <strong style={{ fontSize: "14px", color: "#1c1e21" }}>
-                                                {cmt.author_name}
-                                            </strong>
-                                            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                                                {showMenu && (
-                                                    <div style={{ position: "relative" }}>
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setActiveCommentMenu(activeCommentMenu === cmt._id ? null : cmt._id);
-                                                            }}
-                                                            style={{
-                                                                background: "transparent",
-                                                                border: "none",
-                                                                cursor: "pointer",
-                                                                color: "#65676B",
-                                                                fontSize: "18px",
-                                                                padding: "0 8px",
-                                                                fontWeight: "bold"
-                                                            }}
-                                                        >
-                                                            •••
-                                                        </button>
-                                                        {activeCommentMenu === cmt._id && (
-                                                            <div style={{
-                                                                position: "absolute",
-                                                                top: "24px",
-                                                                right: "0",
-                                                                background: "white",
-                                                                border: "1px solid #ddd",
-                                                                borderRadius: "10px",
-                                                                boxShadow: "0 2px 12px rgba(0,0,0,0.15)",
-                                                                width: "130px",
-                                                                zIndex: 20,
-                                                                overflow: "hidden"
-                                                            }}>
-                                                                <button
-                                                                    onClick={() => handleEditModalComment(cmt)}
-                                                                    style={{
-                                                                        padding: "10px 14px",
-                                                                        border: "none",
-                                                                        background: "white",
-                                                                        textAlign: "left",
-                                                                        cursor: "pointer",
-                                                                        fontSize: "13px",
-                                                                        width: "100%",
-                                                                        borderBottom: "1px solid #eee",
-                                                                        display: "flex",
-                                                                        alignItems: "center",
-                                                                        gap: "8px"
-                                                                    }}
-                                                                >
-                                                                    ✏️ Sửa
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleDeleteModalComment(selectedPost._id, cmt._id)}
-                                                                    style={{
-                                                                        padding: "10px 14px",
-                                                                        border: "none",
-                                                                        background: "white",
-                                                                        textAlign: "left",
-                                                                        cursor: "pointer",
-                                                                        fontSize: "13px",
-                                                                        color: "#dc3545",
-                                                                        width: "100%",
-                                                                        display: "flex",
-                                                                        alignItems: "center",
-                                                                        gap: "8px"
-                                                                    }}
-                                                                >
-                                                                    🗑️ Xóa
-                                                                </button>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
+                                <>                                        
+                                    {modalComments.map(cmt => {
+                                        const isCommentOwner = currentUser && String(currentUser._id || currentUser.id) === String(cmt.author_id);
+                                        const isAdmin = currentUser && currentUser.role === "admin";
                                         
-                                        {/* Hiển thị nội dung comment */}
-                                        <span style={{ fontSize: "14px", color: "#1c1e21", wordBreak: "break-word", lineHeight: "1.5" }}>
-                                            {cmt.content}
-                                        </span>
-                                    </div>
-                                    
-                                    <div style={{ display: "flex", gap: "16px", marginTop: "8px", marginLeft: "12px", fontSize: "12px", color: "#65676B" }}>
-                                        <span>{new Date(cmt.created_at).toLocaleString()}</span>
-                                        <button 
-                                            onClick={() => setReplyingTo(cmt)}
-                                            style={{ border: "none", background: "transparent", color: "#2e7d32", cursor: "pointer", fontSize: "12px", fontWeight: "500", padding: "0" }}
-                                        >
-                                            Trả lời
-                                        </button>
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Replies section - tương tự, ẩn reply bị đánh dấu */}
-                    {replies && replies.length > 0 && (
-                        <div style={{ marginLeft: "52px", marginTop: "8px" }}>
-                            {!isExpanded ? (
-                                <button
-                                    onClick={() => toggleReplies(cmt._id)}
-                                    style={{
-                                        background: "transparent",
-                                        border: "none",
-                                        color: "#2e7d32",
-                                        fontSize: "12px",
-                                        fontWeight: "500",
-                                        cursor: "pointer",
-                                        padding: "4px 8px",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "6px",
-                                        borderRadius: "16px"
-                                    }}
-                                >
-                                    💬 Xem {replies.length} câu trả lời
-                                </button>
-                            ) : (
-                                <>
-                                    <button
-                                        onClick={() => toggleReplies(cmt._id)}
-                                        style={{
-                                            background: "transparent",
-                                            border: "none",
-                                            color: "#65676B",
-                                            fontSize: "12px",
-                                            cursor: "pointer",
-                                            padding: "4px 8px",
-                                            marginBottom: "8px",
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "6px"
-                                        }}
-                                    >
-                                        🔽 Ẩn câu trả lời
-                                    </button>
-                                    <div style={{ paddingLeft: "16px", borderLeft: "2px solid #e8f5e9" }}>
-                                        {replies.map(reply => {
-                                            const isReplyOwner = currentUser && String(currentUser._id || currentUser.id) === String(reply.author_id);
-                                            const showReplyMenu = isReplyOwner || isAdmin;
-                                            
-                                            return (
-                                                <div key={reply._id} style={{ display: "flex", gap: "10px", marginBottom: "14px", alignItems: "flex-start" }}>
+                                        // Chỉ admin hoặc chủ comment mới thấy menu 3 chấm
+                                        const showMenu = isCommentOwner || isAdmin;
+                                        
+                                        const replies = getRepliesForComment(cmt._id);
+                                        const isExpanded = expandedReplies[cmt._id] || false;
+                                        
+                                        return (
+                                            <div key={cmt._id} style={{ marginBottom: "20px", transition: "all 0.2s" }}>
+                                                <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
                                                     <div style={{ 
-                                                        width: "32px", 
-                                                        height: "32px", 
+                                                        width: "40px", 
+                                                        height: "40px", 
                                                         background: "#e8f5e9", 
                                                         borderRadius: "50%", 
                                                         display: "flex", 
                                                         alignItems: "center", 
                                                         justifyContent: "center", 
-                                                        fontSize: "12px", 
-                                                        fontWeight: "bold",
+                                                        color: "#2e7d32", 
+                                                        fontSize: "16px", 
+                                                        fontWeight: "bold", 
                                                         flexShrink: 0,
-                                                        color: "#2e7d32",
                                                         border: "1px solid #c8e6c9"
                                                     }}>
-                                                        {reply.author_name ? reply.author_name.charAt(0).toUpperCase() : "U"}
+                                                        {cmt.author_name ? cmt.author_name.charAt(0).toUpperCase() : "U"}
                                                     </div>
                                                     <div style={{ flex: 1 }}>
-                                                        {editingCommentId === reply._id ? (
-                                                            <div style={{ background: "#f0f2f5", padding: "8px 12px", borderRadius: "16px" }}>
+                                                        {editingCommentId === cmt._id ? (
+                                                            <div style={{ background: "#f0f2f5", padding: "12px 16px", borderRadius: "20px" }}>
                                                                 <input
                                                                     type="text"
                                                                     value={editCommentContent}
                                                                     onChange={(e) => setEditCommentContent(e.target.value)}
                                                                     style={{
                                                                         width: "100%",
-                                                                        padding: "6px 12px",
-                                                                        borderRadius: "8px",
+                                                                        padding: "10px 14px",
+                                                                        borderRadius: "12px",
                                                                         border: "1px solid #2e7d32",
                                                                         outline: "none",
-                                                                        fontSize: "13px",
+                                                                        fontSize: "14px",
                                                                         background: "white"
                                                                     }}
                                                                     autoFocus
-                                                                    onKeyDown={(e) => e.key === "Enter" && handleSaveModalComment(selectedPost._id, reply._id)}
+                                                                    onKeyDown={(e) => e.key === "Enter" && handleSaveModalComment(selectedPost._id, cmt._id)}
                                                                 />
-                                                                <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
-                                                                    <button onClick={() => handleSaveModalComment(selectedPost._id, reply._id)} style={{ padding: "3px 12px", background: "#2e7d32", color: "white", border: "none", borderRadius: "16px", cursor: "pointer", fontSize: "11px" }}>Lưu</button>
-                                                                    <button onClick={() => { setEditingCommentId(null); setEditCommentContent(""); }} style={{ padding: "3px 12px", background: "#e4e6eb", border: "none", borderRadius: "16px", cursor: "pointer", fontSize: "11px" }}>Hủy</button>
+                                                                <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+                                                                    <button
+                                                                        onClick={() => handleSaveModalComment(selectedPost._id, cmt._id)}
+                                                                        style={{
+                                                                            padding: "6px 16px",
+                                                                            background: "#2e7d32",
+                                                                            color: "white",
+                                                                            border: "none",
+                                                                            borderRadius: "20px",
+                                                                            cursor: "pointer",
+                                                                            fontSize: "13px",
+                                                                            fontWeight: "500"
+                                                                        }}
+                                                                    >
+                                                                        Lưu
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setEditingCommentId(null);
+                                                                            setEditCommentContent("");
+                                                                        }}
+                                                                        style={{
+                                                                            padding: "6px 16px",
+                                                                            background: "#e4e6eb",
+                                                                            color: "#333",
+                                                                            border: "none",
+                                                                            borderRadius: "20px",
+                                                                            cursor: "pointer",
+                                                                            fontSize: "13px"
+                                                                        }}
+                                                                    >
+                                                                        Hủy
+                                                                    </button>
                                                                 </div>
                                                             </div>
                                                         ) : (
                                                             <>
                                                                 <div style={{ 
                                                                     background: "#f0f2f5", 
-                                                                    padding: "8px 12px", 
-                                                                    borderRadius: "16px"
+                                                                    padding: "10px 14px", 
+                                                                    borderRadius: "18px"
                                                                 }}>
-                                                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                                                        <strong style={{ fontSize: "12px", display: "block", marginBottom: "4px", color: "#1c1e21" }}>
-                                                                            {reply.author_name}
+                                                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px", marginBottom: "6px" }}>
+                                                                        <strong style={{ fontSize: "14px", color: "#1c1e21" }}>
+                                                                            {cmt.author_name}
                                                                         </strong>
-                                                                        {showReplyMenu && (
-                                                                            <div style={{ position: "relative" }}>
-                                                                                <button
-                                                                                    onClick={(e) => {
-                                                                                        e.stopPropagation();
-                                                                                        setActiveCommentMenu(activeCommentMenu === reply._id ? null : reply._id);
-                                                                                    }}
-                                                                                    style={{ 
-                                                                                        background: "transparent", 
-                                                                                        border: "none", 
-                                                                                        cursor: "pointer", 
-                                                                                        color: "#65676B", 
-                                                                                        fontSize: "16px",
-                                                                                        padding: "0 4px"
-                                                                                    }}
-                                                                                >
-                                                                                    •••
-                                                                                </button>
-                                                                                {activeCommentMenu === reply._id && (
-                                                                                    <div style={{
-                                                                                        position: "absolute",
-                                                                                        top: "20px",
-                                                                                        right: "0",
-                                                                                        background: "white",
-                                                                                        border: "1px solid #ddd",
-                                                                                        borderRadius: "10px",
-                                                                                        boxShadow: "0 2px 12px rgba(0,0,0,0.15)",
-                                                                                        width: "100px",
-                                                                                        zIndex: 20,
-                                                                                        overflow: "hidden"
-                                                                                    }}>
-                                                                                        <button 
-                                                                                            onClick={() => handleEditModalComment(reply)} 
-                                                                                            style={{ 
-                                                                                                padding: "8px 12px", 
-                                                                                                border: "none", 
-                                                                                                background: "white", 
-                                                                                                textAlign: "left", 
-                                                                                                cursor: "pointer", 
-                                                                                                fontSize: "12px", 
-                                                                                                width: "100%",
-                                                                                                borderBottom: "1px solid #eee"
-                                                                                            }}
-                                                                                        >
-                                                                                            ✏️ Sửa
-                                                                                        </button>
-                                                                                        <button 
-                                                                                            onClick={() => handleDeleteModalComment(selectedPost._id, reply._id)} 
-                                                                                            style={{ 
-                                                                                                padding: "8px 12px", 
-                                                                                                border: "none", 
-                                                                                                background: "white", 
-                                                                                                textAlign: "left", 
-                                                                                                cursor: "pointer", 
-                                                                                                fontSize: "12px", 
-                                                                                                color: "#dc3545", 
-                                                                                                width: "100%" 
-                                                                                            }}
-                                                                                        >
-                                                                                            🗑️ Xóa
-                                                                                        </button>
-                                                                                    </div>
-                                                                                )}
-                                                                            </div>
-                                                                        )}
+                                                                        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                                                                            {showMenu && (
+                                                                                <div style={{ position: "relative" }}>
+                                                                                    <button
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            setActiveCommentMenu(activeCommentMenu === cmt._id ? null : cmt._id);
+                                                                                        }}
+                                                                                        style={{
+                                                                                            background: "transparent",
+                                                                                            border: "none",
+                                                                                            cursor: "pointer",
+                                                                                            color: "#65676B",
+                                                                                            fontSize: "18px",
+                                                                                            padding: "0 8px",
+                                                                                            fontWeight: "bold"
+                                                                                        }}
+                                                                                    >
+                                                                                        •••
+                                                                                    </button>
+                                                                                    {activeCommentMenu === cmt._id && (
+                                                                                        <div style={{
+                                                                                            position: "absolute",
+                                                                                            top: "24px",
+                                                                                            right: "0",
+                                                                                            background: "white",
+                                                                                            border: "1px solid #ddd",
+                                                                                            borderRadius: "10px",
+                                                                                            boxShadow: "0 2px 12px rgba(0,0,0,0.15)",
+                                                                                            width: "130px",
+                                                                                            zIndex: 20,
+                                                                                            overflow: "hidden"
+                                                                                        }}>
+                                                                                            <button
+                                                                                                onClick={() => handleEditModalComment(cmt)}
+                                                                                                style={{
+                                                                                                    padding: "10px 14px",
+                                                                                                    border: "none",
+                                                                                                    background: "white",
+                                                                                                    textAlign: "left",
+                                                                                                    cursor: "pointer",
+                                                                                                    fontSize: "13px",
+                                                                                                    width: "100%",
+                                                                                                    borderBottom: "1px solid #eee",
+                                                                                                    display: "flex",
+                                                                                                    alignItems: "center",
+                                                                                                    gap: "8px"
+                                                                                                }}
+                                                                                            >
+                                                                                                ✏️ Sửa
+                                                                                            </button>
+                                                                                            <button
+                                                                                                onClick={() => handleDeleteModalComment(selectedPost._id, cmt._id)}
+                                                                                                style={{
+                                                                                                    padding: "10px 14px",
+                                                                                                    border: "none",
+                                                                                                    background: "white",
+                                                                                                    textAlign: "left",
+                                                                                                    cursor: "pointer",
+                                                                                                    fontSize: "13px",
+                                                                                                    color: "#dc3545",
+                                                                                                    width: "100%",
+                                                                                                    display: "flex",
+                                                                                                    alignItems: "center",
+                                                                                                    gap: "8px"
+                                                                                                }}
+                                                                                            >
+                                                                                                🗑️ Xóa
+                                                                                            </button>
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
                                                                     </div>
-                                                                    <span style={{ fontSize: "13px", color: "#1c1e21", wordBreak: "break-word" }}>
-                                                                        {reply.content}
+                                                                    
+                                                                    {/* Hiển thị nội dung comment */}
+                                                                    <span style={{ fontSize: "14px", color: "#1c1e21", wordBreak: "break-word", lineHeight: "1.5" }}>
+                                                                        {cmt.content}
                                                                     </span>
                                                                 </div>
-                                                                <div style={{ marginTop: "4px", marginLeft: "8px", fontSize: "11px", color: "#65676B" }}>
-                                                                    {new Date(reply.created_at).toLocaleString()}
+                                                                
+                                                                <div style={{ display: "flex", gap: "16px", marginTop: "8px", marginLeft: "12px", fontSize: "12px", color: "#65676B" }}>
+                                                                    <span>{new Date(cmt.created_at).toLocaleString()}</span>
+                                                                    <button 
+                                                                        onClick={() => setReplyingTo(cmt)}
+                                                                        style={{ border: "none", background: "transparent", color: "#2e7d32", cursor: "pointer", fontSize: "12px", fontWeight: "500", padding: "0" }}
+                                                                    >
+                                                                        Trả lời
+                                                                    </button>
                                                                 </div>
                                                             </>
                                                         )}
                                                     </div>
                                                 </div>
-                                            );
-                                        })}
-                                    </div>
+
+                                                {/* Replies section - tương tự, ẩn reply bị đánh dấu */}
+                                                {replies && replies.length > 0 && (
+                                                    <div style={{ marginLeft: "52px", marginTop: "8px" }}>
+                                                        {!isExpanded ? (
+                                                            <button
+                                                                onClick={() => toggleReplies(cmt._id)}
+                                                                style={{
+                                                                    background: "transparent",
+                                                                    border: "none",
+                                                                    color: "#2e7d32",
+                                                                    fontSize: "12px",
+                                                                    fontWeight: "500",
+                                                                    cursor: "pointer",
+                                                                    padding: "4px 8px",
+                                                                    display: "flex",
+                                                                    alignItems: "center",
+                                                                    gap: "6px",
+                                                                    borderRadius: "16px"
+                                                                }}
+                                                            >
+                                                                💬 Xem {replies.length} câu trả lời
+                                                            </button>
+                                                        ) : (
+                                                            <>
+                                                                <button
+                                                                    onClick={() => toggleReplies(cmt._id)}
+                                                                    style={{
+                                                                        background: "transparent",
+                                                                        border: "none",
+                                                                        color: "#65676B",
+                                                                        fontSize: "12px",
+                                                                        cursor: "pointer",
+                                                                        padding: "4px 8px",
+                                                                        marginBottom: "8px",
+                                                                        display: "flex",
+                                                                        alignItems: "center",
+                                                                        gap: "6px"
+                                                                    }}
+                                                                >
+                                                                    🔽 Ẩn câu trả lời
+                                                                </button>
+                                                                <div style={{ paddingLeft: "16px", borderLeft: "2px solid #e8f5e9" }}>
+                                                                    {replies.map(reply => {
+                                                                        const isReplyOwner = currentUser && String(currentUser._id || currentUser.id) === String(reply.author_id);
+                                                                        const showReplyMenu = isReplyOwner || isAdmin;
+                                                                        
+                                                                        return (
+                                                                            <div key={reply._id} style={{ display: "flex", gap: "10px", marginBottom: "14px", alignItems: "flex-start" }}>
+                                                                                <div style={{ 
+                                                                                    width: "32px", 
+                                                                                    height: "32px", 
+                                                                                    background: "#e8f5e9", 
+                                                                                    borderRadius: "50%", 
+                                                                                    display: "flex", 
+                                                                                    alignItems: "center", 
+                                                                                    justifyContent: "center", 
+                                                                                    fontSize: "12px", 
+                                                                                    fontWeight: "bold",
+                                                                                    flexShrink: 0,
+                                                                                    color: "#2e7d32",
+                                                                                    border: "1px solid #c8e6c9"
+                                                                                }}>
+                                                                                    {reply.author_name ? reply.author_name.charAt(0).toUpperCase() : "U"}
+                                                                                </div>
+                                                                                <div style={{ flex: 1 }}>
+                                                                                    {editingCommentId === reply._id ? (
+                                                                                        <div style={{ background: "#f0f2f5", padding: "8px 12px", borderRadius: "16px" }}>
+                                                                                            <input
+                                                                                                type="text"
+                                                                                                value={editCommentContent}
+                                                                                                onChange={(e) => setEditCommentContent(e.target.value)}
+                                                                                                style={{
+                                                                                                    width: "100%",
+                                                                                                    padding: "6px 12px",
+                                                                                                    borderRadius: "8px",
+                                                                                                    border: "1px solid #2e7d32",
+                                                                                                    outline: "none",
+                                                                                                    fontSize: "13px",
+                                                                                                    background: "white"
+                                                                                                }}
+                                                                                                autoFocus
+                                                                                                onKeyDown={(e) => e.key === "Enter" && handleSaveModalComment(selectedPost._id, reply._id)}
+                                                                                            />
+                                                                                            <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+                                                                                                <button onClick={() => handleSaveModalComment(selectedPost._id, reply._id)} style={{ padding: "3px 12px", background: "#2e7d32", color: "white", border: "none", borderRadius: "16px", cursor: "pointer", fontSize: "11px" }}>Lưu</button>
+                                                                                                <button onClick={() => { setEditingCommentId(null); setEditCommentContent(""); }} style={{ padding: "3px 12px", background: "#e4e6eb", border: "none", borderRadius: "16px", cursor: "pointer", fontSize: "11px" }}>Hủy</button>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    ) : (
+                                                                                        <>
+                                                                                            <div style={{ 
+                                                                                                background: "#f0f2f5", 
+                                                                                                padding: "8px 12px", 
+                                                                                                borderRadius: "16px"
+                                                                                            }}>
+                                                                                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                                                                                    <strong style={{ fontSize: "12px", display: "block", marginBottom: "4px", color: "#1c1e21" }}>
+                                                                                                        {reply.author_name}
+                                                                                                    </strong>
+                                                                                                    {showReplyMenu && (
+                                                                                                        <div style={{ position: "relative" }}>
+                                                                                                            <button
+                                                                                                                onClick={(e) => {
+                                                                                                                    e.stopPropagation();
+                                                                                                                    setActiveCommentMenu(activeCommentMenu === reply._id ? null : reply._id);
+                                                                                                                }}
+                                                                                                                style={{ 
+                                                                                                                    background: "transparent", 
+                                                                                                                    border: "none", 
+                                                                                                                    cursor: "pointer", 
+                                                                                                                    color: "#65676B", 
+                                                                                                                    fontSize: "16px",
+                                                                                                                    padding: "0 4px"
+                                                                                                                }}
+                                                                                                            >
+                                                                                                                •••
+                                                                                                            </button>
+                                                                                                            {activeCommentMenu === reply._id && (
+                                                                                                                <div style={{
+                                                                                                                    position: "absolute",
+                                                                                                                    top: "20px",
+                                                                                                                    right: "0",
+                                                                                                                    background: "white",
+                                                                                                                    border: "1px solid #ddd",
+                                                                                                                    borderRadius: "10px",
+                                                                                                                    boxShadow: "0 2px 12px rgba(0,0,0,0.15)",
+                                                                                                                    width: "100px",
+                                                                                                                    zIndex: 20,
+                                                                                                                    overflow: "hidden"
+                                                                                                                }}>
+                                                                                                                    <button 
+                                                                                                                        onClick={() => handleEditModalComment(reply)} 
+                                                                                                                        style={{ 
+                                                                                                                            padding: "8px 12px", 
+                                                                                                                            border: "none", 
+                                                                                                                            background: "white", 
+                                                                                                                            textAlign: "left", 
+                                                                                                                            cursor: "pointer", 
+                                                                                                                            fontSize: "12px", 
+                                                                                                                            width: "100%",
+                                                                                                                            borderBottom: "1px solid #eee"
+                                                                                                                        }}
+                                                                                                                    >
+                                                                                                                        ✏️ Sửa
+                                                                                                                    </button>
+                                                                                                                    <button 
+                                                                                                                        onClick={() => handleDeleteModalComment(selectedPost._id, reply._id)} 
+                                                                                                                        style={{ 
+                                                                                                                            padding: "8px 12px", 
+                                                                                                                            border: "none", 
+                                                                                                                            background: "white", 
+                                                                                                                            textAlign: "left", 
+                                                                                                                            cursor: "pointer", 
+                                                                                                                            fontSize: "12px", 
+                                                                                                                            color: "#dc3545", 
+                                                                                                                            width: "100%" 
+                                                                                                                        }}
+                                                                                                                    >
+                                                                                                                        🗑️ Xóa
+                                                                                                                    </button>
+                                                                                                                </div>
+                                                                                                            )}
+                                                                                                        </div>
+                                                                                                    )}
+                                                                                                </div>
+                                                                                                <span style={{ fontSize: "13px", color: "#1c1e21", wordBreak: "break-word" }}>
+                                                                                                    {reply.content}
+                                                                                                </span>
+                                                                                            </div>
+                                                                                            <div style={{ marginTop: "4px", marginLeft: "8px", fontSize: "11px", color: "#65676B" }}>
+                                                                                                {new Date(reply.created_at).toLocaleString()}
+                                                                                            </div>
+                                                                                        </>
+                                                                                    )}
+                                                                                </div>
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
                                 </>
                             )}
-                        </div>
-                    )}
-                </div>
-            );
-        })}
-    </>
-)}
-</div>
+                            </div>
                         </div>
 
                         <div style={{ padding: "12px 16px", borderTop: "1px solid #e4e6eb", display: "flex", gap: "10px", alignItems: "center", flexShrink: 0 }}>
@@ -1916,7 +1891,7 @@ const handleFilterChange = async (filter) => {
                     onReportSuccess={handleReportSuccess}
                 />
             )}
-                        {/* ==================== MODAL XÁC NHẬN XÓA ==================== */}
+            {/* ==================== MODAL XÁC NHẬN XÓA ==================== */}
             {showConfirmModal && (
                 <div 
                     style={{

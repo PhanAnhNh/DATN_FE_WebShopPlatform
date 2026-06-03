@@ -1,4 +1,3 @@
-// components/layout/header.jsx
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { FaShoppingCart, FaBell, FaUser, FaBook, FaSignOutAlt, FaComment, FaSearch, FaBars, FaUsers } from 'react-icons/fa';
@@ -270,18 +269,33 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
     };
 
     const handleLogout = () => {
-        localStorage.removeItem("user_token");
-        localStorage.removeItem("user");
-        localStorage.removeItem("user_data");
-        
-        setIsMenuOpen(false);
-        setCartCount(0);
-        setFavoriteCount(0);
-        setIsLoggedIn(false);
-        
-        window.dispatchEvent(new CustomEvent('userLoggedOut'));
-        navigate("/");
-    };
+    // Xóa tất cả dữ liệu liên quan đến user
+    localStorage.removeItem("user_token");
+    localStorage.removeItem("user");
+    localStorage.removeItem("user_data");
+    
+    // Xóa cache trong sessionStorage
+    sessionStorage.removeItem("sidebar_user");
+    sessionStorage.removeItem("sidebar_user_cache_time");
+    sessionStorage.removeItem("home_posts_general");
+    sessionStorage.removeItem("home_posts_agriculture");
+    sessionStorage.removeItem("home_posts_seafood");
+    sessionStorage.removeItem("home_posts_specialty");
+    
+    // Cập nhật state
+    setIsMenuOpen(false);
+    setCartCount(0);
+    setFavoriteCount(0);
+    setIsLoggedIn(false);
+    
+    // Dispatch event để các component khác biết
+    window.dispatchEvent(new CustomEvent('userLoggedOut'));
+    
+    // Chuyển hướng về trang chủ (không phải login)
+    navigate("/");
+    // Reload page để reset toàn bộ state
+    window.location.reload();
+};
 
     const handleCartClick = () => {
         navigate("/cart");
