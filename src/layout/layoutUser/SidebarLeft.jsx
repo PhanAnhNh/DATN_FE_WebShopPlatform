@@ -452,22 +452,7 @@ function SidebarLeft({ userProfile = null, onClose = null }) {
                 )
             )}
                
-            <h4 style={{ fontSize: "16px", margin: "15px 0 10px 5px", color: "#65676b", fontWeight: "600" }}>Được quan tâm</h4>
-            <div style={cardStyle}>
-                <h4 style={{ margin: "0 0 10px 0", fontSize: "15px", color: "#333" }}>Đặc sản</h4>
-                <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: "10px" }}>
-                    <MiniProduct name="Nem chua" price="20.000đ/10c" />
-                    <MiniProduct name="Phở gà" price="30.000đ/1tô" />
-                </div>
-            </div>
-
-            <div style={cardStyle}>
-                <h4 style={{ margin: "0 0 10px 0", fontSize: "15px", color: "#333" }}>Hải sản</h4>
-                <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: "10px" }}>
-                    <MiniProduct name="Chè thái nguyên" price="70.000đ/kg" />
-                    <MiniProduct name="Tôm hùm" price="600.000/kg" />
-                </div>
-            </div>
+            
         </div>
     );
 
