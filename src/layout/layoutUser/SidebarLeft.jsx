@@ -6,7 +6,7 @@ import Toast from "../../components/common/Toast";
 import { useAuth } from "../../hooks/useAuth.js";
 
 function SidebarLeft({ userProfile = null, onClose = null }) {
-    const { user: authUser, isAuthenticated } = useAuth();
+    const { user: authUser, isAuthenticated, updateAuthState } = useAuth(); // Thêm updateAuthState
     const [user, setUser] = useState(null);
     const [isEditing, setIsEditing] = useState(false);
     const [editData, setEditData] = useState({});
@@ -29,7 +29,7 @@ function SidebarLeft({ userProfile = null, onClose = null }) {
         setToast({ show: false, message: '', type: 'success' });
     };
 
-    // Lấy thông tin user từ authUser hoặc userProfile
+    // Lấy thông tin user từ authUser hoặc userProfile - KHÔNG DÙNG CACHE NỮA
     useEffect(() => {
         if (!isAuthenticated) {
             setUser(null);
@@ -45,15 +45,7 @@ function SidebarLeft({ userProfile = null, onClose = null }) {
         }
     }, [authUser, userProfile, isAuthenticated]);
 
-    // Cache user data
-    useEffect(() => {
-        if (user && (user.full_name || user.username)) {
-            sessionStorage.setItem("sidebar_user", JSON.stringify(user));
-            sessionStorage.setItem("sidebar_user_cache_time", Date.now().toString());
-        }
-    }, [user]);
-
-    // Fetch profile nếu chưa có userProfile
+    // Fetch profile nếu chưa có userProfile - BỎ CACHE
     useEffect(() => {
         // Nếu đã có userProfile từ props, không cần fetch
         if (userProfile) {
@@ -75,27 +67,21 @@ function SidebarLeft({ userProfile = null, onClose = null }) {
             return;
         }
 
-        // Lấy từ cache hoặc API
+        // BỎ CACHE - luôn fetch mới để đảm bảo dữ liệu cập nhật
         const fetchMyProfile = async () => {
-            const cachedUser = sessionStorage.getItem("sidebar_user");
-            const cacheTime = sessionStorage.getItem("sidebar_user_cache_time");
-            const isCacheValid = cachedUser && cacheTime && (Date.now() - parseInt(cacheTime) < 300000);
-            
-            if (isCacheValid && !user?.full_name) {
-                try {
-                    const parsedUser = JSON.parse(cachedUser);
-                    setUser(parsedUser);
-                    setEditData(parsedUser);
-                    return;
-                } catch (e) {
-                    console.error("Error using cached user:", e);
-                }
-            }
-
             try {
                 const res = await api.get("/api/v1/auth/me");
                 setUser(res.data);
                 setEditData(res.data);
+                
+                // Cập nhật cả auth state để đồng bộ
+                const userData = res.data;
+                localStorage.setItem("user_data", JSON.stringify(userData));
+                localStorage.setItem("user", JSON.stringify(userData));
+                
+                // Gọi updateAuthState để cập nhật auth hook
+                if (updateAuthState) updateAuthState();
+                
             } catch (error) {
                 console.error("Lỗi khi lấy thông tin cá nhân:", error);
                 // Nếu lỗi 401 (unauthorized), không hiển thị user
@@ -108,23 +94,33 @@ function SidebarLeft({ userProfile = null, onClose = null }) {
         };
 
         fetchMyProfile();
-    }, [userProfile, authUser, isUserProfilePage]);
+    }, [userProfile, authUser, isUserProfilePage, updateAuthState]);
 
-    // Lắng nghe sự kiện logout
+    // Lắng nghe sự kiện logout và update profile
     useEffect(() => {
         const handleLogout = () => {
             setUser(null);
             setEditData({});
             setIsEditing(false);
-            // Xóa cache
-            sessionStorage.removeItem("sidebar_user");
-            sessionStorage.removeItem("sidebar_user_cache_time");
+        };
+        
+        // Lắng nghe sự kiện profile updated
+        const handleProfileUpdated = (event) => {
+            if (event.detail && event.detail.user) {
+                setUser(event.detail.user);
+                setEditData(event.detail.user);
+                // Xóa cache cũ
+                sessionStorage.removeItem("sidebar_user");
+                sessionStorage.removeItem("sidebar_user_cache_time");
+            }
         };
         
         window.addEventListener('userLoggedOut', handleLogout);
+        window.addEventListener('profileUpdated', handleProfileUpdated);
         
         return () => {
             window.removeEventListener('userLoggedOut', handleLogout);
+            window.removeEventListener('profileUpdated', handleProfileUpdated);
         };
     }, []);
 
@@ -142,9 +138,24 @@ function SidebarLeft({ userProfile = null, onClose = null }) {
         setLoading(true);
         try {
             const res = await api.put("/api/v1/auth/update-profile", editData);
-            setUser(res.data.user);
-            setEditData(res.data.user);
+            const updatedUser = res.data.user;
+            
+            setUser(updatedUser);
+            setEditData(updatedUser);
             setIsEditing(false);
+            
+            // Cập nhật localStorage
+            localStorage.setItem("user_data", JSON.stringify(updatedUser));
+            localStorage.setItem("user", JSON.stringify(updatedUser));
+            
+            // Cập nhật auth state
+            if (updateAuthState) updateAuthState();
+            
+            // Phát sự kiện để các component khác cập nhật
+            window.dispatchEvent(new CustomEvent('profileUpdated', { 
+                detail: { user: updatedUser } 
+            }));
+            
             showToast("Cập nhật thành công!", "success");
         } catch (error) {
             console.error("Lỗi cập nhật:", error);
@@ -203,14 +214,6 @@ function SidebarLeft({ userProfile = null, onClose = null }) {
         marginBottom: "4px"
     };
 
-    const MiniProduct = ({ img, name, price }) => (
-        <div style={{ display: "flex", flexDirection: "column", gap: "3px", width: "48%" }}>
-            <img src={img || "https://placehold.co/100x60"} alt={name} style={{ width: "100%", height: "60px", objectFit: "cover", borderRadius: "4px" }} />
-            <span style={{ fontSize: "13px", fontWeight: "500" }}>{name}</span>
-            <span style={{ fontSize: "12px", color: "#d32f2f", fontWeight: "bold" }}>{price}</span>
-        </div>
-    );
-
     const getMenuItemStyle = (categoryType) => {
         let isActive = false;
 
@@ -258,31 +261,6 @@ function SidebarLeft({ userProfile = null, onClose = null }) {
 
     const sidebarContent = (
         <div style={{ padding: "16px" }}>
-            {/* Close button for mobile */}
-            {onClose && (
-                <button 
-                    onClick={onClose}
-                    style={{
-                        position: "absolute",
-                        top: "10px",
-                        right: "10px",
-                        width: "32px",
-                        height: "32px",
-                        borderRadius: "50%",
-                        background: "#f0f2f5",
-                        border: "none",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        cursor: "pointer",
-                        transition: "all 0.3s",
-                        zIndex: 10
-                    }}
-                >
-                    <FaTimes size={16} />
-                </button>
-            )}
-
             {toast.show && (
                 <Toast 
                     message={toast.message} 
@@ -451,8 +429,6 @@ function SidebarLeft({ userProfile = null, onClose = null }) {
                     </div>
                 )
             )}
-               
-            
         </div>
     );
 

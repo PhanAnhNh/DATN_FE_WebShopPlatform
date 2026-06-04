@@ -7,6 +7,7 @@ export const useAuth = () => {
 
     const updateAuthState = useCallback(() => {
         const token = localStorage.getItem("user_token");
+        // Ưu tiên lấy user_data trước, nếu không có thì lấy user
         const userData = localStorage.getItem("user_data") || localStorage.getItem("user");
         
         if (token && userData) {
@@ -15,6 +16,7 @@ export const useAuth = () => {
                 setUser(parsedUser);
                 setIsAuthenticated(true);
             } catch (e) {
+                console.error("Error parsing user data:", e);
                 setUser(null);
                 setIsAuthenticated(false);
             }
@@ -58,12 +60,25 @@ export const useAuth = () => {
             setIsAuthenticated(false);
         };
         
+        // Lắng nghe sự kiện profile updated
+        const handleProfileUpdated = (event) => {
+            if (event.detail && event.detail.user) {
+                setUser(event.detail.user);
+                setIsAuthenticated(true);
+                // Cập nhật localStorage
+                localStorage.setItem("user_data", JSON.stringify(event.detail.user));
+                localStorage.setItem("user", JSON.stringify(event.detail.user));
+            }
+        };
+        
         window.addEventListener('storage', handleStorageChange);
         window.addEventListener('userLoggedOut', handleLogoutEvent);
+        window.addEventListener('profileUpdated', handleProfileUpdated);
         
         return () => {
             window.removeEventListener('storage', handleStorageChange);
             window.removeEventListener('userLoggedOut', handleLogoutEvent);
+            window.removeEventListener('profileUpdated', handleProfileUpdated);
         };
     }, [updateAuthState]);
 

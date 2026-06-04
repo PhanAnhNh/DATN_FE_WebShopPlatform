@@ -950,19 +950,20 @@ function Home() {
                                 lineHeight: '1.5', 
                                 color: '#1c1e21'
                         }}>
-                        <ReactMarkdown
-                            components={{
-                                p: ({node, ...props}) => <p style={{margin: '0 0 8px 0'}} {...props} />,
-                                h1: ({node, ...props}) => <h1 style={{fontSize: '24px', margin: '16px 0 8px 0'}} {...props} />,
-                                h2: ({node, ...props}) => <h2 style={{fontSize: '20px', margin: '12px 0 8px 0'}} {...props} />,
-                                h3: ({node, ...props}) => <h3 style={{fontSize: '18px', margin: '10px 0 6px 0'}} {...props} />,
-                                ul: ({node, ...props}) => <ul style={{margin: '8px 0', paddingLeft: '20px'}} {...props} />,
-                                ol: ({node, ...props}) => <ol style={{margin: '8px 0', paddingLeft: '20px'}} {...props} />,
-                                li: ({node, ...props}) => <li style={{margin: '4px 0'}} {...props} />,
-                            }}
-                            >
-                            {post.content}
-                        </ReactMarkdown>
+
+                                <ReactMarkdown
+                                    components={{
+                                        p: ({node, ...props}) => <p style={{margin: '0 0 8px 0'}} {...props} />,
+                                        h1: ({node, ...props}) => <h1 style={{fontSize: '24px', margin: '16px 0 8px 0'}} {...props} />,
+                                        h2: ({node, ...props}) => <h2 style={{fontSize: '20px', margin: '12px 0 8px 0'}} {...props} />,
+                                        h3: ({node, ...props}) => <h3 style={{fontSize: '18px', margin: '10px 0 6px 0'}} {...props} />,
+                                        ul: ({node, ...props}) => <ul style={{margin: '8px 0', paddingLeft: '20px'}} {...props} />,
+                                        ol: ({node, ...props}) => <ol style={{margin: '8px 0', paddingLeft: '20px'}} {...props} />,
+                                        li: ({node, ...props}) => <li style={{margin: '4px 0'}} {...props} />,
+                                    }}
+                                    >
+                                    {post.content}
+                                </ReactMarkdown>
                             </div>
                         )}
                         {post.location && (
@@ -1275,7 +1276,42 @@ function Home() {
                             </div>
 
                             <div style={{ marginBottom: "15px" }}>
-                                {selectedPost.content && <p style={{ margin: "5px 0", fontSize: "15px", whiteSpace: "pre-wrap" }}>{selectedPost.content}</p>}
+                                <div style={{ marginBottom: "15px" }}>
+                                    {selectedPost.content && (
+                                        <div style={{ 
+                                            marginBottom: '16px', 
+                                            fontSize: '15px', 
+                                            lineHeight: '1.5', 
+                                            color: '#1c1e21'
+                                        }}>
+                                            <ReactMarkdown
+                                                components={{
+                                                    p: ({node, ...props}) => <p style={{margin: '0 0 8px 0'}} {...props} />,
+                                                    h1: ({node, ...props}) => <h1 style={{fontSize: '24px', margin: '16px 0 8px 0'}} {...props} />,
+                                                    h2: ({node, ...props}) => <h2 style={{fontSize: '20px', margin: '12px 0 8px 0'}} {...props} />,
+                                                    h3: ({node, ...props}) => <h3 style={{fontSize: '18px', margin: '10px 0 6px 0'}} {...props} />,
+                                                    ul: ({node, ...props}) => <ul style={{margin: '8px 0', paddingLeft: '20px'}} {...props} />,
+                                                    ol: ({node, ...props}) => <ol style={{margin: '8px 0', paddingLeft: '20px'}} {...props} />,
+                                                    li: ({node, ...props}) => <li style={{margin: '4px 0'}} {...props} />,
+                                                    strong: ({node, ...props}) => <strong style={{fontWeight: 'bold'}} {...props} />,
+                                                    em: ({node, ...props}) => <em style={{fontStyle: 'italic'}} {...props} />
+                                                }}
+                                            >
+                                                {selectedPost.content}
+                                            </ReactMarkdown>
+                                        </div>
+                                    )}
+                                    {selectedPost.location && (
+                                        <p style={{ margin: "5px 0", color: "#666", fontSize: "14px" }}>
+                                            📍 <strong>Vị trí:</strong> {selectedPost.location}
+                                        </p>
+                                    )}
+                                    {selectedPost.tags && selectedPost.tags.length > 0 && (
+                                        <p style={{ margin: "5px 0", color: "#2e7d32", fontSize: "14px", fontWeight: "500" }}>
+                                            {selectedPost.tags.map(tag => `#${tag}`).join(" ")}
+                                        </p>
+                                    )}
+                                </div>
                                 {selectedPost.location && (
                                     <p style={{ margin: "5px 0", color: "#666", fontSize: "14px" }}>
                                         📍 <strong>Vị trí:</strong> {selectedPost.location}

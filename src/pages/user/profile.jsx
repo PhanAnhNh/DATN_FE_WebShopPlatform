@@ -5,6 +5,7 @@ import Toast from "../../components/common/Toast";
 import ShareModal from "./ShareModal";
 import SharedPostCard from "./SharedPostCard";
 import ReportModal from "../admin/reportModal";
+import ReactMarkdown from 'react-markdown';
 
 function Profile() {
     // State cho dữ liệu
@@ -837,39 +838,71 @@ function Profile() {
                                 </div>
 
                                 <div onClick={() => openPostModal(post)} style={{ marginBottom: "15px", fontSize: "15px", cursor: "pointer" }}>
-                                    {post.content && <p style={{ margin: "5px 0", whiteSpace: "pre-wrap" }}>{post.content}</p>}
-                                </div>
+                                                        {post.content && (
+                                                            <div style={{ 
+                                                                marginBottom: '16px', 
+                                                                fontSize: '15px', 
+                                                                lineHeight: '1.5', 
+                                                                color: '#1c1e21'
+                                                        }}>
+                                                            
+                                                        <ReactMarkdown
+                                                            components={{
+                                                                p: ({node, ...props}) => <p style={{margin: '0 0 8px 0'}} {...props} />,
+                                                                h1: ({node, ...props}) => <h1 style={{fontSize: '24px', margin: '16px 0 8px 0'}} {...props} />,
+                                                                h2: ({node, ...props}) => <h2 style={{fontSize: '20px', margin: '12px 0 8px 0'}} {...props} />,
+                                                                h3: ({node, ...props}) => <h3 style={{fontSize: '18px', margin: '10px 0 6px 0'}} {...props} />,
+                                                                ul: ({node, ...props}) => <ul style={{margin: '8px 0', paddingLeft: '20px'}} {...props} />,
+                                                                ol: ({node, ...props}) => <ol style={{margin: '8px 0', paddingLeft: '20px'}} {...props} />,
+                                                                li: ({node, ...props}) => <li style={{margin: '4px 0'}} {...props} />,
+                                                            }}
+                                                            >
+                                                            {post.content}
+                                                        </ReactMarkdown>
+                                                            </div>
+                                                        )}
+                                                        {post.location && (
+                                                            <p style={{ margin: "5px 0", color: "#666", fontSize: "14px" }}>
+                                                                📍 <b>Vị trí:</b> {post.location}
+                                                            </p>
+                                                        )}
+                                                        {post.tags && post.tags.length > 0 && (
+                                                            <p style={{ margin: "5px 0", color: "#2e7d32", fontSize: "14px", fontWeight: "500" }}>
+                                                                {post.tags.map(tag => `#${tag}`).join(" ")}
+                                                            </p>
+                                                        )}
+                                                    </div>
 
-                                {post.tags && post.tags.length > 0 && (
-                                    <div style={{ marginBottom: "10px", display: "flex", flexWrap: "wrap", gap: "5px" }}>
-                                        {post.tags.map((tag, idx) => (
-                                            <span key={idx} style={{ background: "#e4e6eb", padding: "2px 8px", borderRadius: "12px", fontSize: "12px", color: "#2e7d32" }}>
-                                                #{tag}
-                                            </span>
-                                        ))}
-                                    </div>
-                                )}
+                                    {post.tags && post.tags.length > 0 && (
+                                        <div style={{ marginBottom: "10px", display: "flex", flexWrap: "wrap", gap: "5px" }}>
+                                            {post.tags.map((tag, idx) => (
+                                                <span key={idx} style={{ background: "#e4e6eb", padding: "2px 8px", borderRadius: "12px", fontSize: "12px", color: "#2e7d32" }}>
+                                                    #{tag}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
 
-                                {post.location && (
-                                    <div style={{ marginBottom: "10px", fontSize: "12px", color: "#888", display: "flex", alignItems: "center", gap: "4px" }}>
-                                        📍 {post.location}
-                                    </div>
-                                )}
+                                    {post.location && (
+                                        <div style={{ marginBottom: "10px", fontSize: "12px", color: "#888", display: "flex", alignItems: "center", gap: "4px" }}>
+                                            📍 {post.location}
+                                        </div>
+                                    )}
 
-                                {post.images && post.images.length > 0 && (
-                                    <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(post.images.length, 3)}, 1fr)`, gap: "4px", marginBottom: "15px" }}>
-                                        {post.images.map((img, idx) => (
-                                            <img key={idx} src={img} alt={`post_img_${idx}`} style={{ width: "100%", borderRadius: "8px", objectFit: "cover", aspectRatio: "1/1" }} />
-                                        ))}
-                                    </div>
-                                )}
+                                    {post.images && post.images.length > 0 && (
+                                        <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(post.images.length, 3)}, 1fr)`, gap: "4px", marginBottom: "15px" }}>
+                                            {post.images.map((img, idx) => (
+                                                <img key={idx} src={img} alt={`post_img_${idx}`} style={{ width: "100%", borderRadius: "8px", objectFit: "cover", aspectRatio: "1/1" }} />
+                                            ))}
+                                        </div>
+                                    )}
 
-                                {post.post_type === 'share' && post.shared_post && (
-                                    <SharedPostCard 
-                                        sharedPost={post.shared_post}
-                                        onClick={() => openPostModal(post.shared_post)}
-                                    />
-                                )}
+                                    {post.post_type === 'share' && post.shared_post && (
+                                        <SharedPostCard 
+                                            sharedPost={post.shared_post}
+                                            onClick={() => openPostModal(post.shared_post)}
+                                        />
+                                    )}
 
                                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", fontSize: "14px", color: "#65676B" }}>
                                     <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
@@ -1251,7 +1284,30 @@ function Profile() {
                             </div>
 
                             <div style={{ marginBottom: "15px" }}>
-                                {selectedPost.content && <p style={{ margin: "5px 0", fontSize: "15px", whiteSpace: "pre-wrap" }}>{selectedPost.content}</p>}
+                                {selectedPost.content && (
+                                        <div style={{ 
+                                            marginBottom: '16px', 
+                                            fontSize: '15px', 
+                                            lineHeight: '1.5', 
+                                            color: '#1c1e21'
+                                                        }}>
+                                                <ReactMarkdown
+                                                    components={{
+                                                        p: ({node, ...props}) => <p style={{margin: '0 0 8px 0'}} {...props} />,
+                                                        h1: ({node, ...props}) => <h1 style={{fontSize: '24px', margin: '16px 0 8px 0'}} {...props} />,
+                                                        h2: ({node, ...props}) => <h2 style={{fontSize: '20px', margin: '12px 0 8px 0'}} {...props} />,
+                                                        h3: ({node, ...props}) => <h3 style={{fontSize: '18px', margin: '10px 0 6px 0'}} {...props} />,
+                                                        ul: ({node, ...props}) => <ul style={{margin: '8px 0', paddingLeft: '20px'}} {...props} />,
+                                                        ol: ({node, ...props}) => <ol style={{margin: '8px 0', paddingLeft: '20px'}} {...props} />,
+                                                        li: ({node, ...props}) => <li style={{margin: '4px 0'}} {...props} />,
+                                                        strong: ({node, ...props}) => <strong style={{fontWeight: 'bold'}} {...props} />,
+                                                        em: ({node, ...props}) => <em style={{fontStyle: 'italic'}} {...props} />
+                                                    }}
+                                                    >
+                                                    {selectedPost.content}
+                                                </ReactMarkdown>
+                                        </div>
+                                    )}
                                 {selectedPost.location && (
                                     <p style={{ margin: "5px 0", color: "#666", fontSize: "14px" }}>
                                         📍 <strong>Vị trí:</strong> {selectedPost.location}
