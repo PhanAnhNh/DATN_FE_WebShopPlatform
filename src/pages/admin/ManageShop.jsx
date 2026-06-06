@@ -776,9 +776,9 @@ const ShopsManagement = () => {
 
       <div className="table-container">
         {loading ? (
-          <div className="loading-spinner">
-            <div className="spinner"></div>
-            <p>Đang tải dữ liệu...</p>
+          <div className="loading-container">
+            <div className="modern-spinner"></div>
+            <p className="loading-text">Đang tải danh sách cửa hàng...</p>
           </div>
         ) : (
           <table className="data-table">

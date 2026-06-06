@@ -11,6 +11,7 @@ import { adminApi } from '../../api/api';
 import '../../css/AdminManageLayout.css';
 import Toast from '../../components/common/Toast';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
+import { useNavigate } from 'react-router-dom';
 
 const PostsManagement = () => {
   const [posts, setPosts] = useState([]);
@@ -20,6 +21,7 @@ const PostsManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
   const [totalPosts, setTotalPosts] = useState(0);
+  const navigate = useNavigate();
   
   // Filter states
   const [visibilityFilter, setVisibilityFilter] = useState('all');
@@ -834,15 +836,34 @@ const PostsManagement = () => {
             <Download size={18} />
             <span>Xuất Excel</span>
           </button>
+          {/* Thêm nút Quản lý vi phạm */}
+          <button 
+            className="btn btn-warning" 
+            onClick={() => navigate('/admin/violations')}
+            style={{
+              background: '#ff9800',
+              color: 'white',
+              border: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 16px',
+              borderRadius: '6px',
+              cursor: 'pointer'
+            }}
+          >
+            <AlertCircle size={18} />
+            <span>Quản lý vi phạm</span>
+          </button>
         </div>
       </div>
 
       {/* Posts Table */}
       <div className="table-container">
         {loading ? (
-          <div className="loading-spinner">
-            <div className="spinner"></div>
-            <p>Đang tải dữ liệu...</p>
+          <div className="loading-container">
+            <div className="modern-spinner"></div>
+            <p className="loading-text">Đang tải dữ liệu...</p>
           </div>
         ) : (
           <table className="data-table">

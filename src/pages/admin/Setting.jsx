@@ -75,10 +75,10 @@ const AdminSettings = () => {
 
   if (loading) {
     return (
-      <div className="admin-settings loading">
-        <FaSpinner className="spinning" />
-        <p>Đang tải cài đặt...</p>
-      </div>
+      <div className="loading-container">
+    <div className="modern-spinner"></div>
+    <p className="loading-text">Đang tải danh sách cửa hàng...</p>
+  </div>
     );
   }
 

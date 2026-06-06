@@ -47,6 +47,7 @@ import GroupDetail from "./pages/user/GroupDetail.jsx";
 import Groups from "./pages/user/Groups.jsx";
 import AdminLayout from "./layout/Adminlayout/LayoutAdmin.jsx";
 import ShopLayout from "./layout/Shoplayout/ShopLayout.jsx";
+import ViolationsManagement from "./components/common/ViolationsManagement.jsx";
 
 function App() {
   return (
@@ -78,6 +79,7 @@ function App() {
             <Route path="/products/favorites" element={<FavoriteProductsPage />} />
             <Route path="/groups" element={<Groups />} />
             <Route path="/groups/:groupId" element={<GroupDetail />} />
+            <Route path="/admin/violations" element={<AdminLayout><ViolationsManagement /></AdminLayout>} />
             
             {/* Admin Routes */}
             <Route 

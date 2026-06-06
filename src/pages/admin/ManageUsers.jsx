@@ -623,9 +623,9 @@ const UsersManagement = () => {
       {/* Users Table */}
       <div className="table-container">
         {loading ? (
-          <div className="loading-spinner">
-            <div className="spinner"></div>
-            <p>Đang tải dữ liệu...</p>
+          <div className="loading-container">
+            <div className="modern-spinner"></div>
+            <p className="loading-text">Đang tải danh sách người dùng...</p>
           </div>
         ) : (
           <table className="data-table">
