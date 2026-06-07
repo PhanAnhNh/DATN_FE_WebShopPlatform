@@ -140,6 +140,7 @@ function Home() {
             sessionStorage.setItem(`home_posts_${category}`, JSON.stringify(posts));
             sessionStorage.setItem(`home_cache_time_${category}`, Date.now().toString());
         }
+        
     }, [posts, category]);
 
     // Lưu liked posts cache
@@ -205,6 +206,7 @@ function Home() {
     
     const fetchFeedAndLikes = async () => {
         try {
+            clearCache();
             let url = "/api/v1/posts/feed";
             if (category !== "general") url += `?category=${category}`;
 
@@ -216,6 +218,7 @@ function Home() {
 
             const res = await api.get(url);
             const fetchedPosts = res.data;
+           
             setPosts(fetchedPosts);
 
             sessionStorage.setItem(`home_posts_${category}`, JSON.stringify(fetchedPosts));
@@ -1017,6 +1020,46 @@ function Home() {
                         />
                     )}
 
+                    {post.author_type === "shop_owner" && post.shop_id && (
+                        <div style={{ marginBottom: "12px", display: "flex", justifyContent: "flex-end" }}>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (post.shop_id) {
+                                        navigate(`/shop/${post.shop_id}`);
+                                    } else if (post.author_id) {
+                                        navigate(`/shop/${post.author_id}`);
+                                    }
+                                }}
+                                style={{
+                                    background: "linear-gradient(135deg, #838b83 0%, #97a599 100%)",
+                                    color: "white",
+                                    border: "none",
+                                    borderRadius: "30px",
+                                    padding: "8px 20px",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "8px",
+                                    cursor: "pointer",
+                                    fontSize: "13px",
+                                    fontWeight: "600",
+                                    boxShadow: "0 2px 8px rgba(46, 125, 50, 0.3)",
+                                    transition: "transform 0.2s, boxShadow 0.2s"
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.transform = "translateY(-2px)";
+                                    e.currentTarget.style.boxShadow = "0 4px 12px rgba(77, 77, 77, 0.4)";
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.transform = "translateY(0)";
+                                    e.currentTarget.style.boxShadow = "0 2px 8px rgba(78, 82, 78, 0.3)";
+                                }}
+                            >
+                                <span>Xem cửa hàng</span>
+                            </button>
+                        </div>
+                    )}
+
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px", fontSize: "14px", color: "#65676B" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
                             <span style={{ color: likedPosts[post._id] ? "#1877F2" : "inherit" }}>👍</span>
@@ -1048,22 +1091,6 @@ function Home() {
                         >
                             ↗️ Chia sẻ
                         </div>
-
-                        {post.author_type === "shop_owner" && post.shop_id && (
-                            <div 
-                                onClick={() => {
-                                    if (post.shop_id) {
-                                        navigate(`/shop/${post.shop_id}`);
-                                    } else if (post.author_id) {
-                                        // Fallback: tìm shop theo author_id
-                                        navigate(`/shop/${post.author_id}`);
-                                    }
-                                }}
-                                style={{ display: "flex", alignItems: "center", gap: "5px", cursor: "pointer", flex: 1, justifyContent: "center", color: "#2e7d32" }}
-                            >
-                                🏪 Xem cửa hàng
-                            </div>
-                        )}
                     </div>    
                 </div>
             ))}
@@ -1328,16 +1355,7 @@ function Home() {
                                         </p>
                                     )}
                                 </div>
-                                {selectedPost.location && (
-                                    <p style={{ margin: "5px 0", color: "#666", fontSize: "14px" }}>
-                                        📍 <strong>Vị trí:</strong> {selectedPost.location}
-                                    </p>
-                                )}
-                                {selectedPost.tags && selectedPost.tags.length > 0 && (
-                                    <p style={{ margin: "5px 0", color: "#2e7d32", fontSize: "14px", fontWeight: "500" }}>
-                                        {selectedPost.tags.map(tag => `#${tag}`).join(" ")}
-                                    </p>
-                                )}
+                                
                             </div>
 
                             {/* Phần hiển thị ảnh trong modal chi tiết - ĐÃ THÊM onClick */}
