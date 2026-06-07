@@ -953,7 +953,7 @@ function Home() {
 
                                 <ReactMarkdown
                                     components={{
-                                        p: ({node, ...props}) => <p style={{margin: '0 0 8px 0'}} {...props} />,
+                                        p: ({node, ...props}) => <p style={{margin: '0 0 8px 0', whiteSpace: 'pre-wrap'}} {...props} />,
                                         h1: ({node, ...props}) => <h1 style={{fontSize: '24px', margin: '16px 0 8px 0'}} {...props} />,
                                         h2: ({node, ...props}) => <h2 style={{fontSize: '20px', margin: '12px 0 8px 0'}} {...props} />,
                                         h3: ({node, ...props}) => <h3 style={{fontSize: '18px', margin: '10px 0 6px 0'}} {...props} />,
@@ -1286,7 +1286,7 @@ function Home() {
                                         }}>
                                             <ReactMarkdown
                                                 components={{
-                                                    p: ({node, ...props}) => <p style={{margin: '0 0 8px 0'}} {...props} />,
+                                                    p: ({node, ...props}) => <p style={{margin: '0 0 8px 0', whiteSpace: 'pre-wrap' }} {...props} />,
                                                     h1: ({node, ...props}) => <h1 style={{fontSize: '24px', margin: '16px 0 8px 0'}} {...props} />,
                                                     h2: ({node, ...props}) => <h2 style={{fontSize: '20px', margin: '12px 0 8px 0'}} {...props} />,
                                                     h3: ({node, ...props}) => <h3 style={{fontSize: '18px', margin: '10px 0 6px 0'}} {...props} />,
