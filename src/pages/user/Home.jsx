@@ -1048,6 +1048,22 @@ function Home() {
                         >
                             ↗️ Chia sẻ
                         </div>
+
+                        {post.author_type === "shop_owner" && post.shop_id && (
+                            <div 
+                                onClick={() => {
+                                    if (post.shop_id) {
+                                        navigate(`/shop/${post.shop_id}`);
+                                    } else if (post.author_id) {
+                                        // Fallback: tìm shop theo author_id
+                                        navigate(`/shop/${post.author_id}`);
+                                    }
+                                }}
+                                style={{ display: "flex", alignItems: "center", gap: "5px", cursor: "pointer", flex: 1, justifyContent: "center", color: "#2e7d32" }}
+                            >
+                                🏪 Xem cửa hàng
+                            </div>
+                        )}
                     </div>    
                 </div>
             ))}
