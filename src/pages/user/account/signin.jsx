@@ -29,112 +29,112 @@ function LoginContent() {
     setToast({ show: true, message, type });
   };
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
+const handleLogin = async (e) => {
+  e.preventDefault();
+  setError("");
+  setLoading(true);
+
+  try {
+    const formData = new URLSearchParams();
+    formData.append("username", loginInput);
+    formData.append("password", password);
+
+    const response = await userApi.post("/api/v1/auth/login", formData.toString(), {
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+    });
+
+    const data = response.data;
+
+    // ⭐ XÓA ĐOẠN KIỂM TRA ROLE NÀY
+    // if (data.user && data.user.role === "shop_owner") {
+    //   throw new Error("Vui lòng đăng nhập qua cổng dành cho shop");
+    // }
+    // if (data.user && data.user.role === "admin") {
+    //   throw new Error("Vui lòng đăng nhập qua cổng dành cho admin");
+    // }
+
+    localStorage.setItem("user_token", data.access_token);
+    localStorage.setItem("user_data", JSON.stringify(data.user));
+    localStorage.setItem("user", JSON.stringify(data.user));
+
+    showToast("Đăng nhập thành công!", "success");
+    
+    // Redirect theo role (tuỳ chọn)
+    setTimeout(() => {
+      const userRole = data.user?.role;
+      if (userRole === "admin") {
+        navigate("/");
+      } else if (userRole === "shop_owner") {
+        navigate("/");
+      } else {
+        navigate("/");
+      }
+    }, 1500);
+
+  } catch (err) {
+    const errorMsg = err.response?.data?.detail || err.message || "Đăng nhập thất bại";
+    setError(errorMsg);
+    showToast(errorMsg, "error");
+  } finally {
+    setLoading(false);
+  }
+};
+
+const loginGoogle = useGoogleLogin({
+  onSuccess: async (tokenResponse) => {
+    setGoogleLoading(true);
     setError("");
-    setLoading(true);
-
+    
     try {
-      const formData = new URLSearchParams();
-      // Gửi loginInput (có thể là email hoặc username) vào trường username
-      formData.append("username", loginInput);
-      formData.append("password", password);
-
-      const response = await userApi.post("/api/v1/auth/login", formData.toString(), {
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
+      const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
       });
-
-      const data = response.data;
-
-      if (data.user && data.user.role === "shop_owner") {
-        throw new Error("Vui lòng đăng nhập qua cổng dành cho shop");
-      }
+      const userInfo = await userInfoResponse.json();
       
-      if (data.user && data.user.role === "admin") {
-        throw new Error("Vui lòng đăng nhập qua cổng dành cho admin");
-      }
-
+      const { email, name, picture, sub: googleId } = userInfo;
+      
+      const response = await userApi.post("/api/v1/auth/google-login", {
+        email: email,
+        full_name: name,
+        avatar_url: picture,
+        google_id: googleId
+      });
+      
+      const data = response.data;
+      
       localStorage.setItem("user_token", data.access_token);
       localStorage.setItem("user_data", JSON.stringify(data.user));
       localStorage.setItem("user", JSON.stringify(data.user));
-
-      showToast("Đăng nhập thành công!", "success");
+      
+      showToast("Đăng nhập với Google thành công!", "success");
       
       setTimeout(() => {
-        navigate("/");
+        const userRole = data.user?.role;
+        if (userRole === "admin") {
+          navigate("/admin");
+        } else if (userRole === "shop_owner") {
+          navigate("/shop/dashboard");
+        } else {
+          navigate("/");
+        }
       }, 1500);
-
+      
     } catch (err) {
-      const errorMsg = err.response?.data?.detail || err.message || "Đăng nhập thất bại";
+      const errorMsg = err.response?.data?.detail || err.message || "Đăng nhập với Google thất bại";
       setError(errorMsg);
       showToast(errorMsg, "error");
     } finally {
-      setLoading(false);
-    }
-  };
-
-  // Sử dụng custom hook để thiết kế lại hoàn toàn nút Google
-  const loginGoogle = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      setGoogleLoading(true);
-      setError("");
-      
-      try {
-        // Dùng access_token để lấy thông tin user từ Google API
-        const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-        });
-        const userInfo = await userInfoResponse.json();
-        console.log("Google user info:", userInfo);
-        
-        const { email, name, picture, sub: googleId } = userInfo;
-        
-        // Gọi API để login hoặc tạo tài khoản với Google
-        const response = await userApi.post("/api/v1/auth/google-login", {
-          email: email,
-          full_name: name,
-          avatar_url: picture,
-          google_id: googleId
-        });
-        
-        const data = response.data;
-        
-        // Kiểm tra role
-        if (data.user && data.user.role === "shop_owner") {
-          throw new Error("Vui lòng đăng nhập qua cổng dành cho shop");
-        }
-        
-        if (data.user && data.user.role === "admin") {
-          throw new Error("Vui lòng đăng nhập qua cổng dành cho admin");
-        }
-        
-        // Lưu token và thông tin user
-        localStorage.setItem("user_token", data.access_token);
-        localStorage.setItem("user_data", JSON.stringify(data.user));
-        localStorage.setItem("user", JSON.stringify(data.user));
-        
-        showToast("Đăng nhập với Google thành công!", "success");
-        
-        setTimeout(() => {
-          navigate("/");
-        }, 1500);
-        
-      } catch (err) {
-        const errorMsg = err.response?.data?.detail || err.message || "Đăng nhập với Google thất bại";
-        setError(errorMsg);
-        showToast(errorMsg, "error");
-      } finally {
-        setGoogleLoading(false);
-      }
-    },
-    onError: () => {
-      console.error("Google login failed");
-      showToast("Đăng nhập với Google thất bại, vui lòng thử lại", "error");
       setGoogleLoading(false);
     }
-  });
+  },
+  onError: () => {
+    console.error("Google login failed");
+    showToast("Đăng nhập với Google thất bại, vui lòng thử lại", "error");
+    setGoogleLoading(false);
+  }
+});
 
   return (
     <div style={styles.container}>

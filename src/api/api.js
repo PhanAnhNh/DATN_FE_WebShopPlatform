@@ -62,75 +62,39 @@ export const shopApi = createApiInstance(secureBackendUrl);
 export const adminApi = createApiInstance(secureBackendUrl);
 
 // Thêm token riêng cho từng instance
-userApi.interceptors.request.use((config) => {
-  const token = localStorage.getItem('user_token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
-shopApi.interceptors.request.use((config) => {
-  const token = localStorage.getItem('shop_token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
 adminApi.interceptors.request.use((config) => {
-  const token = localStorage.getItem('admin_token');
+  // Ưu tiên admin_token trước, nếu không có thì lấy user_token
+  let token = localStorage.getItem('admin_token');
+  if (!token) {
+    token = localStorage.getItem('user_token');
+  }
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
 
-// Response interceptors
-userApi.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    // Không redirect nếu đang ở trang login/register
-    const isAuthPage = window.location.pathname.includes('/login') || 
-                       window.location.pathname.includes('/register');
-    
-    if (error.response?.status === 401 && !isAuthPage) {
-      localStorage.removeItem('user_token');
-      localStorage.removeItem('user_data');
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
+// Sửa userApi interceptor - cũng có thể đọc từ admin_token (nếu cần)
+userApi.interceptors.request.use((config) => {
+  let token = localStorage.getItem('user_token');
+  if (!token) {
+    token = localStorage.getItem('admin_token');
   }
-);
-
-shopApi.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    const isShopAuthPage = window.location.pathname.includes('/shop/login');
-    
-    if (error.response?.status === 401 && !isShopAuthPage) {
-      localStorage.removeItem('shop_token');
-      localStorage.removeItem('shop_data');
-      localStorage.removeItem('shop_info');
-      window.location.href = '/shop/login';
-    }
-    return Promise.reject(error);
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
-);
+  return config;
+});
 
-adminApi.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    const isAdminAuthPage = window.location.pathname.includes('/admin/login');
-    
-    if (error.response?.status === 401 && !isAdminAuthPage) {
-      localStorage.removeItem('admin_token');
-      localStorage.removeItem('admin_data');
-      window.location.href = '/admin/login';
-    }
-    return Promise.reject(error);
+// shopApi tương tự nếu cần
+shopApi.interceptors.request.use((config) => {
+  let token = localStorage.getItem('shop_token');
+  if (!token) {
+    token = localStorage.getItem('user_token');
   }
-);
-
-// Export mặc định
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 export default userApi;
