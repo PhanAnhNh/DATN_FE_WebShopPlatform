@@ -263,7 +263,22 @@ const FavoriteProductsPage = () => {
                       </div>
                       
                       <div style={{ fontSize: "22px", fontWeight: "bold", color: "#d32f2f", marginBottom: "8px" }}>
-                        {formatCurrency(product.price)}
+                        {product.variants && product.variants.length > 0 ? (
+                          // Nếu có biến thể, hiển thị khoảng giá
+                          (() => {
+                            const prices = product.variants.map(v => v.price).filter(p => p > 0);
+                            if (prices.length === 0) return formatCurrency(product.price);
+                            const minPrice = Math.min(...prices);
+                            const maxPrice = Math.max(...prices);
+                            if (minPrice === maxPrice) {
+                              return formatCurrency(minPrice);
+                            }
+                            return `${formatCurrency(minPrice)} - ${formatCurrency(maxPrice)}`;
+                          })()
+                        ) : (
+                          // Không có biến thể, hiển thị giá gốc
+                          formatCurrency(product.price)
+                        )}
                       </div>
                       
                       <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#666", fontSize: "13px" }}>
