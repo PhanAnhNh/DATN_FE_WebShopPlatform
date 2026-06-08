@@ -43,7 +43,7 @@ const FriendList = ({ friends, recentChats, onSelectFriend, filterUnread, onConv
                 onConversationDeleted(user.user_id);
             }
             
-            // Không hiển thị toast khi xóa thành công
+            showToast('Đã xóa hội thoại', 'success');
             
         } catch (err) {
             console.error("Error deleting conversation:", err);
@@ -61,7 +61,7 @@ const FriendList = ({ friends, recentChats, onSelectFriend, filterUnread, onConv
             isOpen: true,
             userToDelete: user
         });
-        setMenuOpenFor(null); // Đóng menu sau khi mở dialog
+        setMenuOpenFor(null);
     };
 
     // Kết hợp danh sách, ưu tiên recent chats
@@ -97,7 +97,7 @@ const FriendList = ({ friends, recentChats, onSelectFriend, filterUnread, onConv
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
-            {/* Thanh tìm kiếm */}
+            {/* Thanh tìm kiếm trong danh sách bạn bè */}
             <div style={{ padding: '10px 16px', borderBottom: '1px solid #eee' }}>
                 <div style={{
                     display: 'flex',
@@ -110,7 +110,7 @@ const FriendList = ({ friends, recentChats, onSelectFriend, filterUnread, onConv
                     <FaSearch size={14} color="#65676b" />
                     <input 
                         type="text"
-                        placeholder="Tìm kiếm bạn bè..."
+                        placeholder="Tìm kiếm trong danh sách chat..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         style={{

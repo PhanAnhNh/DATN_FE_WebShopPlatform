@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { FaTimes, FaFilter } from 'react-icons/fa';
+import { FaTimes, FaFilter, FaSearch, FaUserPlus, FaComment } from 'react-icons/fa';
 import FriendList from './FriendList';
 import ChatWindow from './ChatWindow';
+import StrangerSearch from './StrangerSearch';
 import api from '../../api/api';
 import socket from '../../utils/socket'; 
 
@@ -10,6 +11,8 @@ const ChatModal = ({ isOpen, onClose }) => {
     const [friends, setFriends] = useState([]);
     const [recentChats, setRecentChats] = useState([]);
     const [onlyUnread, setOnlyUnread] = useState(false);
+    const [activeTab, setActiveTab] = useState('friends'); // 'friends' hoặc 'search'
+    const [showSearch, setShowSearch] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
@@ -57,7 +60,9 @@ const ChatModal = ({ isOpen, onClose }) => {
         try {
             const res = await api.get('/api/v1/friends/list');
             setFriends(res.data);
-        } catch (err) { console.error(err); }
+        } catch (err) { 
+            console.error(err); 
+        }
     };
 
     const getCurrentUserId = () => {
@@ -78,7 +83,14 @@ const ChatModal = ({ isOpen, onClose }) => {
         try {
             const res = await api.get('/api/v1/chat/recent');
             setRecentChats(res.data);
-        } catch (err) { console.error(err); }
+        } catch (err) { 
+            console.error(err); 
+        }
+    };
+
+    const handleSelectStranger = (stranger) => {
+        setSelectedFriend(stranger);
+        setActiveTab('friends'); // Chuyển về tab bạn bè sau khi chọn
     };
 
     if (!isOpen) return null;
@@ -114,37 +126,111 @@ const ChatModal = ({ isOpen, onClose }) => {
                     flexShrink: 0 
                 }}>
                     <span style={{ fontWeight: 'bold' }}>
-                        {selectedFriend ? "Trò chuyện" : "Tin nhắn"}
+                        {selectedFriend ? "Trò chuyện" : (activeTab === 'friends' ? "Tin nhắn" : "Tìm kiếm người dùng")}
                     </span>
                     <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                        {!selectedFriend && (
+                        {!selectedFriend && activeTab === 'friends' && (
                             <FaFilter 
                                 size={14} 
                                 style={{ cursor: 'pointer', color: onlyUnread ? '#ffeb3b' : 'white' }} 
                                 onClick={() => setOnlyUnread(!onlyUnread)}
                             />
                         )}
+                        {!selectedFriend && (
+                            <FaSearch 
+                                size={14} 
+                                style={{ cursor: 'pointer' }} 
+                                onClick={() => {
+                                    setActiveTab(activeTab === 'friends' ? 'search' : 'friends');
+                                    setShowSearch(!showSearch);
+                                }}
+                            />
+                        )}
                         <FaTimes style={{ cursor: 'pointer' }} onClick={onClose} />
                     </div>
                 </div>
+
+                {/* Tabs khi chưa chọn chat */}
+                {!selectedFriend && (
+                    <div style={{ 
+                        display: 'flex', 
+                        borderBottom: '1px solid #eee',
+                        backgroundColor: '#f8f9fa',
+                        flexShrink: 0
+                    }}>
+                        <button
+                            onClick={() => setActiveTab('friends')}
+                            style={{
+                                flex: 1,
+                                padding: '10px',
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: activeTab === 'friends' ? '#2e7d32' : '#666',
+                                fontWeight: activeTab === 'friends' ? 'bold' : 'normal',
+                                borderBottom: activeTab === 'friends' ? '2px solid #2e7d32' : 'none',
+                                fontSize: '14px'
+                            }}
+                        >
+                            💬 Bạn bè
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('search')}
+                            style={{
+                                flex: 1,
+                                padding: '10px',
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                color: activeTab === 'search' ? '#2e7d32' : '#666',
+                                fontWeight: activeTab === 'search' ? 'bold' : 'normal',
+                                borderBottom: activeTab === 'search' ? '2px solid #2e7d32' : 'none',
+                                fontSize: '14px'
+                            }}
+                        >
+                            💬 Người lạ
+                        </button>
+                    </div>
+                )}
 
                 {/* Nội dung linh hoạt */}
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                     {selectedFriend ? (
                         <ChatWindow 
                             friend={selectedFriend} 
-                            onClose={() => setSelectedFriend(null)} 
+                            onClose={() => {
+                                setSelectedFriend(null);
+                                fetchRecentChats(); // Refresh sau khi đóng
+                            }} 
                             onCloseModal={onClose}
                         />
                     ) : (
-                        <div style={{ flex: 1, overflowY: 'auto' }}>
-                            <FriendList 
-                                friends={friends} 
-                                recentChats={recentChats}
-                                onSelectFriend={setSelectedFriend} 
-                                filterUnread={onlyUnread}
-                            />
-                        </div>
+                        <>
+                            {activeTab === 'friends' ? (
+                                <div style={{ flex: 1, overflowY: 'auto' }}>
+                                    <FriendList 
+                                        friends={friends} 
+                                        recentChats={recentChats}
+                                        onSelectFriend={setSelectedFriend} 
+                                        filterUnread={onlyUnread}
+                                        onConversationDeleted={() => {
+                                            fetchRecentChats();
+                                            fetchFriends();
+                                        }}
+                                    />
+                                </div>
+                            ) : (
+                                <div style={{ flex: 1, overflowY: 'auto' }}>
+                                    <StrangerSearch 
+                                        onSelectStranger={handleSelectStranger}
+                                        onStartChat={(user) => {
+                                            setSelectedFriend(user);
+                                            setActiveTab('friends');
+                                        }}
+                                    />
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
             </div>
