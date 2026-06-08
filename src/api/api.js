@@ -20,6 +20,7 @@ const createApiInstance = (baseURL) => {
     baseURL: baseURL,
     headers: {
       'Content-Type': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',  // 🔥 THÊM DÒNG NÀY - QUAN TRỌNG NHẤT
     },
     withCredentials: false,
   });
@@ -35,6 +36,11 @@ const createApiInstance = (baseURL) => {
       // Force HTTPS cho URL nếu là absolute URL
       if (config.url && config.url.includes('http://')) {
         config.url = config.url.replace(/http:\/\//g, 'https://');
+      }
+      
+      // 🔥 ĐẢM BẢO header X-Requested-With luôn có trong mọi request
+      if (!config.headers['X-Requested-With']) {
+        config.headers['X-Requested-With'] = 'XMLHttpRequest';
       }
       
       // Ghi log đầy đủ URL để debug
@@ -71,6 +77,10 @@ adminApi.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  // 🔥 Đảm bảo header X-Requested-With vẫn còn sau interceptor này
+  if (!config.headers['X-Requested-With']) {
+    config.headers['X-Requested-With'] = 'XMLHttpRequest';
+  }
   return config;
 });
 
@@ -82,6 +92,10 @@ userApi.interceptors.request.use((config) => {
   }
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+  // 🔥 Đảm bảo header X-Requested-With vẫn còn sau interceptor này
+  if (!config.headers['X-Requested-With']) {
+    config.headers['X-Requested-With'] = 'XMLHttpRequest';
   }
   return config;
 });
@@ -95,6 +109,11 @@ shopApi.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  // 🔥 Đảm bảo header X-Requested-With vẫn còn sau interceptor này
+  if (!config.headers['X-Requested-With']) {
+    config.headers['X-Requested-With'] = 'XMLHttpRequest';
+  }
   return config;
 });
+
 export default userApi;
