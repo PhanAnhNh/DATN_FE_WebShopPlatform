@@ -132,6 +132,7 @@ const ChatWindow = ({ friend, onClose, onCloseModal }) => {
             });
         };
 
+
         // Đảm bảo chỉ đăng ký listener một lần
         socket.on('new_message', handleNewMessage);
         socket.on('message_edited', handleMessageEdited);
@@ -183,6 +184,18 @@ const ChatWindow = ({ friend, onClose, onCloseModal }) => {
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
+
+            const handleEditClick = (msg) => {
+            setEditingMessage(msg);
+            setEditContent(msg.content);
+            setMenuOpenFor(null); // Đóng menu ngay khi click Sửa
+        };
+
+        const handleCancelEdit = () => {
+            setEditingMessage(null);
+            setEditContent('');
+        };
+
 
     const sendMessage = async () => {
         if (!newMessage.trim() || !friend?.user_id || !currentUserId) return;
@@ -257,28 +270,31 @@ const ChatWindow = ({ friend, onClose, onCloseModal }) => {
     };
 
     const handleEditMessage = async (message) => {
-        if (!editContent.trim()) return;
-        
-        try {
-            await api.put(`/api/v1/chat/${message.id || message._id}`, {
+    if (!editContent.trim()) return;
+    
+    try {
+        // Gửi content dưới dạng query parameter
+        await api.put(`/api/v1/chat/${message.id || message._id}`, null, {
+            params: {
                 content: editContent
-            });
-            
-            if (isMounted.current) {
-                setMessages(prev => prev.map(msg => 
-                    (msg.id === message.id || msg._id === message._id)
-                        ? { ...msg, content: editContent, is_edited: true }
-                        : msg
-                ));
-                setEditingMessage(null);
-                setEditContent('');
-                setMenuOpenFor(null);
             }
-        } catch (err) {
-            console.error("Error editing message:", err);
-            alert("Không thể sửa tin nhắn");
+        });
+        
+        if (isMounted.current) {
+            setMessages(prev => prev.map(msg => 
+                (msg.id === message.id || msg._id === message._id)
+                    ? { ...msg, content: editContent, is_edited: true }
+                    : msg
+            ));
+            setEditingMessage(null);
+            setEditContent('');
+            setMenuOpenFor(null);
         }
-    };
+    } catch (err) {
+        console.error("Error editing message:", err);
+        alert("Không thể sửa tin nhắn");
+    }
+};
 
     const handleDeleteMessage = async (message) => {
         // Tránh xóa nhiều lần
@@ -436,16 +452,20 @@ const ChatWindow = ({ friend, onClose, onCloseModal }) => {
                 ) : (
                     messages.map((msg) => {
                         const isMe = msg.sender_id === currentUserId;
-                        const isEditing = editingMessage && (editingMessage.id === msg.id || editingMessage._id === msg._id);
+                        const isEditing =
+                        (editingMessage?.id || editingMessage?._id) ===
+                        (msg.id || msg._id);
                         const showMenu = menuOpenFor === (msg.id || msg._id);
                         
                         return (
                             <div key={msg.id || msg._id} style={{
                                 alignSelf: isMe ? 'flex-end' : 'flex-start',
                                 maxWidth: '85%',
-                                position: 'relative'
+                                position: 'relative',
+                                marginBottom: '12px'
                             }}>
                                 {isEditing ? (
+                                    // Form sửa tin nhắn - chỉ hiển thị khi đang sửa
                                     <div style={{
                                         background: 'white',
                                         borderRadius: '15px',
@@ -483,10 +503,7 @@ const ChatWindow = ({ friend, onClose, onCloseModal }) => {
                                                 Lưu
                                             </button>
                                             <button 
-                                                onClick={() => { 
-                                                    setEditingMessage(null); 
-                                                    setEditContent(''); 
-                                                }} 
+                                                onClick={handleCancelEdit} 
                                                 style={{ 
                                                     background: '#ccc', 
                                                     border: 'none', 
@@ -502,6 +519,7 @@ const ChatWindow = ({ friend, onClose, onCloseModal }) => {
                                     </div>
                                 ) : (
                                     <>
+                                        {/* Nội dung tin nhắn */}
                                         <div style={{ position: 'relative' }}>
                                             <div style={{
                                                 background: isMe ? '#2e7d32' : 'white',
@@ -528,8 +546,9 @@ const ChatWindow = ({ friend, onClose, onCloseModal }) => {
                                             </div>
                                         </div>
                                         
+                                        {/* ✅ CHỈ HIỂN THỊ NÚT MENU CHO TIN NHẮN CỦA MÌNH */}
                                         {isMe && (
-                                            <div style={{ position: 'absolute', top: '-5px', left: '-30px' }}>
+                                            <div style={{ position: 'absolute', top: '2px', right: '90px' }}> {/* Đổi left thành right */}
                                                 <button
                                                     onClick={() => setMenuOpenFor(showMenu ? null : (msg.id || msg._id))}
                                                     style={{
@@ -537,8 +556,16 @@ const ChatWindow = ({ friend, onClose, onCloseModal }) => {
                                                         border: 'none',
                                                         cursor: 'pointer',
                                                         color: '#888',
-                                                        padding: '4px'
+                                                        padding: '4px',
+                                                        borderRadius: '50%',
+                                                        width: '28px',
+                                                        height: '28px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center'
                                                     }}
+                                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e4e6e9'}
+                                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                                                 >
                                                     <FaEllipsisV size={12} />
                                                 </button>
@@ -546,21 +573,18 @@ const ChatWindow = ({ friend, onClose, onCloseModal }) => {
                                                 {showMenu && (
                                                     <div style={{
                                                         position: 'absolute',
-                                                        top: '20px',
+                                                        top: '28px',
                                                         right: '0',
                                                         background: 'white',
                                                         border: '1px solid #ddd',
                                                         borderRadius: '8px',
                                                         boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
                                                         zIndex: 10,
-                                                        minWidth: '100px'
+                                                        minWidth: '100px',
+                                                        overflow: 'hidden'
                                                     }}>
                                                         <button
-                                                            onClick={() => {
-                                                                setEditingMessage(msg);
-                                                                setEditContent(msg.content);
-                                                                setMenuOpenFor(null);
-                                                            }}
+                                                            onClick={() => handleEditClick(msg)}  // Dùng hàm mới
                                                             style={{
                                                                 display: 'flex',
                                                                 alignItems: 'center',
@@ -571,8 +595,11 @@ const ChatWindow = ({ friend, onClose, onCloseModal }) => {
                                                                 cursor: 'pointer',
                                                                 width: '100%',
                                                                 textAlign: 'left',
-                                                                borderBottom: '1px solid #eee'
+                                                                borderBottom: '1px solid #eee',
+                                                                fontSize: '13px'
                                                             }}
+                                                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+                                                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
                                                         >
                                                             <FaEdit size={12} /> Sửa
                                                         </button>
@@ -588,8 +615,11 @@ const ChatWindow = ({ friend, onClose, onCloseModal }) => {
                                                                 cursor: 'pointer',
                                                                 width: '100%',
                                                                 textAlign: 'left',
-                                                                color: '#dc3545'
+                                                                color: '#dc3545',
+                                                                fontSize: '13px'
                                                             }}
+                                                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+                                                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
                                                         >
                                                             <FaTrash size={12} /> Xóa
                                                         </button>

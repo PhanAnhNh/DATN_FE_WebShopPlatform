@@ -36,6 +36,8 @@ import {
     fetchCommentsWithPaginationAPI
 } from '../../api/userProfileAPI';
 import '../../css/UserProfile.css';
+import { FaComment } from 'react-icons/fa';
+import ChatWindow from '../../components/chat/ChatWindow';
 
 const UserProfile = () => {
     const { userId } = useParams();
@@ -48,7 +50,7 @@ const UserProfile = () => {
     const [isFollowing, setIsFollowing] = useState(false);
     const [followingLoading, setFollowingLoading] = useState(false);
     const [currentUser, setCurrentUser] = useState(null);
-    
+    const [showChatWindow, setShowChatWindow] = useState(false);
     // Comment states
     const [showComments, setShowComments] = useState({});
     const [postComments, setPostComments] = useState({});
@@ -134,6 +136,14 @@ const UserProfile = () => {
         setConfirmMessage(message);
         setConfirmAction(() => onConfirm);
         setShowConfirmModal(true);
+    };
+
+    const handleOpenChat = () => {
+        setShowChatWindow(true);
+    };
+
+    const handleCloseChat = () => {
+        setShowChatWindow(false);
     };
 
     useEffect(() => {
@@ -967,22 +977,48 @@ const UserProfile = () => {
                         </div>
                         
         
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            {!isOwnProfile && (
-                                <FriendButton 
-                                    userId={user?._id} 
-                                    currentUserId={currentUser?._id}
-                                    onStatusChange={(newStatus) => {
-                                        console.log('Friend status changed:', newStatus);
-                                        if (newStatus === 'friends') {
-                                            setUser(prev => ({ ...prev, friends_count: (prev.friends_count || 0) + 1 }));
-                                        } else if (newStatus === 'not_friends') {
-                                            setUser(prev => ({ ...prev, friends_count: Math.max(0, (prev.friends_count || 0) - 1) }));
-                                        }
-                                    }}
-                                />
-                            )}
-                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+    {!isOwnProfile && (
+        <>
+            <FriendButton 
+                userId={user?._id} 
+                currentUserId={currentUser?._id}
+                onStatusChange={(newStatus) => {
+                    console.log('Friend status changed:', newStatus);
+                    if (newStatus === 'friends') {
+                        setUser(prev => ({ ...prev, friends_count: (prev.friends_count || 0) + 1 }));
+                    } else if (newStatus === 'not_friends') {
+                        setUser(prev => ({ ...prev, friends_count: Math.max(0, (prev.friends_count || 0) - 1) }));
+                    }
+                }}
+            />
+            
+            {/* Nút Nhắn tin */}
+            <button
+                onClick={handleOpenChat}
+                style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '8px 16px',
+                    background: '#2e7d32',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = '#1b5e20'}
+                onMouseLeave={(e) => e.currentTarget.style.background = '#2e7d32'}
+            >
+                <FaComment size={14} />
+                Nhắn tin
+            </button>
+        </>
+    )}
+</div>
                     </div>
                 </div>
 
@@ -2043,6 +2079,34 @@ const UserProfile = () => {
                     duration={3000}
                 />
             )}
+            {/* Chat Window Modal */}
+{showChatWindow && user && (
+    <div style={{
+        position: 'fixed',
+        right: '20px',
+        bottom: '20px',
+        zIndex: 2000,
+        width: '380px',
+        height: '500px',
+        background: 'white',
+        borderRadius: '12px',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden'
+    }}>
+        <ChatWindow
+            friend={{
+                user_id: user._id,
+                full_name: user.full_name || user.username,
+                username: user.username,
+                avatar_url: user.avatar_url
+            }}
+            onClose={handleCloseChat}
+            onCloseModal={handleCloseChat}
+        />
+    </div>
+)}
         </Layout>
     );
 };
