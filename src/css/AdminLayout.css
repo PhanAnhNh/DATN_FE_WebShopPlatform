@@ -141,37 +141,13 @@ body {
   transition: all 0.2s;
 }
 
-.search-box {
-  position: relative;
-  width: 400px;
-}
 
-.search-box input {
-  width: 100%;
-  padding: 10px 16px 10px 44px;
-  border: 1px solid var(--admin-border);
-  border-radius: 40px;
-  background-color: var(--admin-input-bg);
-  font-size: 14px;
-  outline: none;
-  transition: all 0.2s;
+.title-name {
+  font-size: 23px;
+  font-weight: 600;
   color: var(--admin-text-primary);
 }
 
-.search-box input:focus {
-  border-color: var(--admin-primary);
-  background-color: var(--admin-bg-sidebar);
-  box-shadow: 0 0 0 3px var(--admin-primary-soft);
-}
-
-.search-icon {
-  position: absolute;
-  left: 16px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--admin-text-secondary);
-  font-size: 16px;
-}
 
 .user-info {
   display: flex;

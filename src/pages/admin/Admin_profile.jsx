@@ -220,7 +220,7 @@ const AdminProfile = () => {
       <div className="profile-header">
         <div className="profile-cover">
           <img 
-            src={user?.cover_url || 'https://via.placeholder.com/1200x300/2e7d32/ffffff?text=Admin+Profile'} 
+            src={user?.cover_url || 'https://cdn2.fptshop.com.vn/unsafe/800x0/anh_bia_dep_20_e08ae835c5.jpg'} 
             alt="Cover" 
           />
         </div>

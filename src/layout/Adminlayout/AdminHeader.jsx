@@ -62,9 +62,9 @@ const AdminHeader = () => {
 
   return (
     <header className="header">
-      <div className="search-box">
-        <span className="search-icon">🔍</span>
-        <input type="text" placeholder="Tìm kiếm bài viết, sản phẩm..." />
+      <div className="title-name">
+        <span >Bảng Điều Khiển</span>
+        
       </div>
       
       <div className="user-info">

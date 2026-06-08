@@ -2097,10 +2097,10 @@ function Home() {
                                 background: "rgba(0,0,0,0.5)",
                                 border: "none",
                                 color: "white",
-                                fontSize: "40px",
+                                fontSize: "20px",
                                 cursor: "pointer",
-                                width: "60px",
-                                height: "60px",
+                                width: "50px",
+                                height: "50px",
                                 borderRadius: "50%",
                                 display: "flex",
                                 alignItems: "center",
@@ -2120,11 +2120,11 @@ function Home() {
                         src={lightboxImages[currentImageIndex]}
                         alt={`Lightbox ${currentImageIndex + 1}`}
                         style={{
-                            maxWidth: "90vw",
-                            maxHeight: "90vh",
+                            width: "100%",
+                            height: "100%",
+                            maxWidth: "50vw",
+                            maxHeight: "50vh",
                             objectFit: "contain",
-                            cursor: "default",
-                            borderRadius: "8px"
                         }}
                         onClick={(e) => e.stopPropagation()}
                     />
@@ -2139,10 +2139,10 @@ function Home() {
                                 background: "rgba(0,0,0,0.5)",
                                 border: "none",
                                 color: "white",
-                                fontSize: "40px",
+                                fontSize: "20px",
                                 cursor: "pointer",
-                                width: "60px",
-                                height: "60px",
+                                width: "45px",
+                                height: "45px",
                                 borderRadius: "50%",
                                 display: "flex",
                                 alignItems: "center",

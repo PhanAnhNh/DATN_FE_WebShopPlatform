@@ -221,12 +221,12 @@
 }
 
 .stat-label {
-  font-size: 13px;
+  font-size: 14px !important;
   color: #6c757d;
 }
 
 .stat-value {
-  font-size: 14px;
+  font-size: 14px !important;
   font-weight: 600;
   color: #2e7d32;
 }

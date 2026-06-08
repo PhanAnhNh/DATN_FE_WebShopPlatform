@@ -161,8 +161,6 @@ const Dashboard = () => {
 
   return (
     <div>
-      <h2 className="dashboard-title">Bảng Điều Khiển</h2>
-
       {loading && (
         <div style={{ textAlign: 'center', padding: '20px' }}>
           <div className="spinner"></div>
@@ -191,7 +189,7 @@ const Dashboard = () => {
         {/* Biểu đồ đường */}
         <div className="chart-card">
           <div className="chart-header">
-            <h3>Lượt Truy Cập (Demo)</h3>
+            <h3>Lượt Truy Cập</h3>
             <button className="download-btn"><Download size={14} /> Tải báo cáo</button>
           </div>
           <div className="chart-container" style={{ height: '300px', width: '100%' }}>
