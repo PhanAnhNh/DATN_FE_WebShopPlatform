@@ -29,7 +29,7 @@ const Sidebar = () => {
       {/* Logo */}
       <div className="sidebar-logo" onClick={() => navigate('/admin/dashboard')} style={{ cursor: 'pointer' }}>
         <div className="logo-icon">
-          <span>🧺</span>
+          <img src="/logoda.png" alt="Logo" style={{ width: '30px', height: '30px' }} />
         </div>
         <span className="logo-text">Đặc Sản<br />Quê Tôi</span>
       </div>
