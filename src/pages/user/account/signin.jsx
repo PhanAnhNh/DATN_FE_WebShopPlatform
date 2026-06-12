@@ -9,14 +9,13 @@ import userApi from '../../../api/api';
 const GOOGLE_CLIENT_ID = "298767992144-us7ot1ggmedj7t5092lhvueu0pr1ht2g.apps.googleusercontent.com";
 
 function LoginContent() {
-  const [loginInput, setLoginInput] = useState(""); // Thay đổi từ email thành loginInput
+  const [loginInput, setLoginInput] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   
-  // Toast states
   const [toast, setToast] = useState({
     show: false,
     message: '',
@@ -29,120 +28,167 @@ function LoginContent() {
     setToast({ show: true, message, type });
   };
 
-const handleLogin = async (e) => {
-  e.preventDefault();
-  setError("");
-  setLoading(true);
-
-  try {
-    const formData = new URLSearchParams();
-    formData.append("username", loginInput);
-    formData.append("password", password);
-
-    const response = await userApi.post("/api/v1/auth/login", formData.toString(), {
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-    });
-
-    const data = response.data;
-
-    // ⭐ XÓA ĐOẠN KIỂM TRA ROLE NÀY
-    // if (data.user && data.user.role === "shop_owner") {
-    //   throw new Error("Vui lòng đăng nhập qua cổng dành cho shop");
-    // }
-    // if (data.user && data.user.role === "admin") {
-    //   throw new Error("Vui lòng đăng nhập qua cổng dành cho admin");
-    // }
-
-    localStorage.setItem("user_token", data.access_token);
-    localStorage.setItem("user_data", JSON.stringify(data.user));
-    localStorage.setItem("user", JSON.stringify(data.user));
-
-    showToast("Đăng nhập thành công!", "success");
-    
-    // Redirect theo role (tuỳ chọn)
-    setTimeout(() => {
-      const userRole = data.user?.role;
-      if (userRole === "admin") {
-        navigate("/");
-      } else if (userRole === "shop_owner") {
-        navigate("/");
-      } else {
-        navigate("/");
-      }
-    }, 1500);
-
-  } catch (err) {
-    const errorMsg = err.response?.data?.detail || err.message || "Đăng nhập thất bại";
-    setError(errorMsg);
-    showToast(errorMsg, "error");
-  } finally {
-    setLoading(false);
-  }
-};
-
-const loginGoogle = useGoogleLogin({
-  onSuccess: async (tokenResponse) => {
-    setGoogleLoading(true);
+  const handleLogin = async (e) => {
+    e.preventDefault();
     setError("");
-    
+    setLoading(true);
+
     try {
-      const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-        headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+      const formData = new URLSearchParams();
+      formData.append("username", loginInput);
+      formData.append("password", password);
+
+      const response = await userApi.post("/api/v1/auth/login", formData.toString(), {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
       });
-      const userInfo = await userInfoResponse.json();
-      
-      const { email, name, picture, sub: googleId } = userInfo;
-      
-      const response = await userApi.post("/api/v1/auth/google-login", {
-        email: email,
-        full_name: name,
-        avatar_url: picture,
-        google_id: googleId
-      });
-      
+
       const data = response.data;
-      
+
       localStorage.setItem("user_token", data.access_token);
       localStorage.setItem("user_data", JSON.stringify(data.user));
       localStorage.setItem("user", JSON.stringify(data.user));
-      
-      showToast("Đăng nhập với Google thành công!", "success");
+
+      showToast("Đăng nhập thành công!", "success");
       
       setTimeout(() => {
         const userRole = data.user?.role;
         if (userRole === "admin") {
-          navigate("/admin");
+          navigate("/");
         } else if (userRole === "shop_owner") {
-          navigate("/shop/dashboard");
+          navigate("/");
         } else {
           navigate("/");
         }
       }, 1500);
-      
+
     } catch (err) {
-      const errorMsg = err.response?.data?.detail || err.message || "Đăng nhập với Google thất bại";
+      // ✅ XỬ LÝ LỖI ĐẸP - KHÔNG HIỂN THỊ MÃ LỖI 400
+      let errorMsg = "Đăng nhập thất bại";
+      
+      // Lấy message từ response
+      const serverDetail = err.response?.data?.detail;
+      const serverMessage = err.response?.data?.message;
+      
+      // Kiểm tra các trường hợp lỗi cụ thể
+      if (err.response?.status === 400) {
+        if (serverDetail === "Incorrect username or password" || 
+            serverDetail === "Incorrect email or password" ||
+            serverDetail?.toLowerCase().includes("incorrect")) {
+          errorMsg = "Sai email/tên đăng nhập hoặc mật khẩu. Vui lòng thử lại.";
+        } else if (serverDetail === "User not found" || serverDetail?.toLowerCase().includes("not found")) {
+          errorMsg = "Tài khoản không tồn tại. Vui lòng kiểm tra lại email/tên đăng nhập.";
+        } else if (serverDetail === "Account is not active" || serverDetail?.toLowerCase().includes("active")) {
+          errorMsg = "Tài khoản của bạn chưa được kích hoạt. Vui lòng kiểm tra email để xác thực.";
+        } else if (serverDetail === "Account is locked" || serverDetail?.toLowerCase().includes("lock")) {
+          errorMsg = "Tài khoản của bạn đã bị khóa. Vui lòng liên hệ hỗ trợ.";
+        } else if (serverMessage) {
+          errorMsg = serverMessage;
+        } else if (typeof serverDetail === "string") {
+          errorMsg = serverDetail;
+        } else {
+          errorMsg = "Sai email/tên đăng nhập hoặc mật khẩu.";
+        }
+      } else if (err.response?.status === 401) {
+        errorMsg = "Không có quyền truy cập. Vui lòng kiểm tra lại thông tin đăng nhập.";
+      } else if (err.response?.status === 403) {
+        errorMsg = "Bạn không có quyền truy cập vào hệ thống.";
+      } else if (err.response?.status === 404) {
+        errorMsg = "Không tìm thấy tài khoản. Vui lòng kiểm tra lại.";
+      } else if (err.response?.status === 429) {
+        errorMsg = "Quá nhiều lần đăng nhập thất bại. Vui lòng thử lại sau 5 phút.";
+      } else if (err.response?.status >= 500) {
+        errorMsg = "Lỗi máy chủ. Vui lòng thử lại sau.";
+      } else if (err.message && err.message !== "Request failed with status code 400") {
+        errorMsg = err.message;
+      }
+      
       setError(errorMsg);
       showToast(errorMsg, "error");
     } finally {
+      setLoading(false);
+    }
+  };
+
+  const loginGoogle = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      setGoogleLoading(true);
+      setError("");
+      
+      try {
+        const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+        });
+        const userInfo = await userInfoResponse.json();
+        
+        const { email, name, picture, sub: googleId } = userInfo;
+        
+        const response = await userApi.post("/api/v1/auth/google-login", {
+          email: email,
+          full_name: name,
+          avatar_url: picture,
+          google_id: googleId
+        });
+        
+        const data = response.data;
+        
+        localStorage.setItem("user_token", data.access_token);
+        localStorage.setItem("user_data", JSON.stringify(data.user));
+        localStorage.setItem("user", JSON.stringify(data.user));
+        
+        showToast("Đăng nhập với Google thành công!", "success");
+        
+        setTimeout(() => {
+          const userRole = data.user?.role;
+          if (userRole === "admin") {
+            navigate("/admin");
+          } else if (userRole === "shop_owner") {
+            navigate("/shop/dashboard");
+          } else {
+            navigate("/");
+          }
+        }, 1500);
+        
+      } catch (err) {
+        // ✅ XỬ LÝ LỖI GOOGLE ĐẸP
+        let errorMsg = "Đăng nhập với Google thất bại";
+        
+        if (err.response?.status === 400) {
+          const serverDetail = err.response?.data?.detail;
+          if (serverDetail?.toLowerCase().includes("email")) {
+            errorMsg = "Email từ Google không hợp lệ hoặc đã được sử dụng.";
+          } else if (serverDetail?.toLowerCase().includes("account")) {
+            errorMsg = "Tài khoản Google chưa được đăng ký. Vui lòng đăng ký trước.";
+          } else if (serverDetail) {
+            errorMsg = serverDetail;
+          } else {
+            errorMsg = "Không thể đăng nhập bằng Google. Vui lòng thử lại.";
+          }
+        } else if (err.response?.status === 409) {
+          errorMsg = "Email đã tồn tại. Vui lòng đăng nhập bằng mật khẩu.";
+        } else if (err.response?.status >= 500) {
+          errorMsg = "Lỗi máy chủ. Vui lòng thử lại sau.";
+        }
+        
+        setError(errorMsg);
+        showToast(errorMsg, "error");
+      } finally {
+        setGoogleLoading(false);
+      }
+    },
+    onError: () => {
+      setError("Đăng nhập với Google thất bại, vui lòng thử lại");
+      showToast("Đăng nhập với Google thất bại, vui lòng thử lại", "error");
       setGoogleLoading(false);
     }
-  },
-  onError: () => {
-    console.error("Google login failed");
-    showToast("Đăng nhập với Google thất bại, vui lòng thử lại", "error");
-    setGoogleLoading(false);
-  }
-});
+  });
 
   return (
     <div style={styles.container}>
-      {/* Background Image */}
       <div style={styles.backgroundImage}></div>
       <div style={styles.overlay}></div>
       
-      {/* Toast Container */}
       {toast.show && (
         <div className="toast-container" style={styles.toastContainer}>
           <Toast 
@@ -153,13 +199,10 @@ const loginGoogle = useGoogleLogin({
         </div>
       )}
 
-      {/* Floating Form Container */}
       <div style={styles.formContainer}>
         <div style={styles.card}>
-          {/* Close Button */}
           <button style={styles.closeBtn} onClick={() => navigate("/")}>✕</button>
           
-          {/* Logo & Header */}
           <div style={styles.header}>
             <div style={styles.logoWrapper}>
               <div style={styles.logoIcon}>🌾</div>
@@ -169,7 +212,6 @@ const loginGoogle = useGoogleLogin({
             <h2 style={styles.loginTitle}>Đăng nhập</h2>
           </div>
 
-          {/* Login Form */}
           <form onSubmit={handleLogin} style={styles.form}>
             <div style={styles.inputGroup}>
               <label style={styles.label}>
@@ -222,7 +264,13 @@ const loginGoogle = useGoogleLogin({
               </span>
             </div>
 
-            {error && <div style={styles.errorMessage}>{error}</div>}
+            {/* ✅ HIỂN THỊ LỖI DẠNG ĐẸP */}
+            {error && (
+              <div style={styles.errorMessage}>
+                <span style={styles.errorIcon}>⚠️</span>
+                <span>{error}</span>
+              </div>
+            )}
 
             <button 
               type="submit" 
@@ -289,7 +337,6 @@ const loginGoogle = useGoogleLogin({
   );
 }
 
-// Wrap với GoogleOAuthProvider
 function Login() {
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
@@ -501,13 +548,19 @@ const styles = {
   },
   
   errorMessage: {
-    padding: "12px",
-    backgroundColor: "#fee",
-    color: "#e74c3c",
+    padding: "12px 16px",
+    backgroundColor: "#fee2e2",
+    color: "#dc2626",
     borderRadius: "12px",
     fontSize: "13px",
-    textAlign: "center",
-    border: "1px solid #fcc",
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    border: "1px solid #fecaca",
+  },
+  
+  errorIcon: {
+    fontSize: "16px",
   },
   
   submitBtn: {
@@ -637,7 +690,6 @@ const styles = {
   },
 };
 
-// Add animations to document
 const styleSheet = document.createElement("style");
 styleSheet.textContent = `
   @keyframes spin {
@@ -668,13 +720,6 @@ styleSheet.textContent = `
   .social-btn:hover {
     background-color: #f9f9f9 !important;
     border-color: #d0d0d0 !important;
-  }
-  
-  .toast-container {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 1000;
   }
   
   @media (max-width: 640px) {

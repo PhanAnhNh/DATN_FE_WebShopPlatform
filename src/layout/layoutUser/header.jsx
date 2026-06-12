@@ -21,7 +21,7 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
     const [isSearching, setIsSearching] = useState(false);
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
     const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem("user_token"));
-    const [activeSearchTab, setActiveSearchTab] = useState('all'); // 'all', 'posts', 'users', 'groups'
+    const [activeSearchTab, setActiveSearchTab] = useState('all');
     
     const menuRef = useRef(null);
     const searchRef = useRef(null);
@@ -122,18 +122,32 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
         }
     };
 
+    // Tìm kiếm theo hashtag
+    const searchByHashtag = async (keyword) => {
+        try {
+            const token = localStorage.getItem("user_token");
+            if (!token) return [];
+
+            // Loại bỏ dấu # nếu có
+            const hashtag = keyword.startsWith('#') ? keyword.substring(1) : keyword;
+            const response = await api.get(`/api/v1/posts/search/by-hashtag?hashtag=${encodeURIComponent(hashtag)}&limit=20`);
+            return response.data || [];
+        } catch (error) {
+            console.error("Lỗi tìm kiếm hashtag:", error);
+            return [];
+        }
+    };
+
     // Tìm kiếm người dùng
     const searchUsers = async (keyword) => {
         try {
             const token = localStorage.getItem("user_token");
             if (!token) return [];
 
-            // Thử gọi API tìm kiếm người dùng
             const response = await api.get(`/api/v1/users/search?keyword=${encodeURIComponent(keyword)}`);
             return response.data || [];
         } catch (error) {
-            console.error("Lỗi tìm kiếm người dùng (API chưa có):", error);
-            // Trả về mảng rỗng thay vì fallback gây lỗi
+            console.error("Lỗi tìm kiếm người dùng:", error);
             return [];
         }
     };
@@ -144,11 +158,10 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
             const token = localStorage.getItem("user_token");
             if (!token) return [];
 
-            // Thử gọi API tìm kiếm nhóm
             const response = await api.get(`/api/v1/groups/search?keyword=${encodeURIComponent(keyword)}`);
             return response.data || [];
         } catch (error) {
-            console.error("Lỗi tìm kiếm nhóm (API chưa có):", error);
+            console.error("Lỗi tìm kiếm nhóm:", error);
             // Fallback: lấy danh sách nhóm công khai và lọc theo keyword
             try {
                 const response = await api.get('/api/v1/groups/public?limit=50');
@@ -164,7 +177,7 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
         }
     };
 
-    // Search function
+    // HÀM TÌM KIẾM CHÍNH (ĐÃ SỬA - CHỈ CÒN 1 LẦN KHAI BÁO)
     const handleSearch = async (keyword) => {
         if (!keyword.trim()) {
             setSearchResults([]);
@@ -176,16 +189,27 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
 
         setIsSearching(true);
         try {
-            // Tìm kiếm đồng thời bài viết, người dùng và nhóm
-            const [posts, users, groups] = await Promise.all([
-                searchPosts(keyword),
-                searchUsers(keyword),
-                searchGroups(keyword)
-            ]);
-            
-            setSearchResults(posts);
-            setUserSearchResults(users);
-            setGroupSearchResults(groups);
+            // Kiểm tra nếu keyword bắt đầu bằng # -> tìm theo hashtag
+            if (keyword.trim().startsWith('#')) {
+                const hashtag = keyword.trim().substring(1);
+                const posts = await searchByHashtag(hashtag);
+                setSearchResults(posts);
+                setUserSearchResults([]);
+                setGroupSearchResults([]);
+                setActiveSearchTab('posts'); // Tự động chuyển sang tab bài viết
+            } else {
+                // Tìm kiếm bình thường: bài viết, người dùng, nhóm
+                const [posts, users, groups] = await Promise.all([
+                    searchPosts(keyword),
+                    searchUsers(keyword),
+                    searchGroups(keyword)
+                ]);
+                
+                setSearchResults(posts);
+                setUserSearchResults(users);
+                setGroupSearchResults(groups);
+                setActiveSearchTab('all');
+            }
             setShowSearchResults(true);
         } catch (error) {
             console.error("Lỗi tìm kiếm:", error);
@@ -269,33 +293,27 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
     };
 
     const handleLogout = () => {
-    // Xóa tất cả dữ liệu liên quan đến user
-    localStorage.removeItem("user_token");
-    localStorage.removeItem("user");
-    localStorage.removeItem("user_data");
-    
-    // Xóa cache trong sessionStorage
-    sessionStorage.removeItem("sidebar_user");
-    sessionStorage.removeItem("sidebar_user_cache_time");
-    sessionStorage.removeItem("home_posts_general");
-    sessionStorage.removeItem("home_posts_agriculture");
-    sessionStorage.removeItem("home_posts_seafood");
-    sessionStorage.removeItem("home_posts_specialty");
-    
-    // Cập nhật state
-    setIsMenuOpen(false);
-    setCartCount(0);
-    setFavoriteCount(0);
-    setIsLoggedIn(false);
-    
-    // Dispatch event để các component khác biết
-    window.dispatchEvent(new CustomEvent('userLoggedOut'));
-    
-    // Chuyển hướng về trang chủ (không phải login)
-    navigate("/");
-    // Reload page để reset toàn bộ state
-    window.location.reload();
-};
+        localStorage.removeItem("user_token");
+        localStorage.removeItem("user");
+        localStorage.removeItem("user_data");
+        
+        sessionStorage.removeItem("sidebar_user");
+        sessionStorage.removeItem("sidebar_user_cache_time");
+        sessionStorage.removeItem("home_posts_general");
+        sessionStorage.removeItem("home_posts_agriculture");
+        sessionStorage.removeItem("home_posts_seafood");
+        sessionStorage.removeItem("home_posts_specialty");
+        
+        setIsMenuOpen(false);
+        setCartCount(0);
+        setFavoriteCount(0);
+        setIsLoggedIn(false);
+        
+        window.dispatchEvent(new CustomEvent('userLoggedOut'));
+        
+        navigate("/");
+        window.location.reload();
+    };
 
     const handleCartClick = () => {
         navigate("/cart");
@@ -345,39 +363,25 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
         transition: "background-color 0.2s",
     };
 
-    // Lọc kết quả theo tab
-    const getFilteredResults = () => {
-        switch(activeSearchTab) {
-            case 'posts':
-                return searchResults;
-            case 'users':
-                return userSearchResults;
-            case 'groups':
-                return groupSearchResults;
-            default:
-                return [...searchResults, ...userSearchResults, ...groupSearchResults];
-        }
-    };
-
     const totalResults = searchResults.length + userSearchResults.length + groupSearchResults.length;
 
     return (
         <>
             <div style={{
-            height: "60px",
-            background: "white",
-            display: "flex",
-            alignItems: "center",
-            borderBottom: "1px solid #ddd",
-            width: "100%",
-            boxSizing: "border-box",
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            zIndex: 1000,
-            padding: "0 16px"
-        }}>
+                height: "60px",
+                background: "white",
+                display: "flex",
+                alignItems: "center",
+                borderBottom: "1px solid #ddd",
+                width: "100%",
+                boxSizing: "border-box",
+                position: "fixed",
+                top: 0,
+                left: 0,
+                right: 0,
+                zIndex: 1000,
+                padding: "0 16px"
+            }}>
                 {/* Nút hamburger */}
                 <div style={{ marginRight: "12px", display: isMobile ? "block" : "none" }}>
                     <button 
@@ -431,7 +435,7 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
                             maxWidth: isMobile ? "100%" : "500px"
                         }}>
                             <input
-                                placeholder={isMobile ? "Tìm kiếm..." : "Tìm kiếm bài viết, người dùng, nhóm..."}
+                                placeholder={isMobile ? "Tìm kiếm..." : "Tìm kiếm bài viết, người dùng, nhóm, #hashtag..."}
                                 value={searchKeyword}
                                 onChange={(e) => setSearchKeyword(e.target.value)}
                                 style={{
@@ -493,6 +497,19 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
                                         </div>
                                     ) : (
                                         <>
+                                            {/* Hiển thị badge khi tìm kiếm hashtag */}
+                                            {searchKeyword.trim().startsWith('#') && (
+                                                <div style={{
+                                                    padding: "8px 15px",
+                                                    backgroundColor: "#e8f5e9",
+                                                    fontSize: "13px",
+                                                    color: "#2e7d32",
+                                                    borderBottom: "1px solid #c8e6c9"
+                                                }}>
+                                                    🔍 Kết quả tìm kiếm hashtag: <strong>{searchKeyword}</strong>
+                                                </div>
+                                            )}
+                                            
                                             <div style={{ 
                                                 padding: "10px 15px", 
                                                 borderBottom: "1px solid #eee",
@@ -503,72 +520,74 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
                                                 Tìm thấy {totalResults} kết quả cho "{searchKeyword}"
                                             </div>
                                             
-                                            {/* Tabs */}
-                                            <div style={{ 
-                                                display: "flex", 
-                                                borderBottom: "1px solid #eee",
-                                                padding: "0 10px",
-                                                flexWrap: "wrap"
-                                            }}>
-                                                <button
-                                                    onClick={() => setActiveSearchTab('all')}
-                                                    style={{
-                                                        padding: "10px 15px",
-                                                        background: "none",
-                                                        border: "none",
-                                                        cursor: "pointer",
-                                                        color: activeSearchTab === 'all' ? "#2e7d32" : "#666",
-                                                        fontWeight: activeSearchTab === 'all' ? "bold" : "normal",
-                                                        borderBottom: activeSearchTab === 'all' ? "2px solid #2e7d32" : "none"
-                                                    }}
-                                                >
-                                                    Tất cả ({totalResults})
-                                                </button>
-                                                <button
-                                                    onClick={() => setActiveSearchTab('posts')}
-                                                    style={{
-                                                        padding: "10px 15px",
-                                                        background: "none",
-                                                        border: "none",
-                                                        cursor: "pointer",
-                                                        color: activeSearchTab === 'posts' ? "#2e7d32" : "#666",
-                                                        fontWeight: activeSearchTab === 'posts' ? "bold" : "normal",
-                                                        borderBottom: activeSearchTab === 'posts' ? "2px solid #2e7d32" : "none"
-                                                    }}
-                                                >
-                                                    Bài viết ({searchResults.length})
-                                                </button>
-                                                <button
-                                                    onClick={() => setActiveSearchTab('users')}
-                                                    style={{
-                                                        padding: "10px 15px",
-                                                        background: "none",
-                                                        border: "none",
-                                                        cursor: "pointer",
-                                                        color: activeSearchTab === 'users' ? "#2e7d32" : "#666",
-                                                        fontWeight: activeSearchTab === 'users' ? "bold" : "normal",
-                                                        borderBottom: activeSearchTab === 'users' ? "2px solid #2e7d32" : "none"
-                                                    }}
-                                                >
-                                                    Người dùng ({userSearchResults.length})
-                                                </button>
-                                                <button
-                                                    onClick={() => setActiveSearchTab('groups')}
-                                                    style={{
-                                                        padding: "10px 15px",
-                                                        background: "none",
-                                                        border: "none",
-                                                        cursor: "pointer",
-                                                        color: activeSearchTab === 'groups' ? "#2e7d32" : "#666",
-                                                        fontWeight: activeSearchTab === 'groups' ? "bold" : "normal",
-                                                        borderBottom: activeSearchTab === 'groups' ? "2px solid #2e7d32" : "none"
-                                                    }}
-                                                >
-                                                    Nhóm ({groupSearchResults.length})
-                                                </button>
-                                            </div>
+                                            {/* Tabs - chỉ hiển thị khi không phải tìm kiếm hashtag */}
+                                            {!searchKeyword.trim().startsWith('#') && (
+                                                <div style={{ 
+                                                    display: "flex", 
+                                                    borderBottom: "1px solid #eee",
+                                                    padding: "0 10px",
+                                                    flexWrap: "wrap"
+                                                }}>
+                                                    <button
+                                                        onClick={() => setActiveSearchTab('all')}
+                                                        style={{
+                                                            padding: "10px 15px",
+                                                            background: "none",
+                                                            border: "none",
+                                                            cursor: "pointer",
+                                                            color: activeSearchTab === 'all' ? "#2e7d32" : "#666",
+                                                            fontWeight: activeSearchTab === 'all' ? "bold" : "normal",
+                                                            borderBottom: activeSearchTab === 'all' ? "2px solid #2e7d32" : "none"
+                                                        }}
+                                                    >
+                                                        Tất cả ({totalResults})
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setActiveSearchTab('posts')}
+                                                        style={{
+                                                            padding: "10px 15px",
+                                                            background: "none",
+                                                            border: "none",
+                                                            cursor: "pointer",
+                                                            color: activeSearchTab === 'posts' ? "#2e7d32" : "#666",
+                                                            fontWeight: activeSearchTab === 'posts' ? "bold" : "normal",
+                                                            borderBottom: activeSearchTab === 'posts' ? "2px solid #2e7d32" : "none"
+                                                        }}
+                                                    >
+                                                        Bài viết ({searchResults.length})
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setActiveSearchTab('users')}
+                                                        style={{
+                                                            padding: "10px 15px",
+                                                            background: "none",
+                                                            border: "none",
+                                                            cursor: "pointer",
+                                                            color: activeSearchTab === 'users' ? "#2e7d32" : "#666",
+                                                            fontWeight: activeSearchTab === 'users' ? "bold" : "normal",
+                                                            borderBottom: activeSearchTab === 'users' ? "2px solid #2e7d32" : "none"
+                                                        }}
+                                                    >
+                                                        Người dùng ({userSearchResults.length})
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setActiveSearchTab('groups')}
+                                                        style={{
+                                                            padding: "10px 15px",
+                                                            background: "none",
+                                                            border: "none",
+                                                            cursor: "pointer",
+                                                            color: activeSearchTab === 'groups' ? "#2e7d32" : "#666",
+                                                            fontWeight: activeSearchTab === 'groups' ? "bold" : "normal",
+                                                            borderBottom: activeSearchTab === 'groups' ? "2px solid #2e7d32" : "none"
+                                                        }}
+                                                    >
+                                                        Nhóm ({groupSearchResults.length})
+                                                    </button>
+                                                </div>
+                                            )}
                                             
-                                            {/* Kết quả tìm kiếm theo tab */}
+                                            {/* Kết quả tìm kiếm */}
                                             <div>
                                                 {/* Kết quả nhóm */}
                                                 {(activeSearchTab === 'all' || activeSearchTab === 'groups') && groupSearchResults.length > 0 && (
@@ -785,6 +804,27 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
                                                                         }}>
                                                                             {post.content || "Không có nội dung"}
                                                                         </div>
+                                                                        {/* Hiển thị tags nếu có */}
+                                                                        {post.tags && post.tags.length > 0 && (
+                                                                            <div style={{ 
+                                                                                display: "flex", 
+                                                                                gap: "6px", 
+                                                                                marginTop: "6px",
+                                                                                flexWrap: "wrap"
+                                                                            }}>
+                                                                                {post.tags.slice(0, 3).map(tag => (
+                                                                                    <span key={tag} style={{
+                                                                                        fontSize: "10px",
+                                                                                        color: "#2e7d32",
+                                                                                        background: "#e8f5e9",
+                                                                                        padding: "2px 6px",
+                                                                                        borderRadius: "10px"
+                                                                                    }}>
+                                                                                        #{tag}
+                                                                                    </span>
+                                                                                ))}
+                                                                            </div>
+                                                                        )}
                                                                         <div style={{ 
                                                                             fontSize: "11px", 
                                                                             color: "#999",

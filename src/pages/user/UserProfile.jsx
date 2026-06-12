@@ -1381,7 +1381,7 @@ const UserProfile = () => {
                             
                             <input
                                 type="text"
-                                placeholder="Thêm tag (cách nhau bằng dấu phẩy, VD: cafe, bạn bè)"
+                                placeholder="Thêm Hashtag (cách nhau bằng dấu phẩy, VD: cafe, bạn bè)"
                                 value={editFormData.tags.join(', ')}
                                 onChange={handleEditTagsChange}
                             />

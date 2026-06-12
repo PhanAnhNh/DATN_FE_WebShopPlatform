@@ -1,0 +1,101 @@
+/* components/hashtag/TrendingHashtags.css */
+.trending-hashtags {
+    background: white;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.trending-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.trending-header h3 {
+    margin: 0;
+    font-size: 18px;
+    color: #333;
+}
+
+.trending-badge {
+    background: #e8f5e9;
+    color: #2e7d32;
+    padding: 4px 8px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.hashtags-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.hashtag-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.hashtag-item:hover {
+    background-color: #f5f5f5;
+    transform: translateX(4px);
+}
+
+.hashtag-rank {
+    font-size: 20px;
+    font-weight: bold;
+    color: #999;
+    min-width: 35px;
+}
+
+.hashtag-info {
+    flex: 1;
+}
+
+.hashtag-name {
+    font-weight: 600;
+    color: #2e7d32;
+    font-size: 14px;
+    margin-bottom: 4px;
+}
+
+.hashtag-name:hover {
+    text-decoration: underline;
+}
+
+.hashtag-count {
+    font-size: 11px;
+    color: #888;
+}
+
+.hashtag-trend {
+    font-size: 18px;
+}
+
+.skeleton-item {
+    height: 50px;
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+    border-radius: 8px;
+}
+
+@keyframes loading {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}

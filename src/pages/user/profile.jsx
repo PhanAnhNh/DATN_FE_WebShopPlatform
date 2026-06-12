@@ -986,7 +986,7 @@ function Profile() {
                             
                             <input
                                 type="text"
-                                placeholder="Thêm tag (cách nhau bằng dấu phẩy, VD: cafe, bạn bè)"
+                                placeholder="Thêm Hashtag (cách nhau bằng dấu phẩy, VD: cafe, bạn bè)"
                                 value={newPost.tags.join(', ')}
                                 onChange={handleTagsChange}
                                 style={{ width: "100%", padding: "8px 12px", border: "1px solid #ddd", borderRadius: "8px", marginBottom: "10px", fontSize: "14px" }}
