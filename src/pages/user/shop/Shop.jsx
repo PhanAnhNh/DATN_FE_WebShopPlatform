@@ -262,78 +262,97 @@ const ShopPage = () => {
         }
     };
 
-    // 👈 HÀM MỚI: Fetch tất cả shop (có tính khoảng cách nếu có location)
-    const fetchAllShops = async () => {
-        setNearbyLoading(true);
-        try {
-            const locationKey = location ? `${location.lat}_${location.lng}` : 'no_location';
-            const cachedShops = sessionStorage.getItem(`shop_all_${locationKey}`);
-            const cacheTime = sessionStorage.getItem('shop_full_cache_timestamp');
-            const now = Date.now();
-            const isCacheValid = cacheTime && (now - parseInt(cacheTime) < 300000);
-            
-            if (cachedShops && isCacheValid) {
-                setAllShops(JSON.parse(cachedShops));
-                console.log("✅ Loaded all shops from cache");
-                setNearbyLoading(false);
-                return;
-            }
-            
-            // Gọi API lấy danh sách tất cả shop (hoặc shop trong bán kính lớn)
-            const res = await userApi.get("/api/v1/shops/nearby", {
-                params: location ? {
-                    lat: location.lat,
-                    lng: location.lng,
-                    radius_km: 100, // Tăng bán kính lên 100km để lấy nhiều shop hơn
-                    limit: 100
-                } : {
-                    limit: 100
-                }
-            });
-            
-            console.log("All shops response:", res.data);
-            
-            let shops = (res.data.data || []);
-            
-            // Format và sắp xếp theo khoảng cách (gần lên trước)
-            const formatted = shops.map(shop => ({
-                id: shop._id || shop.id,
-                name: shop.name,
-                address: shop.address || shop.location?.address || "Đang cập nhật",
-                rating: shop.rating || 4.5,
-                distance_km: shop.distance_km || null,
-                distance_text: shop.distance_km ? (
-                    shop.distance_km < 1 
-                        ? `${Math.round(shop.distance_km * 1000)}m` 
-                        : `${shop.distance_km.toFixed(1)}km`
-                ) : null,
-                avatar: shop.logo_url,
-                banner_url: shop.banner_url,
-                cover_image: shop.banner_url || "https://via.placeholder.com/300x160?text=Shop"
-            }));
-            
-            // Sắp xếp: shop có distance_km (gần) lên trước, sau đó đến shop không có distance
-            const sortedShops = formatted.sort((a, b) => {
-                if (a.distance_km === null && b.distance_km === null) return 0;
-                if (a.distance_km === null) return 1;
-                if (b.distance_km === null) return -1;
-                return a.distance_km - b.distance_km;
-            });
-            
-            console.log("Formatted and sorted shops:", sortedShops);
-            setAllShops(sortedShops);
-            
-            sessionStorage.setItem(`shop_all_${locationKey}`, JSON.stringify(sortedShops));
-            
-        } catch (error) {
-            console.error("Lỗi lấy danh sách shop:", error);
-            // Nếu lỗi, thử fetch không có location
+    
+const fetchAllShops = async () => {
+    setNearbyLoading(true);
+    try {
+        // Kiểm tra xem có location không
+        if (!location || !location.lat || !location.lng) {
+            console.log("📍 Chưa có vị trí người dùng, fetch shops không có khoảng cách");
             await fetchAllShopsWithoutLocation();
-        } finally {
             setNearbyLoading(false);
+            return;
         }
-    };
-
+        
+        const locationKey = `${location.lat.toFixed(4)}_${location.lng.toFixed(4)}`;
+        const cachedShops = sessionStorage.getItem(`shop_all_${locationKey}`);
+        const cacheTime = sessionStorage.getItem('shop_nearby_cache_timestamp');
+        const now = Date.now();
+        const isCacheValid = cacheTime && (now - parseInt(cacheTime) < 300000); // 5 phút
+        
+        if (cachedShops && isCacheValid) {
+            const parsedShops = JSON.parse(cachedShops);
+            setAllShops(parsedShops);
+            console.log("✅ Loaded nearby shops from cache:", parsedShops.length);
+            setNearbyLoading(false);
+            return;
+        }
+        
+        console.log(`📍 Đang tìm shop gần vị trí: ${location.lat}, ${location.lng}`);
+        
+        // Gọi API nearby với bán kính 50km
+        const res = await userApi.get("/api/v1/shops/nearby", {
+            params: {
+                lat: location.lat,
+                lng: location.lng,
+                radius_km: 50,
+                limit: 100
+            }
+        });
+        
+        console.log("📦 API Response:", res.data);
+        
+        // Lấy dữ liệu shops từ response
+        const shopsData = res.data.data || [];
+        
+        // Format dữ liệu shops
+        const formatted = shopsData.map(shop => ({
+            id: shop._id || shop.id,
+            name: shop.name,
+            address: shop.address || "Đang cập nhật",
+            rating: shop.rating || 4.5,
+            distance_km: shop.distance_km || null,
+            duration_min: shop.duration_min || null,
+            distance_text: shop.distance_km ? (
+                shop.distance_km < 1 
+                    ? `${Math.round(shop.distance_km * 1000)}m` 
+                    : `${shop.distance_km.toFixed(1)}km`
+            ) : null,
+            avatar: shop.logo_url,
+            banner_url: shop.banner_url,
+            cover_image: shop.banner_url || "https://via.placeholder.com/300x160?text=Shop",
+            phone: shop.phone,
+            email: shop.email,
+            is_verified: shop.is_verified
+        }));
+        
+        // Sắp xếp theo khoảng cách gần nhất
+        const sortedShops = formatted.sort((a, b) => {
+            if (a.distance_km === null && b.distance_km === null) return 0;
+            if (a.distance_km === null) return 1;
+            if (b.distance_km === null) return -1;
+            return a.distance_km - b.distance_km;
+        });
+        
+        console.log(`✅ Tìm thấy ${sortedShops.length} shop trong bán kính 50km`);
+        if (sortedShops.length > 0) {
+            console.log("🏪 Shop gần nhất:", sortedShops[0].name, "-", sortedShops[0].distance_text);
+        }
+        
+        setAllShops(sortedShops);
+        
+        // Lưu cache
+        sessionStorage.setItem(`shop_all_${locationKey}`, JSON.stringify(sortedShops));
+        sessionStorage.setItem('shop_nearby_cache_timestamp', now.toString());
+        
+    } catch (error) {
+        console.error("❌ Lỗi lấy danh sách shop:", error);
+        // Fallback: lấy tất cả shop không có khoảng cách
+        await fetchAllShopsWithoutLocation();
+    } finally {
+        setNearbyLoading(false);
+    }
+};
     // Fetch tất cả shop khi chưa có location (không tính khoảng cách)
     const fetchAllShopsWithoutLocation = async () => {
         try {
@@ -712,7 +731,8 @@ const ShopPage = () => {
                             )}
                         </div>
 
-                        {/* DANH SÁCH TẤT CẢ CỬA HÀNG - Grid 2 cột trên mobile */}
+
+                        {/* DANH SÁCH TẤT CẢ CỬA HÀNG */}
                         <div style={{
                             background: "white",
                             borderRadius: "12px",
@@ -721,6 +741,11 @@ const ShopPage = () => {
                         }}>
                             <h3 style={{ margin: "0 0 15px 0", fontSize: isMobileView ? "16px" : "18px", color: "#333" }}>
                                 🏪 Danh sách cửa hàng
+                                {location && !isLoadingShops && allShops.length > 0 && (
+                                    <span style={{ fontSize: "12px", color: "#666", marginLeft: "10px", fontWeight: "normal" }}>
+                                        (Đang hiển thị theo khoảng cách gần nhất)
+                                    </span>
+                                )}
                             </h3>
                             
                             {isLoadingShops && allShops.length === 0 ? (
@@ -753,8 +778,11 @@ const ShopPage = () => {
                                     gap: isMobileView ? "12px" : "20px"
                                 }}>
                                     {allShops.slice(0, isMobileView ? 6 : allShops.length).map(shop => {
-                                        // Kiểm tra xem có hiển thị khoảng cách không (chỉ hiển thị nếu distance_km <= 10)
-                                        const showDistance = shop.distance_km !== null && shop.distance_km <= 10;
+                                        // 🔧 SỬA LẠI: Hiển thị khoảng cách nếu có distance_km (không giới hạn <=10)
+                                        const hasDistance = shop.distance_km !== null && shop.distance_km !== undefined;
+                                        
+                                        // Debug log để kiểm tra dữ liệu
+                                        console.log(`Shop ${shop.name}: distance_km = ${shop.distance_km}, distance_text = ${shop.distance_text}`);
                                         
                                         return (
                                             <div
@@ -769,6 +797,7 @@ const ShopPage = () => {
                                                 }}
                                                 onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-5px)"}
                                                 onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}
+                                                onClick={() => handleShopClick(shop.id)}
                                             >
                                                 <div style={{
                                                     height: isMobileView ? "120px" : "160px",
@@ -804,7 +833,7 @@ const ShopPage = () => {
                                                             whiteSpace: "normal",
                                                             lineHeight: "1.3",
                                                             display: "-webkit-box",
-                                                            WebkitLineClamp: 1,
+                                                            WebkitLineClamp: 2,
                                                             WebkitBoxOrient: "vertical",
                                                             overflow: "hidden",
                                                             textOverflow: "ellipsis"
@@ -817,17 +846,44 @@ const ShopPage = () => {
                                                         ⭐ {shop.rating}
                                                     </div>
 
-                                                    {showDistance && (
-                                                        <div style={{ color: "#4CAF50", fontSize: isMobileView ? "11px" : "14px", marginTop: "4px", fontWeight: "500" }}>
-                                                            🚗 Cách bạn: <strong>{shop.distance_text}</strong>
-                                                        </div>
-                                                    )}
-                                                    
-                                                    {shop.distance_km !== null && shop.distance_km > 10 && (
-                                                        <div style={{ color: "#999", fontSize: isMobileView ? "10px" : "12px", marginTop: "4px", fontStyle: "italic" }}>
-                                                            (Xa hơn 10km)
-                                                        </div>
-                                                    )}
+                                                    {/* 🔧 SỬA LẠI: Hiển thị khoảng cách nếu có dữ liệu */}
+                                                    {/* Phần hiển thị khoảng cách - đã có sẵn trong code của bạn, giữ nguyên */}
+{hasDistance ? (
+    <div style={{ 
+        color: shop.distance_km <= 5 ? "#4CAF50" : (shop.distance_km <= 10 ? "#FF9800" : "#999"), 
+        fontSize: isMobileView ? "11px" : "14px", 
+        marginTop: "6px", 
+        fontWeight: "500",
+        display: "flex",
+        alignItems: "center",
+        gap: "4px"
+    }}>
+        <span>🚗</span>
+        <span>
+            {shop.distance_text || (shop.distance_km < 1 
+                ? `${Math.round(shop.distance_km * 1000)}m` 
+                : `${shop.distance_km.toFixed(1)}km`)} từ bạn
+        </span>
+        {shop.duration_min && (
+            <span style={{ fontSize: "10px", color: "#666", marginLeft: "4px" }}>
+                (≈ {shop.duration_min} phút)
+            </span>
+        )}
+    </div>
+) : (
+    <div style={{ 
+        color: "#999", 
+        fontSize: isMobileView ? "10px" : "12px", 
+        marginTop: "6px",
+        fontStyle: "italic",
+        display: "flex",
+        alignItems: "center",
+        gap: "4px"
+    }}>
+        <span>📍</span>
+        <span>{location ? "Đang cập nhật khoảng cách" : "Vui lòng bật định vị để xem khoảng cách"}</span>
+    </div>
+)}
 
                                                     <button
                                                         style={{
@@ -842,7 +898,10 @@ const ShopPage = () => {
                                                             cursor: "pointer",
                                                             fontSize: isMobileView ? "12px" : "14px"
                                                         }}
-                                                        onClick={() => handleShopClick(shop.id)}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation(); // Ngăn chặn sự kiện click từ div cha
+                                                            handleShopClick(shop.id);
+                                                        }}
                                                     >
                                                         Xem cửa hàng
                                                     </button>

@@ -408,7 +408,7 @@ function Header({ onMenuToggle, mobileMenuOpen }) {
                 }} 
                 onClick={() => navigate("/")}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <img src="/logoda.png" alt="Logo" style={{ width: "57px", height: "45px" }} />
+                        <img src="/logoda.png" alt="Logo" style={{ width: "49px", height: "45px" }} />
                         <h2 style={{ color: "#2e7d32", margin: 0, fontSize: "20px" }}>
                             Đặc Sản Quê Tôi
                         </h2>
