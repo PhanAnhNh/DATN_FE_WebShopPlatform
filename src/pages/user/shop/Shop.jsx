@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Layout from "../../../layout/layoutUser/Layout";
 import {userApi} from "../../../api/api";
@@ -21,6 +21,25 @@ const ShopPage = () => {
     const [nearbyLoading, setNearbyLoading] = useState(false);
     const [isInitialLoad, setIsInitialLoad] = useState(true);
     const locationPath = useLocation();
+    
+    const hasFetchedShopsRef = useRef(false);
+    const hasFetchedDataRef = useRef(false);
+
+    // Hàm rút gọn địa chỉ - chỉ lấy phần đầu tiên (trước dấu phẩy)
+    const getShortAddress = (address) => {
+        if (!address) return "Đang cập nhật";
+        
+        // Nếu địa chỉ có dấu phẩy, chỉ lấy phần đầu tiên
+        if (address.includes(',')) {
+            const firstPart = address.split(',')[0];
+            if (firstPart.length <= 35) return firstPart;
+            return firstPart.substring(0, 32) + "...";
+        }
+        
+        // Nếu không có dấu phẩy, cắt ngắn
+        if (address.length <= 35) return address;
+        return address.substring(0, 32) + "...";
+    };
 
     // Fetch provinces from API
     useEffect(() => {
@@ -70,8 +89,6 @@ const ShopPage = () => {
                 params: { limit: 3 }
             });
             
-            console.log("🔥 API Response:", res.data);
-
             let productsData = null;
             if (Array.isArray(res.data)) {
                 productsData = res.data;
@@ -101,15 +118,10 @@ const ShopPage = () => {
             
         } catch (error) {
             console.error("❌ Error fetching hot products:", error);
-            if (error.response) {
-                console.error("Status:", error.response.status);
-                console.error("Data:", error.response.data);
-            }
             setHotProducts([]);
         }
     };
 
-    // Hàm đọc cache đầy đủ khi component mount
     const loadFullCache = () => {
         const cachedProducts = sessionStorage.getItem('shop_featuredProducts');
         const cachedHot = sessionStorage.getItem('shop_hotProducts');
@@ -154,12 +166,8 @@ const ShopPage = () => {
             }
         }
         
-        if (cachedCategory) {
-            setActiveCategory(cachedCategory);
-        }
-        if (cachedSubCategory) {
-            setSelectedSubCategory(cachedSubCategory);
-        }
+        if (cachedCategory) setActiveCategory(cachedCategory);
+        if (cachedSubCategory) setSelectedSubCategory(cachedSubCategory);
         if (cachedPriceRange) {
             try {
                 setPriceRange(JSON.parse(cachedPriceRange));
@@ -171,7 +179,6 @@ const ShopPage = () => {
         return hasValidCache;
     };
 
-    // Hàm lưu cache đầy đủ
     const saveFullCache = () => {
         if (featuredProducts.length > 0) {
             sessionStorage.setItem('shop_featuredProducts', JSON.stringify(featuredProducts));
@@ -188,39 +195,31 @@ const ShopPage = () => {
         sessionStorage.setItem('shop_full_cache_timestamp', Date.now().toString());
     };
 
-    // Effect để lưu cache khi có thay đổi dữ liệu
     useEffect(() => {
         if (!isInitialLoad && (featuredProducts.length > 0 || hotProducts.length > 0 || allShops.length > 0)) {
             saveFullCache();
         }
     }, [featuredProducts, hotProducts, allShops, activeCategory, selectedSubCategory, priceRange]);
 
-    // Effect chính - load dữ liệu khi mount
     useEffect(() => {
+        if (hasFetchedDataRef.current) return;
+        hasFetchedDataRef.current = true;
+        
         const hasCache = loadFullCache();
         
-        if (hasCache && (featuredProducts.length > 0 || hotProducts.length > 0 || allShops.length > 0)) {
+        if (hasCache && (featuredProducts.length > 0 || hotProducts.length > 0)) {
             console.log("Using cached data - no API calls made");
             setLoading(false);
             setIsInitialLoad(false);
         } else {
-            console.log("No valid cache, fetching all data from API");
-            fetchAllData();
+            console.log("No valid cache, fetching products from API");
+            fetchProductsOnly();
         }
     }, []);
 
-    // Khi có location thay đổi
-    useEffect(() => {
-        if (location && isInitialLoad === false && allShops.length === 0) {
-            fetchAllShops();
-        }
-    }, [location]);
-
-    // Fetch tất cả dữ liệu từ API
-    const fetchAllData = async () => {
+    const fetchProductsOnly = async () => {
         setLoading(true);
         try {
-            // Fetch products thường
             const productsRes = await userApi.get("/api/v1/products/", {
                 params: {
                     category: activeCategory !== "all" ? activeCategory : undefined,
@@ -243,18 +242,10 @@ const ShopPage = () => {
             
             await fetchHotProducts();
             
-            // Fetch shops nếu có location
-            if (location) {
-                await fetchAllShops();
-            } else {
-                // Nếu chưa có location, vẫn fetch tất cả shop (không có distance)
-                await fetchAllShopsWithoutLocation();
-            }
-            
             sessionStorage.setItem('shop_full_cache_timestamp', Date.now().toString());
             
         } catch (error) {
-            console.error("Error fetching data:", error);
+            console.error("Error fetching products:", error);
             setFeaturedProducts([]);
         } finally {
             setLoading(false);
@@ -262,128 +253,76 @@ const ShopPage = () => {
         }
     };
 
-    
-const fetchAllShops = async () => {
-    setNearbyLoading(true);
-    try {
-        // Kiểm tra xem có location không
+    const fetchAllShops = async () => {
         if (!location || !location.lat || !location.lng) {
-            console.log("📍 Chưa có vị trí người dùng, fetch shops không có khoảng cách");
-            await fetchAllShopsWithoutLocation();
-            setNearbyLoading(false);
+            console.log("❌ No valid location, skipping fetchAllShops");
             return;
         }
         
         const locationKey = `${location.lat.toFixed(4)}_${location.lng.toFixed(4)}`;
-        const cachedShops = sessionStorage.getItem(`shop_all_${locationKey}`);
-        const cacheTime = sessionStorage.getItem('shop_nearby_cache_timestamp');
-        const now = Date.now();
-        const isCacheValid = cacheTime && (now - parseInt(cacheTime) < 300000); // 5 phút
-        
-        if (cachedShops && isCacheValid) {
-            const parsedShops = JSON.parse(cachedShops);
-            setAllShops(parsedShops);
-            console.log("✅ Loaded nearby shops from cache:", parsedShops.length);
-            setNearbyLoading(false);
+        if (hasFetchedShopsRef.current === locationKey) {
+            console.log("⚠️ Already fetched shops for this location");
             return;
         }
         
-        console.log(`📍 Đang tìm shop gần vị trí: ${location.lat}, ${location.lng}`);
+        console.log("🔍 fetchAllShops called with location:", location);
+        setNearbyLoading(true);
+        hasFetchedShopsRef.current = locationKey;
         
-        // Gọi API nearby với bán kính 50km
-        const res = await userApi.get("/api/v1/shops/nearby", {
-            params: {
-                lat: location.lat,
-                lng: location.lng,
-                radius_km: 50,
-                limit: 100
-            }
-        });
-        
-        console.log("📦 API Response:", res.data);
-        
-        // Lấy dữ liệu shops từ response
-        const shopsData = res.data.data || [];
-        
-        // Format dữ liệu shops
-        const formatted = shopsData.map(shop => ({
-            id: shop._id || shop.id,
-            name: shop.name,
-            address: shop.address || "Đang cập nhật",
-            rating: shop.rating || 4.5,
-            distance_km: shop.distance_km || null,
-            duration_min: shop.duration_min || null,
-            distance_text: shop.distance_km ? (
-                shop.distance_km < 1 
-                    ? `${Math.round(shop.distance_km * 1000)}m` 
-                    : `${shop.distance_km.toFixed(1)}km`
-            ) : null,
-            avatar: shop.logo_url,
-            banner_url: shop.banner_url,
-            cover_image: shop.banner_url || "https://via.placeholder.com/300x160?text=Shop",
-            phone: shop.phone,
-            email: shop.email,
-            is_verified: shop.is_verified
-        }));
-        
-        // Sắp xếp theo khoảng cách gần nhất
-        const sortedShops = formatted.sort((a, b) => {
-            if (a.distance_km === null && b.distance_km === null) return 0;
-            if (a.distance_km === null) return 1;
-            if (b.distance_km === null) return -1;
-            return a.distance_km - b.distance_km;
-        });
-        
-        console.log(`✅ Tìm thấy ${sortedShops.length} shop trong bán kính 50km`);
-        if (sortedShops.length > 0) {
-            console.log("🏪 Shop gần nhất:", sortedShops[0].name, "-", sortedShops[0].distance_text);
-        }
-        
-        setAllShops(sortedShops);
-        
-        // Lưu cache
-        sessionStorage.setItem(`shop_all_${locationKey}`, JSON.stringify(sortedShops));
-        sessionStorage.setItem('shop_nearby_cache_timestamp', now.toString());
-        
-    } catch (error) {
-        console.error("❌ Lỗi lấy danh sách shop:", error);
-        // Fallback: lấy tất cả shop không có khoảng cách
-        await fetchAllShopsWithoutLocation();
-    } finally {
-        setNearbyLoading(false);
-    }
-};
-    // Fetch tất cả shop khi chưa có location (không tính khoảng cách)
-    const fetchAllShopsWithoutLocation = async () => {
         try {
-            const res = await userApi.get("/api/v1/shops/", {
-                params: { limit: 100 }
+            console.log(`📍 Fetching shops near: ${location.lat}, ${location.lng}`);
+            
+            const res = await userApi.get("/api/v1/shops/nearby", {
+                params: {
+                    lat: location.lat,
+                    lng: location.lng,
+                    radius_km: 50,
+                    limit: 100
+                }
             });
             
-            console.log("All shops without location response:", res.data);
+            console.log("📦 API /nearby response:", res.data);
             
-            const shopsData = res.data.data || res.data || [];
+            const shopsData = res.data.data || [];
+            console.log(`📦 Found ${shopsData.length} shops from API`);
+            
             const formatted = shopsData.map(shop => ({
                 id: shop._id || shop.id,
                 name: shop.name,
-                address: shop.address || shop.location?.address || "Đang cập nhật",
+                address: shop.address || "Đang cập nhật",
                 rating: shop.rating || 4.5,
-                distance_km: null,
-                distance_text: null,
+                distance_km: shop.distance_km || null,
+                distance_text: shop.distance_km ? (
+                    shop.distance_km < 1 
+                        ? `${Math.round(shop.distance_km * 1000)}m` 
+                        : `${shop.distance_km.toFixed(1)}km`
+                ) : null,
+                duration_min: shop.duration_min,
                 avatar: shop.logo_url,
                 banner_url: shop.banner_url,
                 cover_image: shop.banner_url || "https://via.placeholder.com/300x160?text=Shop"
             }));
             
+            console.log("Formatted shops with distances:", formatted.map(s => ({ name: s.name, distance: s.distance_km })));
+            
             setAllShops(formatted);
             
-            sessionStorage.setItem(`shop_all_no_location`, JSON.stringify(formatted));
+            sessionStorage.setItem(`shop_all_${locationKey}`, JSON.stringify(formatted));
+            sessionStorage.setItem('shop_nearby_cache_timestamp', Date.now().toString());
             
         } catch (error) {
-            console.error("Lỗi lấy danh sách shop (không location):", error);
-            setAllShops([]);
+            console.error("❌ Error in fetchAllShops:", error);
+        } finally {
+            setNearbyLoading(false);
         }
     };
+
+    useEffect(() => {
+        if (location && !locationLoading) {
+            console.log("📍 Location available, fetching nearby shops...");
+            fetchAllShops();
+        }
+    }, [location, locationLoading]);
 
     const handleProvinceClick = (provinceId) => {
         navigate(`/province/${provinceId}`);
@@ -394,16 +333,6 @@ const fetchAllShops = async () => {
             style: 'currency',
             currency: 'VND'
         }).format(amount);
-    };
-
-    const goToForum = () => {
-        if (locationPath.pathname === "/") return;
-        navigate("/");
-    };
-
-    const goToShop = () => {
-        if (locationPath.pathname === "/use/shop") return; 
-        navigate("/use/shop");
     };
 
     const handleShopClick = (shopId) => {
@@ -457,11 +386,8 @@ const fetchAllShops = async () => {
     };
 
     const isLoadingShops = nearbyLoading || (locationLoading && !location);
-
     const displayProducts = hotProducts.length > 0 ? hotProducts : featuredProducts.slice(0, 3);
 
-    // Media query styles for responsive
-    const isMobile = () => window.innerWidth <= 768;
     const [isMobileView, setIsMobileView] = useState(window.innerWidth <= 768);
 
     useEffect(() => {
@@ -475,10 +401,9 @@ const fetchAllShops = async () => {
     return (
         <Layout>
             <div className="shop-page" style={{ maxWidth: "1200px", margin: "0 auto", padding: isMobileView ? "10px" : "0" }}>
-                {/* Header tabs */}
                 <NavigationTabs />
 
-                {/* Khu vực tỉnh thành - Grid 2 cột trên mobile */}
+                {/* Khu vực tỉnh thành */}
                 <div style={{
                     background: "white",
                     borderRadius: "16px",
@@ -511,9 +436,6 @@ const fetchAllShops = async () => {
                                         display: "flex",
                                         alignItems: "flex-end",
                                         justifyContent: "center",
-                                        fontWeight: "bold",
-                                        fontSize: "18px",
-                                        color: "white",
                                         cursor: "pointer",
                                         position: "relative",
                                         overflow: "hidden",
@@ -538,42 +460,16 @@ const fetchAllShops = async () => {
                                         textAlign: "center"
                                     }}>
                                         <div style={{ fontWeight: "bold", fontSize: isMobileView ? "14px" : "16px" }}>{province.name}</div>
-                                        {!isMobileView && province.description && (
-                                            <div style={{ fontSize: "12px", marginTop: "5px", opacity: 0.9 }}>
-                                                {province.description.length > 50 ? province.description.substring(0, 50) + "..." : province.description}
-                                            </div>
-                                        )}
                                     </div>
                                 </div>
                             ))}
                         </div>
                     )}
-                    {isMobileView && provinces.length > 6 && (
-                        <div style={{ textAlign: "center", marginTop: "12px" }}>
-                            <button style={{
-                                padding: "8px 16px",
-                                background: "#4CAF50",
-                                color: "white",
-                                border: "none",
-                                borderRadius: "20px",
-                                cursor: "pointer",
-                                fontSize: "12px"
-                            }} onClick={() => {
-                                // Handle show more provinces
-                                const moreProvinces = provinces.slice(6);
-                                // You can implement modal or expand logic here
-                                alert(`Còn ${moreProvinces.length} tỉnh thành nữa`);
-                            }}>
-                                Xem thêm {provinces.length - 6} tỉnh
-                            </button>
-                        </div>
-                    )}
                 </div>
 
                 <div style={{ display: "flex", gap: "20px", flexDirection: isMobileView ? "column" : "row" }}>
-                    {/* Nội dung chính bên phải */}
                     <div style={{ flex: 1 }}>
-                        {/* SẢN PHẨM HOT - BÁN CHẠY NHẤT - Horizontal scroll on mobile */}
+                        {/* SẢN PHẨM HOT */}
                         <div style={{
                             background: "white",
                             borderRadius: "12px",
@@ -591,13 +487,10 @@ const fetchAllShops = async () => {
                                     borderRadius: "20px", 
                                     fontSize: "12px",
                                     fontWeight: "bold"
-                                }}>
-                                    Hot
-                                </span>
+                                }}>Hot</span>
                             </div>
                             
                             {isMobileView ? (
-                                // Horizontal scroll for mobile
                                 <div style={{
                                     overflowX: "auto",
                                     overflowY: "hidden",
@@ -625,58 +518,28 @@ const fetchAllShops = async () => {
                                                         borderRadius: "8px",
                                                         transition: "all 0.3s",
                                                         background: "#f9f9f9",
-                                                        position: "relative",
                                                         width: "180px",
                                                         display: "inline-block",
                                                         whiteSpace: "normal"
                                                     }}
-                                                    onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-4px)"}
-                                                    onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}
                                                 >
                                                     <ProductImage product={product} isHot={true} />
-                                                    
-                                                    <div style={{ 
-                                                        fontWeight: "bold", 
-                                                        marginTop: "10px", 
-                                                        whiteSpace: "normal",
-                                                        wordBreak: "break-word",
-                                                        fontSize: "14px"
-                                                    }}>
-                                                        {product.name}
-                                                    </div>
-                                                    
+                                                    <div style={{ fontWeight: "bold", marginTop: "10px", fontSize: "14px" }}>{product.name}</div>
                                                     <div style={{ color: "#d32f2f", fontWeight: "bold", marginTop: "5px", fontSize: "14px" }}>
                                                         {formatCurrency(product.price)}/{product.unit || "kg"}
                                                     </div>
-                                                    
-                                                    <div style={{ fontSize: "12px", color: "#666", marginTop: "5px", whiteSpace: "normal" }}>
-                                                        {product.shop_name}
-                                                    </div>
-                                                    
-                                                    {product.sold_quantity !== undefined && (
-                                                        <div style={{ 
-                                                            fontSize: "11px", 
-                                                            color: "#ff5722", 
-                                                            marginTop: "5px",
-                                                            fontWeight: "500"
-                                                        }}>
-                                                            🛒 Đã bán: {product.sold_quantity.toLocaleString()}
-                                                        </div>
-                                                    )}
+                                                    <div style={{ fontSize: "12px", color: "#666", marginTop: "5px" }}>{product.shop_name}</div>
                                                 </div>
                                             ))
                                         )}
                                     </div>
                                 </div>
                             ) : (
-                                // Grid for desktop
                                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "20px" }}>
                                     {loading && displayProducts.length === 0 ? (
-                                        <div style={{ textAlign: "center", width: "100%", padding: "40px" }}>Đang tải...</div>
+                                        <div style={{ textAlign: "center", padding: "40px" }}>Đang tải...</div>
                                     ) : displayProducts.length === 0 ? (
-                                        <div style={{ textAlign: "center", width: "100%", padding: "40px", color: "#999" }}>
-                                            Chưa có sản phẩm nào
-                                        </div>
+                                        <div style={{ textAlign: "center", padding: "40px", color: "#999" }}>Chưa có sản phẩm nào</div>
                                     ) : (
                                         displayProducts.map((product) => (
                                             <div
@@ -688,42 +551,15 @@ const fetchAllShops = async () => {
                                                     padding: "15px",
                                                     borderRadius: "8px",
                                                     transition: "all 0.3s",
-                                                    background: "#f9f9f9",
-                                                    position: "relative"
+                                                    background: "#f9f9f9"
                                                 }}
-                                                onMouseEnter={(e) => e.currentTarget.style.transform = "translateY(-4px)"}
-                                                onMouseLeave={(e) => e.currentTarget.style.transform = "translateY(0)"}
                                             >
                                                 <ProductImage product={product} isHot={true} />
-                                                
-                                                <div style={{ 
-                                                    fontWeight: "bold", 
-                                                    marginTop: "10px", 
-                                                    whiteSpace: "nowrap",
-                                                    overflow: "hidden",
-                                                    textOverflow: "ellipsis" 
-                                                }}>
-                                                    {product.name}
-                                                </div>
-                                                
+                                                <div style={{ fontWeight: "bold", marginTop: "10px" }}>{product.name}</div>
                                                 <div style={{ color: "#d32f2f", fontWeight: "bold", marginTop: "5px" }}>
                                                     {formatCurrency(product.price)}/{product.unit || "kg"}
                                                 </div>
-                                                
-                                                <div style={{ fontSize: "12px", color: "#666", marginTop: "5px" }}>
-                                                    {product.shop_name}
-                                                </div>
-                                                
-                                                {product.sold_quantity !== undefined && (
-                                                    <div style={{ 
-                                                        fontSize: "11px", 
-                                                        color: "#ff5722", 
-                                                        marginTop: "5px",
-                                                        fontWeight: "500"
-                                                    }}>
-                                                        🛒 Đã bán: {product.sold_quantity.toLocaleString()}
-                                                    </div>
-                                                )}
+                                                <div style={{ fontSize: "12px", color: "#666", marginTop: "5px" }}>{product.shop_name}</div>
                                             </div>
                                         ))
                                     )}
@@ -731,8 +567,7 @@ const fetchAllShops = async () => {
                             )}
                         </div>
 
-
-                        {/* DANH SÁCH TẤT CẢ CỬA HÀNG */}
+                        {/* DANH SÁCH CỬA HÀNG */}
                         <div style={{
                             background: "white",
                             borderRadius: "12px",
@@ -740,7 +575,7 @@ const fetchAllShops = async () => {
                             boxShadow: "0 1px 3px rgba(0,0,0,0.1)"
                         }}>
                             <h3 style={{ margin: "0 0 15px 0", fontSize: isMobileView ? "16px" : "18px", color: "#333" }}>
-                                🏪 Danh sách cửa hàng
+                                Danh sách cửa hàng
                                 {location && !isLoadingShops && allShops.length > 0 && (
                                     <span style={{ fontSize: "12px", color: "#666", marginLeft: "10px", fontWeight: "normal" }}>
                                         (Đang hiển thị theo khoảng cách gần nhất)
@@ -760,12 +595,6 @@ const fetchAllShops = async () => {
                                         margin: "0 auto 10px"
                                     }}></div>
                                     <p>Đang tải danh sách cửa hàng...</p>
-                                    <style>{`
-                                        @keyframes spin {
-                                            0% { transform: rotate(0deg); }
-                                            100% { transform: rotate(360deg); }
-                                        }
-                                    `}</style>
                                 </div>
                             ) : allShops.length === 0 ? (
                                 <div style={{ textAlign: "center", padding: "40px", color: "#999" }}>
@@ -778,11 +607,13 @@ const fetchAllShops = async () => {
                                     gap: isMobileView ? "12px" : "20px"
                                 }}>
                                     {allShops.slice(0, isMobileView ? 6 : allShops.length).map(shop => {
-                                        // 🔧 SỬA LẠI: Hiển thị khoảng cách nếu có distance_km (không giới hạn <=10)
-                                        const hasDistance = shop.distance_km !== null && shop.distance_km !== undefined;
+                                        // Kiểm tra nếu có khoảng cách và <= 20km
+                                        const isWithin20km = shop.distance_km !== null && 
+                                                             shop.distance_km !== undefined && 
+                                                             shop.distance_km <= 20;
                                         
-                                        // Debug log để kiểm tra dữ liệu
-                                        console.log(`Shop ${shop.name}: distance_km = ${shop.distance_km}, distance_text = ${shop.distance_text}`);
+                                        // Địa chỉ rút gọn
+                                        const shortAddress = getShortAddress(shop.address);
                                         
                                         return (
                                             <div
@@ -810,80 +641,61 @@ const fetchAllShops = async () => {
                                                 <div style={{ padding: isMobileView ? "12px" : "15px" }}>
                                                     <div style={{ 
                                                         fontWeight: "bold", 
-                                                        fontSize: isMobileView ? "13px" : "16px", 
+                                                        fontSize: isMobileView ? "13px" : "16px",
                                                         whiteSpace: "nowrap",
                                                         overflow: "hidden",
-                                                        textOverflow: "ellipsis",
-                                                        maxWidth: "100%" 
+                                                        textOverflow: "ellipsis"
                                                     }}>
                                                         {shop.name}
                                                     </div>
-
-                                                    <div style={{ 
-                                                        marginTop: "6px", 
-                                                        color: "#666", 
-                                                        fontSize: isMobileView ? "11px" : "13px",
-                                                        display: "flex",
-                                                        alignItems: "flex-start",
-                                                        gap: "4px"
-                                                    }}>
-                                                        <span>📍</span>
-                                                        <span style={{ 
-                                                            wordBreak: "break-word", 
-                                                            whiteSpace: "normal",
-                                                            lineHeight: "1.3",
-                                                            display: "-webkit-box",
-                                                            WebkitLineClamp: 2,
-                                                            WebkitBoxOrient: "vertical",
+                                                    
+                                                    {/* Nếu dưới 20km: HIỂN THỊ KHOẢNG CÁCH, không hiển thị địa chỉ */}
+                                                    {isWithin20km ? (
+                                                        <>
+                                                            <div style={{ 
+                                                                marginTop: "4px", 
+                                                                color: shop.distance_km <= 5 ? "#4CAF50" : (shop.distance_km <= 10 ? "#FF9800" : "#2196F3"), 
+                                                                fontSize: isMobileView ? "9px" : "12px", 
+                                                                fontWeight: "normal",
+                                                                display: "flex",
+                                                                alignItems: "center",
+                                                                gap: "6px"
+                                                            }}>
+                                                                <span>🚗</span>
+                                                                <span>{shop.distance_text} từ bạn</span>
+                                                                {shop.duration_min && (
+                                                                    <span style={{ fontSize: "11px", color: "#666", fontWeight: "normal" }}>
+                                                                        (≈ {shop.duration_min} phút)
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </>
+                                                    ) : (
+                                                        /* Nếu trên 20km hoặc không có distance: HIỂN THỊ ĐỊA CHỈ */
+                                                        <div style={{ 
+                                                            marginTop: "4px", 
+                                                            color: "#666", 
+                                                            fontSize: isMobileView ? "11px" : "12px", 
+                                                            display: "flex", 
+                                                            gap: "4px",
+                                                            alignItems: "center",
+                                                            whiteSpace: "nowrap",
                                                             overflow: "hidden",
                                                             textOverflow: "ellipsis"
                                                         }}>
-                                                            {shop.address}
-                                                        </span>
-                                                    </div>
-
-                                                    <div style={{ marginTop: "4px", color: "#f5b042", fontSize: isMobileView ? "12px" : "14px" }}>
+                                                            <span>📍</span>
+                                                            <span style={{
+                                                                overflow: "hidden",
+                                                                textOverflow: "ellipsis"
+                                                            }}>
+                                                                {shortAddress}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    
+                                                    <div style={{ marginTop: "4px", color: "#f5b042", fontSize: isMobileView ? "11px" : "13px" }}>
                                                         ⭐ {shop.rating}
                                                     </div>
-
-                                                    {/* 🔧 SỬA LẠI: Hiển thị khoảng cách nếu có dữ liệu */}
-                                                    {/* Phần hiển thị khoảng cách - đã có sẵn trong code của bạn, giữ nguyên */}
-{hasDistance ? (
-    <div style={{ 
-        color: shop.distance_km <= 5 ? "#4CAF50" : (shop.distance_km <= 10 ? "#FF9800" : "#999"), 
-        fontSize: isMobileView ? "11px" : "14px", 
-        marginTop: "6px", 
-        fontWeight: "500",
-        display: "flex",
-        alignItems: "center",
-        gap: "4px"
-    }}>
-        <span>🚗</span>
-        <span>
-            {shop.distance_text || (shop.distance_km < 1 
-                ? `${Math.round(shop.distance_km * 1000)}m` 
-                : `${shop.distance_km.toFixed(1)}km`)} từ bạn
-        </span>
-        {shop.duration_min && (
-            <span style={{ fontSize: "10px", color: "#666", marginLeft: "4px" }}>
-                (≈ {shop.duration_min} phút)
-            </span>
-        )}
-    </div>
-) : (
-    <div style={{ 
-        color: "#999", 
-        fontSize: isMobileView ? "10px" : "12px", 
-        marginTop: "6px",
-        fontStyle: "italic",
-        display: "flex",
-        alignItems: "center",
-        gap: "4px"
-    }}>
-        <span>📍</span>
-        <span>{location ? "Đang cập nhật khoảng cách" : "Vui lòng bật định vị để xem khoảng cách"}</span>
-    </div>
-)}
 
                                                     <button
                                                         style={{
@@ -896,10 +708,10 @@ const fetchAllShops = async () => {
                                                             border: "none",
                                                             fontWeight: "bold",
                                                             cursor: "pointer",
-                                                            fontSize: isMobileView ? "12px" : "14px"
+                                                            fontSize: isMobileView ? "12px" : "13px"
                                                         }}
                                                         onClick={(e) => {
-                                                            e.stopPropagation(); // Ngăn chặn sự kiện click từ div cha
+                                                            e.stopPropagation();
                                                             handleShopClick(shop.id);
                                                         }}
                                                     >
@@ -911,29 +723,16 @@ const fetchAllShops = async () => {
                                     })}
                                 </div>
                             )}
-                            {isMobileView && allShops.length > 6 && (
-                                <div style={{ textAlign: "center", marginTop: "16px" }}>
-                                    <button style={{
-                                        padding: "10px 20px",
-                                        background: "#4CAF50",
-                                        color: "white",
-                                        border: "none",
-                                        borderRadius: "25px",
-                                        cursor: "pointer",
-                                        fontSize: "14px",
-                                        fontWeight: "bold"
-                                    }} onClick={() => {
-                                        // Handle show more shops
-                                        alert(`Xem thêm cửa hàng`);
-                                    }}>
-                                        Xem thêm cửa hàng
-                                    </button>
-                                </div>
-                            )}
                         </div>
                     </div>
                 </div>
             </div>
+            <style>{`
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            `}</style>
         </Layout>
     );
 };
